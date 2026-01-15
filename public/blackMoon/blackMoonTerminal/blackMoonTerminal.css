@@ -1,0 +1,41 @@
+@import url("../../fonts.css");
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 1. 标题样式：居中 */
+.terminal-title {
+  font-weight: normal;
+  text-align: center;
+  margin-top: 5vh; /* 距离顶部一点距离 */
+  font-size: 2rem;
+  letter-spacing: 0.2rem;
+  font-family: "HuaYuanMingChao","SupplyMono", monospace;
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 2rem 3vw;
+  width: 90vw; /* 限制宽度防止过宽 */
+  padding: 1rem;
+  gap: 1rem;
+  background: #111111;
+  border: 1px solid white;
+}
+
+#terminal {
+  padding: 1.5rem;
+  white-space: pre-wrap;
+  font-family: "HuaYuanMingChao","SupplyMono", monospace;
+  user-select: none;
+  line-height: 1.6;
+}

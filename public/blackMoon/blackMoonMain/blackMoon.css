@@ -1,0 +1,253 @@
+@import url("../../fonts.css");
+
+/* {
+  outline: red solid 1px !important;
+  box-sizing: border-box;
+}*/
+
+html, body {
+  margin: 0;
+  padding: 0;
+  /* 移除固定高度，允许内容撑开 */
+  min-height: 100%;
+  width: 100%;
+  background-color: black;
+  font-size: 1rem;
+  line-height: 1rem;
+  color: white;
+}
+
+#ascii-container {
+  position: relative;
+  top: 0;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  min-height: 166vh;
+  background-color: black;
+  color: white;
+  white-space: pre;
+  user-select: none;
+  letter-spacing: 0;
+  line-height: 1;
+  display: block;
+}
+
+#ascii-pre, #ascii-text {
+  will-change: contents, opacity;
+  transform: translateZ(0);
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  font-family: "SupplyMono", monospace;
+  font-size: 1rem;
+  line-height: 1;
+  white-space: pre;
+  text-align: left;
+  color: white;
+  max-width: 100%;
+}
+
+#ascii-pre {
+  z-index: 1;
+}
+#ascii-text {
+  z-index: 2; /* 动图在乱码上方 */
+  background-color: black;
+  display: none;
+}
+/* 容器保持不变 */
+.marquee-container {
+  width: 100%;
+  overflow: hidden;
+  background: black;
+  user-select: none;
+}
+
+.marquee-content {
+  display: flex;
+  white-space: nowrap;
+  gap: 10rem; /* 短句之间的间距 */
+  width: max-content;
+  animation: scroll-left 40s linear infinite;
+}
+
+/* 局部堆叠容器 */
+.phrase-stack {
+  display: grid;
+  grid-template-areas: "stack";
+  place-items: center center;
+}
+
+.phrase-stack span {
+  grid-area: stack;
+  line-height: 1;
+  transition: opacity 0.4s ease-in-out;
+}
+
+/* 状态控制 */
+.phrase-stack .base {
+  background-image: linear-gradient(
+    to bottom,
+    darkred 0%,
+    #750000 40%,
+    #560000 60%,
+    #3d0000 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  opacity: 1;
+  font-size: 5rem;
+  padding-top: 0.3em;
+  font-family: "HackGlitch", monospace;
+}
+
+.phrase-stack .over {
+  color: darkred;
+  opacity: 0;
+  font-size: 5rem;
+  padding-top: 0.1em;
+  font-family: "Neonrift", monospace;
+}
+
+/* Hover 交互 */
+.marquee-container:hover .marquee-content {
+  animation-play-state: paused;
+}
+
+.marquee-container:hover .base { opacity: 0; }
+.marquee-container:hover .over { opacity: 1; }
+
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.glitch-bar {
+  width: 100%;
+  background-color: black;
+  color: white;
+  font-family: "SupplyMono", monospace;
+  text-align: center;
+  user-select: none;
+  z-index: 10;
+  position: sticky
+}
+#top-bar {
+  top: 0; /* 粘在顶部 */
+}
+
+#bottom-bar {
+  bottom: 0; /* 粘在底部 */
+}
+.line {
+  width: 100%;
+  border-top: 1px dashed white;
+}
+
+.bar-content {
+  padding: 0.25em 0;
+  font-size: 0.8rem;
+  line-height: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+}
+
+.random-text {
+  display: inline-block;
+  min-width: 8ch;
+}
+
+.glitch-btn {
+  opacity: 0;
+  transform: translateY(-50%) translateX(-2rem);
+  pointer-events: none; /* 没出现前禁止点击 */
+
+  /* 2. 定义动画：动画名、持续时间、延迟时间、缓动函数、保持结束状态 */
+  animation: btnAppear 0.7s ease-out 23s forwards;
+  position: absolute;   /* 脱离文档流，不再挤压文字 */
+  left: 1rem;          /* 距离右边框的距离 */
+  top: 50%;             /* 垂直居中参考 */
+
+  display: inline-block;
+  font-size: 1rem;     /* 调小字体以适配 Bar */
+  font-family: "PlatoHeavy", monospace;
+  color: #888888;
+  transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+  z-index: 100;
+  text-decoration: none;
+
+  .text {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* 调整伪元素线条的动画距离 */
+  &:before {
+    content: "";
+    position: absolute;
+    left: -0.25em;
+    top: 0;
+    background: crimson;     /* $lightGrey */
+    width: 2px;              /* 线条变细点 */
+    height: 100%;
+    z-index: 1;
+    transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  &:hover {
+    color: crimson;
+    &:before {
+        background: #888888;
+        transform: translateX(0.85em) scaleX(15) scaleY(0.2);
+      }
+    }
+}
+
+/* 3. 遮罩层位置微调 */
+.glitch-btn .mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  display: none;
+  span {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: 0;
+    text-align: center;
+  }
+}
+
+@keyframes btnAppear {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-2rem);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+    pointer-events: auto; /* 动画结束后恢复点击 */
+  }
+}
+
+.lock-scroll {
+  overflow: hidden;
+  height: 100%; /* 确保在移动端也生效 */
+  touch-action: none;
+}
