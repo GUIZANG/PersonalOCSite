@@ -1,7 +1,3 @@
-Here’s a polished English translation of your full text, with the parenthetical section completed in context:
-
----
-
 **PersonalOCSite**
 
 A continuously evolving and iterative web visual project.
@@ -47,7 +43,3 @@ In the future, the project will continue to seek a balance between visual experi
 This process is itself part of the project: constant experimentation, iteration, and adjustment, discovering unexpected effects and new possibilities along the way.
 
 This project is a dynamically growing experimental space, both a technical and a visual experiment. Updates are welcome, and so are ideas or inspirations for the experimental process. Each adjustment may bring new surprises, and every iteration is a fresh exploration.
-
----
-
-If you want, I can also make a **more concise, portfolio-ready version** in English that keeps the essence but reads smoothly for international audiences. This is often better for MPhil or design portfolios. Do you want me to do that?
