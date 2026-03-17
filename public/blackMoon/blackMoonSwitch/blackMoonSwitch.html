@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="blackMoonSwitch.css" />
+  <title>Title</title>
+</head>
+<body>
+  <div class="container">
+    <!-- LAYER 0 -->
+    <div class="background-clues">
+
+    </div>
+
+    <!-- LAYER 1 -->
+    <div class="security-panel" id="panel">
+      <div class="panel-content">
+        <h1 id="status-text">SYSTEM HALTED</h1>
+        <div class="status-box">
+          <div class="status-line">POWER: <span class="blink red-text">CRITICAL</span></div>
+          <div class="status-line">NET: <span class="blink">OFFLINE</span></div>
+          <div class="status-line">CORE: <span class="blink">UNSTABLE</span></div>
+        </div>
+        <p class="instruction" style="margin-top:20px; font-size: 0.8rem; letter-spacing: 2px;">MANUAL OVERRIDE
+          REQUIRED</p>
+
+        <div class="keypad-grid">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LAYER 2 -->
+    <div class="darkness-overlay" id="flashlight"></div>
+
+    <!-- LAYER 3 -->
+    <canvas id="matrixCanvas"></canvas>
+
+    <!-- LAYER 4 -->
+    <div class="matrix-overlay" id="successMessage">
+    </div>
+  </div>
+<script src="blackMoonSwitch.js"></script>
+</body>
+</html>

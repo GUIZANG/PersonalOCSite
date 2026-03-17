@@ -1,5 +1,5 @@
 @import url("../../fonts.css");
-
+@import url("../../scrollBar.css");
 /* {
   outline: red solid 1px !important;
   box-sizing: border-box;
@@ -100,17 +100,15 @@ html, body {
   background-clip: text;
   color: transparent;
   opacity: 1;
-  font-size: 5rem;
-  padding-top: 0.3em;
-  font-family: "HackGlitch", monospace;
+  font-size: 4.5rem;
+  font-family: "Onryou", monospace;
 }
 
 .phrase-stack .over {
   color: darkred;
   opacity: 0;
-  font-size: 5rem;
-  padding-top: 0.1em;
-  font-family: "Neonrift", monospace;
+  font-size: 4.5rem;
+  font-family: "Onryou", monospace;
 }
 
 /* Hover 交互 */
@@ -120,7 +118,6 @@ html, body {
 
 .marquee-container:hover .base { opacity: 0; }
 .marquee-container:hover .over { opacity: 1; }
-
 
 @keyframes scroll-left {
   0% {
@@ -183,7 +180,7 @@ html, body {
 
   display: inline-block;
   font-size: 1rem;     /* 调小字体以适配 Bar */
-  font-family: "PlatoHeavy", monospace;
+  font-family: "Beyno", monospace;
   color: #888888;
   transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
   z-index: 100;
@@ -198,9 +195,9 @@ html, body {
   &:before {
     content: "";
     position: absolute;
-    left: -0.25em;
+    left: -0.2em;
     top: 0;
-    background: crimson;     /* $lightGrey */
+    background: darkred;     /* $lightGrey */
     width: 2px;              /* 线条变细点 */
     height: 100%;
     z-index: 1;
@@ -211,7 +208,7 @@ html, body {
     color: crimson;
     &:before {
         background: #888888;
-        transform: translateX(0.85em) scaleX(15) scaleY(0.2);
+        transform: translateX(0.85em) scaleX(20) scaleY(0.2);
       }
     }
 }
