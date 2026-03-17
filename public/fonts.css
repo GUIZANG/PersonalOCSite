@@ -1,5 +1,105 @@
 @font-face {
-  font-family: "SupplyMono";
+  font-family: "BeautyGlitch";
+  src: url("../fonts/BeautyGlitch/BeautyGlitchDemoRegular-Rp6ae.ttf");
+}
+@font-face {
+  font-family: "Beyno";
+  src: url("../fonts/Beyno/BEYNO.ttf");
+}
+@font-face {
+  font-family: "Cavier";
+  src: url("../fonts/caviarDreams/CaviarDreams.ttf");
+}
+@font-face {
+  font-family: "Cyberpunk";
+  src: url("../fonts/Cyberpunk/SdglitchdemoRegular-YzROj.ttf");
+}
+@font-face {
+  font-family: "Formula";
+  src: url("../fonts/Formula/PPFormula-CondensedBlack.otf");
+}
+@font-face {
+  font-family: "Frama";
+  src: url("../fonts/Frama/PPFrama-Black.otf");
+}
+@font-face {
+  font-family: "HackGlitch";
+  src: url("../fonts/HackGlitch/HackGlitch-DOlY9.otf");
+}
+@font-face {
+  font-family: "HuaYuanMingChao";
+  src: url("../fonts/HuaYuanMingChaoTi/RiBenHuaYuanMingChaoTi-2.ttf");
+}
+@font-face {
+  font-family: "KeShiLuMing";
+  src: url("../fonts/KeShiLuMingTi/I-Ming-5-10-2.ttf");
+}
+@font-face {
+  font-family: "MajorMonnoDisplay";
+  src: url("../fonts/MajorMonnoDisplay/MajorMonoDisplay.ttf");
+}
+@font-face {
+  font-family: "MaoKen";
+  src: url("../fonts/MaoKen/MaokenGlitchSerif-Regular.otf");
+}
+@font-face {
+  font-family: "Microbe";
+  src: url("../fonts/Microbe/RubikMicrobe.ttf");
+}
+@font-face {
+  font-family: "Monarchy";
+  src: url("../fonts/Monarchy/MonarchyAbsoluteRegular-YqgKO.ttf");
+}
+@font-face {
+  font-family: "Neonrift";
+  src: url("../fonts/Neonrift/Neonrift-ARORp.ttf");
+}
+@font-face {
+  font-family: "Norse";
+  src: url("../fonts/Norse/Norse.otf");
+  font-weight: 100;
+}
+@font-face {
+  font-family: "Norse";
+  src: url("../fonts/Norse/Norse-bold.otf");
+  font-weight: 500;
+}
+@font-face {
+  font-family: "NvShu";
+  src: url("../fonts/NvShu/NyushuFengQi-1.003.ttf");
+}
+@font-face {
+  font-family: "Onryou";
+  src: url("../fonts/Onryou/onryou.TTF");
+}
+@font-face {
+  font-family: "PingFang";
+  src: url("../fonts/PingFangXingChen/PingFangXingChenTi.ttf");
+}
+@font-face {
+  font-family: "Plato";
+  src: url("../fonts/Plato/StPlatoSansDisplayDemoThin-LV8DZ.otf");
+  font-weight: 100;
+}
+@font-face {
+  font-family: "Plato";
+  src: url("../fonts/Plato/StPlatoSansDisplayDemoHeavy-PVGDr.otf");
+  font-weight: 500;
+}
+@font-face {
+  font-family: "Polya";
+  src: url("../fonts/Polya/POLYA.otf");
+}
+@font-face {
+  font-family: "punkbabe";
+  src: url("../fonts/punkbabe/Punkbabe-4Rxl.ttf");
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("../fonts/Rubik/Rubik80sFade-Regular.ttf");
+}
+@font-face {
+  font-family: "supplyMono";
   src: url("../fonts/supplyMono/Supply-Light.otf");
 }
 @font-face {
@@ -7,42 +107,18 @@
   src: url("../fonts/WenYueGaoHei/WenYue-GaoHei-J-2.otf");
 }
 @font-face {
-  font-family: "Rubik";
-  src: url("../fonts/Rubik_80s_Fade/Rubik80sFade-Regular.ttf");
+  font-family: "WenYueHouXianDai";
+  src: url("../fonts/WenYueHouXianDai/WenYue-HouXianDaiTi-W3-75-J-2.otf");
 }
 @font-face {
-  font-family: "Din1451";
-  src: url("../fonts/Din1451/AlteDin1451Mittelschrift-gBdP.ttf");
+  font-family: "XiangCui";
+  src: url("../fonts/XiangCui/ZeroHei2.0.ttf");
 }
 @font-face {
-  font-family: "HuaYuanMingChao";
-  src: url("../fonts/HuaYuanMingChaoTi/RiBenHuaYuanMingChaoTi-2.ttf");
+  font-family: "YiShanBei";
+  src: url("../fonts/YiShanBei/YiShanBeiZhuanTi.ttf");
 }
 @font-face {
-  font-family: "PlatoHeavy";
-  src: url("../fonts/Plato/StPlatoSansDisplayDemoHeavy-PVGDr.otf");
-}
-@font-face {
-  font-family: "PlatoThin";
-  src: url("../fonts/Plato/StPlatoSansDisplayDemoThin-LV8DZ.otf");
-}
-@font-face {
-  font-family: "Cyberpunk";
-  src: url("../fonts/Cyberpunk/SdglitchdemoRegular-YzROj.ttf");
-}
-@font-face {
-  font-family: "Neonrift";
-  src: url("../fonts/Neonrift/Neonrift-ARORp.ttf");
-}
-@font-face {
-  font-family: "Monarchy";
-  src: url("../fonts/Monarchy/MonarchyAbsoluteRegular-YqgKO.ttf");
-}
-@font-face {
-  font-family: "Punkbabe";
-  src: url("../fonts/punkbabe-font/Punkbabe-4Rxl.ttf");
-}
-@font-face {
-  font-family: "HackGlitch";
-  src: url("../fonts/HackGlitch/HackGlitch-DOlY9.otf");
+  font-family: "YuFan";
+  src: url("../fonts/YuFan/YuFanXinYu-Light.ttf");
 }

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANCIENT REPTILIAN BRAIN</title>
+<link rel="icon" href="../../pics/logo/brain.svg" type="image/x-icon" />
+<link rel="stylesheet" href="homepageStyle.css">
+</head>
+<body>
+
+<button class="music-btn" id="musicBtn">
+  <span class="bars">
+    <span class="bar"></span>
+    <span class="bar"></span>
+    <span class="bar"></span>
+    <span class="bar"></span>
+  </span>
+</button>
+
+<audio id="bgm" autoplay loop>
+  <source src="../../music/MoonlightSonata.mp3" type="audio/mpeg">
+</audio>
+
+
+
+<div class="curzr-glitch-effect" hidden></div>
+
+<!-- Scroll Container for animations -->
+<div class="scroll-container"></div>
+<!-- Scroll Progress Indicator -->
+<div class="scroll-progress" id="scrollProgress">
+  <div class="scroll-progress-fill" id="scrollFill"></div>
+  <span class="scroll-marker past">Void</span>
+  <span class="scroll-marker present">Dazed</span>
+  <span class="scroll-marker future">Lucid</span>
+</div>
+
+<div id="display-container">
+  <div class="content-wrapper" id="content-wrapper">
+    <div id="text-box"></div>
+    <button id="wake-up-btn">
+      <span class="text">Wake Up</span>
+    </button>
+  </div>
+</div>
+
+<script src="../../libs/anime.min.js"></script>
+<script src="../../libs/three.min.js"></script>
+<script src="scrollFill.js"></script>
+<script src="storyAnimation.js"></script>
+<script src="circleMouse.js"></script>
+<script src="wakeUpBtn.js"></script>
+<script src="musicPlayer.js"></script>
+<script type="module" src="moonAnimation.js"></script>
+<script src="btnFeature.js"></script>
+</body>
+</html>

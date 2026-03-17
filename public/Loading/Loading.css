@@ -1,0 +1,184 @@
+@import url("../fonts.css");
+@layer base, text, box, settings;
+
+/* =======================
+   SETTINGS (固定变量)
+   ======================= */
+@layer settings {
+  :root {
+    --radius: 25vmin;
+    --radius-text: calc(var(--radius) + 7vmin);
+    --blur: 0.3rem;
+
+    --spinDuration: 12s;
+    --speedYMod: -3;
+    --speedXMod: 1;
+    --speedZMod: 0;
+
+    --perspective: 1000px;
+
+    --c-black: #ffffff;
+    --c-white: #000000;
+    --s-line: 1px;
+    --c-line: var(--c-black);
+    --c-bg: var(--c-white);
+    --c-onBg: var(--c-black);
+    --swingX: -45deg;
+    --swingY: 45deg;
+  }
+
+  body {
+    perspective: var(--perspective);
+  }
+
+  body, h1 {
+    transform-style: preserve-3d;
+  }
+}
+
+/* =======================
+   TEXT (3D 环绕文字)
+   ======================= */
+@layer text {
+  h1 {
+    position: relative;
+    animation: spin3d var(--spinDuration) linear infinite;
+  }
+
+  h1 span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform:
+      translate3d(-50%, -50%, 0)
+      rotateY(calc(var(--i) * 360deg))
+      translateZ(var(--radius-text));
+    backface-visibility: visible;
+    white-space: pre;
+  }
+
+  @keyframes spin3d {
+    0% {
+      transform:
+        rotateX(0deg)
+        rotateZ(0deg)
+        rotateY(0deg);
+    }
+
+    25% {
+      transform:
+        rotateX(var(--swingY))
+        rotateZ(calc(90deg * var(--speedZMod)))
+        rotateY(calc(90deg * var(--speedYMod)));
+    }
+
+    50% {
+      transform:
+        rotateX(0deg)
+        rotateZ(calc(180deg * var(--speedZMod)))
+        rotateY(calc(180deg * var(--speedYMod)));
+    }
+    75% {
+      transform:
+        rotateX(var(--swingX))
+        rotateZ(calc(270deg * var(--speedZMod)))
+        rotateY(calc(270deg * var(--speedYMod)));
+    }
+    100% {
+      transform:
+        rotateX(0deg)
+        rotateZ(calc(360deg * var(--speedZMod)))
+        rotateY(calc(360deg * var(--speedYMod)));
+    }
+  }
+}
+
+/* =======================
+   BOX (dialog 圆形容器)
+   ======================= */
+@layer box {
+  dialog {
+    width: calc(2 * var(--radius));
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: var(--s-line) solid var(--c-line);
+    padding: 0;
+
+    background:
+      radial-gradient(
+        var(--c-bg) 20%,
+        rgb(from var(--c-bg) r g b / 0)
+      );
+
+    backdrop-filter: blur(var(--blur));
+    transform: translateZ(0);
+
+    transition:
+      backdrop-filter 0.6s ease-in,
+      background-image 0.6s ease-in,
+      background-size 0.6s ease-in;
+  }
+
+  dialog:hover {
+    backdrop-filter: blur(0px);
+
+    background-image:
+      radial-gradient(
+        circle at 50% 50%,
+        transparent 0% 35%,
+        var(--c-bg) 35% 100%
+      );
+
+    background-repeat: repeat;
+    background-size: 3px 3px;
+  }
+}
+
+/* =======================
+   BASE (布局与重置)
+   ======================= */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    display: grid;
+    place-content: center;
+    min-height: 100dvh;
+    background: var(--c-bg);
+    color: var(--c-onBg);
+  }
+
+  body > * {
+    grid-area: 1 / 1;
+  }
+
+  h1 {
+    margin: 0;
+    padding: 0;
+    font-weight: 200;
+    font-size: 5rem;
+    letter-spacing: 0.5rem;
+    pointer-events: none;
+    font-family: "SupplyMono", monospace;
+    text-align: justify; /* 档案、协议感 */
+  }
+
+  dialog {
+    position: relative;
+    background: none;
+  }
+}
+
+/* Loading 全屏容器 */
+#loading {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  display: grid;
+  place-content: center;
+  background: var(--c-bg);
+  z-index: 999;
+}
+

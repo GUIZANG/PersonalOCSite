@@ -1,0 +1,14 @@
+.glitch-title {
+  position: fixed;
+  top: 50%;
+  font-size: 1rem;
+  font-family: 'SupplyMono', sans-serif;
+  letter-spacing: 0.1em;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+  color: white;
+  z-index: 100;
+}

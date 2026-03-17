@@ -1,0 +1,190 @@
+/* --- Root Variables & Wrapper --- */
+.glitch-checkbox-wrapper {
+  --primary-color: #2ceeca;
+  --secondary-color: #a855f7;
+  --text-color: #e5e5e5;
+  --font-family: "SupplyMono", "HuaYuanMingChaoTi", monospace;
+  --glitch-anim-duration: 0.3s;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* 上下间距 1rem */
+  font-family: var(--font-family);
+  background-color: #333333; /* 背景透明 */
+  padding: 1rem; /* 内边距 1rem */
+  border: 1px dashed #ffffff; /* 白色轮廓线 */
+  width: fit-content;
+}
+
+/* --- Container Checkbox --- */
+.glitch-checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem; /* Box与文字间距 1rem */
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.glitch-checkbox-container input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* --- Checkbox (正方形) --- */
+.checkbox-box {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid var(--primary-color);
+  position: relative;
+  transition: all 0.3s ease-in-out;
+  box-sizing: border-box; /* 确保边框不撑大尺寸 */
+}
+
+.checkbox-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60%;
+  height: 60%;
+  background-color: var(--primary-color);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+/* --- Label --- */
+.checkbox-label {
+  color: var(--text-color);
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  position: relative;
+  transition: color 0.3s ease-in-out, text-shadow 0.3s ease-in-out;
+}
+
+/* --- Checked State --- */
+.glitch-checkbox-container input:checked + .checkbox-box .checkbox-mark {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  animation: glitch-anim-checkbox var(--glitch-anim-duration) both;
+}
+
+.glitch-checkbox-container input:checked ~ .checkbox-label {
+  color: var(--primary-color);
+  text-shadow: 0 0 8px rgba(0, 242, 234, 0.7);
+}
+
+/* --- Hover Effects --- */
+.glitch-checkbox-container:hover .checkbox-box {
+  box-shadow: 0 0 10px var(--primary-color);
+}
+
+.glitch-checkbox-container:hover .checkbox-label::before,
+.glitch-checkbox-container:hover .checkbox-label::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent; /* 保持透明 */
+}
+
+.glitch-checkbox-container:hover .checkbox-label::before {
+  color: var(--secondary-color);
+  animation: glitch-anim-text var(--glitch-anim-duration)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+.glitch-checkbox-container:hover .checkbox-label::after {
+  color: var(--primary-color);
+  animation: glitch-anim-text var(--glitch-anim-duration)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94) reverse both;
+}
+.glitch-checkbox-wrapper {
+  transition: opacity 1.2s ease-in-out;
+}
+
+/* --- Keyframes (去除了多边形切片，保留位移抖动) --- */
+@keyframes glitch-anim-checkbox {
+  0%   { transform: translate(-50%, -50%); }
+  20%  { transform: translate(calc(-50% - 2px), calc(-50% + 1px)); }
+  40%  { transform: translate(calc(-50% + 2px), calc(-50% - 1px)); }
+  60%  { transform: translate(calc(-50% - 1px), calc(-50% + 1px)); }
+  80%  { transform: translate(calc(-50% + 1px), calc(-50% - 2px)); }
+  100% { transform: translate(-50%, -50%); }
+}
+
+@keyframes glitch-anim-text {
+  0%   { transform: translate(0); }
+  20%  { transform: translate(-3px, 2px); }
+  40%  { transform: translate(2px, -1px); }
+  60%  { transform: translate(-2px, 1px); }
+  80%  { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+
+.section-wrapper{
+  justify-items: center;
+}
+
+.big-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 2rem;
+  padding: 2rem 5rem 1rem 5rem;
+  gap: 1rem;
+  background: #111111;
+  border: 1px solid white;
+  width: fit-content;
+  min-width: 60vw;
+  flex-shrink: 0;
+}
+
+/* 所有 section 和 step 默认隐藏 */
+.section-wrapper:not(:first-of-type){
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 0.4s cubic-bezier(0.4,0.1,0.25,0.4),
+    opacity 0.4s cubic-bezier(0.4,0.1,0.25,0.4) 0.6s;
+}
+.section-wrapper:first-of-type{
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 0.4s cubic-bezier(0.4,0.1,0.25,0.4),
+    opacity 0.4s cubic-bezier(0.4,0.1,0.25,0.4);
+}
+
+.step-content {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 3s cubic-bezier(0.4,0.1,0.25,0.4),
+    opacity 1.2s cubic-bezier(0.4,0.1,0.25,0.4);
+}
+.step-content:last-child {
+  margin-bottom: 5rem;
+}
+
+/* 当前已解锁 */
+.section-wrapper.is-visible,
+.step-content.is-visible {
+  max-height: 500vh; /* 足够大即可 */
+  opacity: 1;
+}
+.section-wrapper:not(.is-visible) {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}

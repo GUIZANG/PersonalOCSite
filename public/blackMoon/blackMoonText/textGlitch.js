@@ -1,4 +1,4 @@
-const GLITCH_CHARS = "0123456789<>/|[]{}!@#$%^&*-=+_";
+const GLITCH_CHARS = "老病死怨憎求恨苦痛咒罹乱惨";
 
 let glitchTimers = new Map();  // 元素 => timerId
 let originalTexts = new Map(); // 元素 => 原始文本
@@ -8,7 +8,7 @@ function glitchText(el) {
   if (!originalText) return;
 
   const text = originalText.split("");
-  const count = Math.floor(Math.random() * 3) + 1;
+  const count = Math.floor(Math.random()) + 1;
 
   for (let i = 0; i < count; i++) {
     const idx = Math.floor(Math.random() * text.length);
@@ -22,7 +22,7 @@ function startGlitch(el) {
   if (glitchTimers.has(el)) return; // 已经在闪了
 
   originalTexts.set(el, el.textContent);
-  const timer = setInterval(() => glitchText(el), 200);
+  const timer = setInterval(() => glitchText(el), 300);
   glitchTimers.set(el, timer);
 }
 

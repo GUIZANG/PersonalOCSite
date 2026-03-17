@@ -1,0 +1,112 @@
+@import url("../../fonts.css");
+.container {
+  position: relative;
+  margin-top: 1rem;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  bottom: 0;
+  background: transparent;
+
+}
+#container.hidden {
+  display: none !important;
+}
+
+.letter-wrapper {
+  position: relative;
+  width: 4.5rem;
+  height: 12.5rem;
+  overflow: hidden;
+  display: flex;
+  justify-items: center;
+  align-items: center;
+  background: transparent;
+
+  perspective: 15rem;
+}
+
+.letter {
+  position: absolute;
+  top: -1.2rem;
+  left: 0;
+  width: 100%;
+  height: 120%;
+
+  /* 以下保持不变 */
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+  font-size: 10rem;
+  font-family: "Formula", monospace;
+
+  color: transparent; /* 文字透明 */
+  background-image: url("../../../pics/moon-letter.jpg");
+  background-repeat: no-repeat;
+  background-size: 36rem 15rem;
+  background-clip: text;
+  -webkit-background-clip: text;
+
+  /* 关键：防止动画时背景跟着位移 */
+  background-attachment: local;
+
+  filter:
+    drop-shadow(0 -1px 1px rgba(23, 84, 68, 0.77)) /* 上阴影 */
+    drop-shadow(0 1px 1px rgb(25, 82, 68));  /* 下阴影 */
+}
+.letter-wrapper:nth-child(1) .letter { background-position: 0 center; }
+.letter-wrapper:nth-child(2) .letter { background-position: -4.5rem center; }
+.letter-wrapper:nth-child(3) .letter { background-position: -9.0rem center; }
+.letter-wrapper:nth-child(4) .letter { background-position: -13.5rem center; }
+.letter-wrapper:nth-child(5) .letter { background-position: -18.0rem center; }
+.letter-wrapper:nth-child(6) .letter { background-position: -22.5rem center; }
+.letter-wrapper:nth-child(7) .letter { background-position: -27.0rem center; }
+.letter-wrapper:nth-child(8) .letter { background-position: -31.5rem center; }
+
+
+/* 动画keyframes */
+@keyframes oldUp {
+  from { transform: translateY(0); }
+  to {   transform: translateY(-12.5rem); }
+}
+@keyframes oldDown {
+  from { transform: translateY(0); }
+  to {   transform: translateY(12.5rem); }
+}
+@keyframes newUp {
+  from { transform: translateY(12.5rem); }
+  to {   transform: translateY(0); }
+}
+@keyframes newDown {
+  from { transform: translateY(-12.5rem); }
+  to {   transform: translateY(0); }
+}
+
+
+@keyframes oldLeft {
+  from { transform: rotateY(0deg); translateZ(0)}
+  to {   transform: rotateY(-90deg) translateZ(4.5rem); }
+}
+@keyframes newLeft {
+  from { transform: rotateY(90deg) translateZ(4.5rem); }
+  to {   transform: rotateY(0deg); translateZ(0)}
+}
+@keyframes oldRight {
+  from { transform: rotateY(0deg); translateZ(0)}
+  to {   transform: rotateY(90deg) translateZ(4.5rem); }
+}
+@keyframes newRight {
+  from { transform: rotateY(-90deg) translateZ(4.5rem); }
+  to {   transform: rotateY(0deg); translateZ(0)}
+}
+/* 动画class */
+.old-up { animation: oldUp 0.8s ease-in forwards; }
+.old-down { animation: oldDown 0.8s ease-in forwards; }
+.old-left { animation: oldLeft 0.8s ease-in forwards; }
+.old-right { animation: oldRight 0.8s ease-in forwards; }
+
+.new-up { animation: newUp 0.8s ease-in forwards; }
+.new-down { animation: newDown 0.8s ease-in forwards; }
+.new-left { animation: newLeft 0.8s ease-in forwards; }
+.new-right { animation: newRight 0.8s ease-in forwards; }
