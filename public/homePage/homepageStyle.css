@@ -302,8 +302,8 @@ body.locked {
   position: fixed;
   bottom: 20px;
   right: 15px;
-  width: 50px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   z-index: 9999;
   cursor: none;
   display: flex;
@@ -361,22 +361,137 @@ body.locked {
     inset -3px -4px 10px rgba(150, 100, 255, 0.3);
 }
 
-.bars {
+.music-icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
   display: flex;
-  gap: 3px;
-  height: 20px;
-  align-items: flex-end; /* 确保从下往上长 */
-}
-.bar {
-  width: 4px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 1px;
-  transition: height 0.2s cubic-bezier(0.5, 0, 0, 1);
+  align-items: center;
+  justify-content: center;
 }
 
-.paused .bar {
-  height: 8px !important;
-  opacity: 0.6; /* 暂停时稍微淡化，增加呼吸感 */
+.music-symbol {
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.18));
+}
+
+.symbol-triangle,
+.symbol-bar {
+  fill: rgba(255, 255, 255, 0.92);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.symbol-bar-left {
+  transform-origin: 9px 12px;
+}
+
+.symbol-bar-right {
+  transform-origin: 15px 12px;
+}
+
+.symbol-triangle {
+  transform-origin: 12px 12px;
+}
+
+.music-btn.is-playing:not(.morph-to-play):not(.morph-to-pause) .symbol-triangle {
+  transform: scale(1);
+}
+
+.music-btn.is-playing:not(.morph-to-play):not(.morph-to-pause) .symbol-bar-left {
+  transform: translate(2.8px, 0) scaleX(0.001);
+}
+
+.music-btn.is-playing:not(.morph-to-play):not(.morph-to-pause) .symbol-bar-right {
+  transform: translate(-2.8px, 0) scaleX(0.001);
+}
+
+.music-btn:not(.is-playing):not(.morph-to-play):not(.morph-to-pause) .symbol-triangle {
+  transform: scale(0.001);
+}
+
+.music-btn:not(.is-playing):not(.morph-to-play):not(.morph-to-pause) .symbol-bar-left,
+.music-btn:not(.is-playing):not(.morph-to-play):not(.morph-to-pause) .symbol-bar-right {
+  transform: translate(0, 0) scaleX(1);
+}
+
+.music-btn.morph-to-pause .symbol-triangle {
+  animation: tri-to-pause 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.music-btn.morph-to-pause .symbol-bar-left {
+  animation: bar-left-to-pause 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.music-btn.morph-to-pause .symbol-bar-right {
+  animation: bar-right-to-pause 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.music-btn.morph-to-play .symbol-triangle {
+  animation: tri-to-play 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.music-btn.morph-to-play .symbol-bar-left {
+  animation: bar-left-to-play 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.music-btn.morph-to-play .symbol-bar-right {
+  animation: bar-right-to-play 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+@keyframes tri-to-pause {
+  0% { transform: scale(1); }
+  18% { transform: scale(0.82, 1.06); }
+  36% { transform: scale(0.58, 1.02); }
+  54% { transform: scale(0.34, 0.96); }
+  72% { transform: scale(0.14, 0.9); }
+  100% { transform: scale(0.001); }
+}
+
+@keyframes tri-to-play {
+  0% { transform: scale(0.001); }
+  18% { transform: scale(0.14, 0.9); }
+  36% { transform: scale(0.34, 0.96); }
+  54% { transform: scale(0.58, 1.02); }
+  72% { transform: scale(0.82, 1.06); }
+  100% { transform: scale(1); }
+}
+
+@keyframes bar-left-to-pause {
+  0% { transform: translate(2.8px, 0) scaleX(0.001); }
+  18% { transform: translate(2.1px, 0) scaleX(0.18); }
+  36% { transform: translate(1.2px, 0) scaleX(0.42); }
+  54% { transform: translate(0.5px, 0) scaleX(0.68); }
+  72% { transform: translate(0.1px, 0) scaleX(0.88); }
+  100% { transform: translate(0, 0) scaleX(1); }
+}
+
+@keyframes bar-right-to-pause {
+  0% { transform: translate(-2.8px, 0) scaleX(0.001); }
+  18% { transform: translate(-2.1px, 0) scaleX(0.18); }
+  36% { transform: translate(-1.2px, 0) scaleX(0.42); }
+  54% { transform: translate(-0.5px, 0) scaleX(0.68); }
+  72% { transform: translate(-0.1px, 0) scaleX(0.88); }
+  100% { transform: translate(0, 0) scaleX(1); }
+}
+
+@keyframes bar-left-to-play {
+  0% { transform: translate(0, 0) scaleX(1); }
+  18% { transform: translate(0.1px, 0) scaleX(0.88); }
+  36% { transform: translate(0.5px, 0) scaleX(0.68); }
+  54% { transform: translate(1.2px, 0) scaleX(0.42); }
+  72% { transform: translate(2.1px, 0) scaleX(0.18); }
+  100% { transform: translate(2.8px, 0) scaleX(0.001); }
+}
+
+@keyframes bar-right-to-play {
+  0% { transform: translate(0, 0) scaleX(1); }
+  18% { transform: translate(-0.1px, 0) scaleX(0.88); }
+  36% { transform: translate(-0.5px, 0) scaleX(0.68); }
+  54% { transform: translate(-1.2px, 0) scaleX(0.42); }
+  72% { transform: translate(-2.1px, 0) scaleX(0.18); }
+  100% { transform: translate(-2.8px, 0) scaleX(0.001); }
 }
 

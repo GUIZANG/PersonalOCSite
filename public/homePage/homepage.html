@@ -9,16 +9,17 @@
 </head>
 <body>
 
-<button class="music-btn" id="musicBtn">
-  <span class="bars">
-    <span class="bar"></span>
-    <span class="bar"></span>
-    <span class="bar"></span>
-    <span class="bar"></span>
+<button class="music-btn" id="musicBtn" aria-label="Toggle music">
+  <span class="music-icon" aria-hidden="true">
+    <svg class="music-symbol" viewBox="0 0 24 24" aria-hidden="true">
+      <path class="symbol-triangle" d="M9.1 6.4C8.6 6.1 8 6.5 8 7.1v9.8c0 .6.6 1 1.1.7l7.8-4.8c.6-.4.6-1.2 0-1.6l-7.8-4.8z"/>
+      <rect class="symbol-bar symbol-bar-left" x="7.1" y="5" width="3.8" height="14" rx="1.9"/>
+      <rect class="symbol-bar symbol-bar-right" x="13.1" y="5" width="3.8" height="14" rx="1.9"/>
+    </svg>
   </span>
 </button>
 
-<audio id="bgm" autoplay loop>
+<audio id="bgm" autoplay loop playsinline preload="auto">
   <source src="../../music/MoonlightSonata.mp3" type="audio/mpeg">
 </audio>
 
