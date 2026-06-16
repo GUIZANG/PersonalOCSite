@@ -2,7 +2,46 @@
 
 A continuously evolving and iterative web visual project.
 
+Repository: [https://github.com/GUIZANG/PersonalOCSite](https://github.com/GUIZANG/PersonalOCSite)
+
 This project is an exploratory space, attempting to combine visuals, interaction, and design language. It is both an experiment and an exercise—a continual exploration of the expressive potential of the web. The project is still under development, with many design and technical elements constantly being refined and optimized.
+
+🔹 **Requirements**
+
+See [`requirements.txt`](requirements.txt) for runtime and dependency notes.
+
+- Node.js >= 18
+- npm >= 9
+
+🔹 **Quick Start**
+
+```bash
+npm install
+npm run dev
+```
+
+This project does not use a root `index.html`. After the dev server starts, open a specific page directly, for example:
+
+- Homepage: `http://localhost:5173/homePage/homepage.html`
+- Black Moon terminal: `http://localhost:5173/blackMoon/blackMoonTerminal/blackMoonTerminal.html`
+- Black Moon text: `http://localhost:5173/blackMoon/blackMoonText/blackMoonText.html`
+- Black Moon main scene: `http://localhost:5173/blackMoon/blackMoonMain/blackMoon.html`
+
+Build and preview:
+
+```bash
+npm run build
+npm run preview
+```
+
+🔹 **Project Structure**
+
+- `public/` — main static multi-page site (HTML / CSS / JavaScript)
+- `public/homePage/` — homepage with scroll-driven narrative, shader scene, custom cursor, and music
+- `public/blackMoon/` — Black Moon narrative / terminal / text / main scene modules
+- `libs/` — locally bundled third-party libraries loaded by static pages
+- `src/` — leftover Vue scaffold files (currently unused by the live site)
+- `fonts/`, `pics/`, `music/` — shared assets
 
 🔹 **Project Goal**
 

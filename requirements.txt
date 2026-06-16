@@ -1,0 +1,25 @@
+# PersonalOCSite — environment & dependency requirements
+#
+# Runtime
+# - Node.js >= 18 (LTS recommended)
+# - npm >= 9
+#
+# Install project dependencies:
+#   npm install
+#
+# Local development:
+#   npm run dev
+#   Open http://localhost:5173/homePage/homepage.html
+#
+# Production build:
+#   npm run build
+#   npm run preview
+
+# npm dependencies (also declared in package.json)
+gsap>=3.14.2
+three>=0.184.0
+vue>=3.5.24
+
+# npm devDependencies
+vite>=7.2.4
+@vitejs/plugin-vue>=6.0.1
