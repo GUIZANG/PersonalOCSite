@@ -1,5 +1,17 @@
 @import "../fonts.css";
 
+@property --music-angle-1 {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: -75deg;
+}
+
+@property --music-angle-2 {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: -45deg;
+}
+
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
@@ -298,200 +310,194 @@ body.locked {
 }
 
 .music-btn {
-  /* 基础位置 */
+  --border-width: clamp(1px, 0.0625em, 4px);
+  --anim-hover-time: 400ms;
+  --anim-hover-ease: cubic-bezier(0.25, 1, 0.5, 1);
+
   position: fixed;
-  bottom: 20px;
-  right: 15px;
-  width: 44px;
-  height: 44px;
+  bottom: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
   z-index: 9999;
   cursor: none;
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 6px;
+  transform: perspective(700px) translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg);
+  transform-style: preserve-3d;
+  border-radius: 12px;
   border: none;
   overflow: hidden;
-
-  /* 核心 1：暗色基底 + 极细微的偏光 */
+  padding: 0;
   background:
-    /* 模拟表面最亮的那道折射光 */
-    linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 40%),
-    /* 深色基调：15% 的暗灰色，确保透光但不刺眼 */
-    rgba(20, 20, 25, 0.15);
-
-    conic-gradient(from 180deg at 50% 50%,
-    #e2e9ff 0deg,
-    #f1e1ff 60deg,
-    #ffdde1 120deg,
-    #fff9e1 180deg,
-    #e1ffef 240deg,
-    #e1f7ff 300deg,
-    #e2e9ff 360deg);
-
-  /* 核心 2：透光折射（暗色玻璃的灵魂） */
-  backdrop-filter: blur(12px) saturate(200%) brightness(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(200%) brightness(1.2);
-
-  /* 核心 3：复刻 Three.js 的 iridescence (薄膜干涉) */
+    linear-gradient(
+      -75deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.2),
+      rgba(255, 255, 255, 0.04)
+    );
+  backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+  -webkit-backdrop-filter: blur(clamp(1px, 0.125em, 4px));
   box-shadow:
-    /* 1. 外部环境投影 */
-    0 8px 16px rgba(0, 0, 0, 0.4),
-    /* 2. 核心：极细的彩虹边框（模拟 iridescence 边缘） */
-    inset 0 0 0 1px rgba(180, 200, 255, 0.15),
-    /* 3. 顶部边缘高光 (模拟 IOR: 1.2) */
-    inset 1px 2px 3px rgba(255, 255, 255, 0.2),
-    /* 4. 底部偏紫蓝色的折射光 (薄膜干涉效果) */
-    inset -2px -3px 6px rgba(120, 100, 255, 0.15),
-    /* 5. 右侧微弱的偏绿折射 */
-    inset -1px 0 4px rgba(100, 255, 200, 0.1);
-
-  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+    inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.5),
+    0 0.25em 0.125em -0.125em rgba(0, 0, 0, 0.2),
+    0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.2),
+    0 0 0 0 rgba(255, 255, 255, 1);
+  transition:
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    background var(--anim-hover-time) var(--anim-hover-ease),
+    backdrop-filter var(--anim-hover-time) var(--anim-hover-ease),
+    box-shadow var(--anim-hover-time) var(--anim-hover-ease),
+    --music-angle-1 500ms ease;
 }
 
-/* 悬停时的“流光”效果 */
+.music-btn::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  width: calc(100% - var(--border-width));
+  height: calc(100% - var(--border-width));
+  top: calc(var(--border-width) / 2);
+  left: calc(var(--border-width) / 2);
+  box-sizing: border-box;
+  border-radius: 11px;
+  background: linear-gradient(
+    var(--music-angle-2),
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.45) 40% 50%,
+    rgba(255, 255, 255, 0) 55%
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+  background-size: 200% 200%;
+  background-position: 0% 50%;
+  background-repeat: no-repeat;
+  transition:
+    background-position calc(var(--anim-hover-time) * 1.25) var(--anim-hover-ease),
+    --music-angle-2 calc(var(--anim-hover-time) * 1.25) var(--anim-hover-ease);
+}
+
+.music-btn::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: calc(var(--border-width) / -2);
+  border-radius: 13px;
+  padding: var(--border-width);
+  box-sizing: border-box;
+  background:
+    conic-gradient(
+      from var(--music-angle-1) at 50% 50%,
+      rgba(0, 0, 0, 0.5),
+      rgba(0, 0, 0, 0) 5% 40%,
+      rgba(0, 0, 0, 0.5) 50%,
+      rgba(0, 0, 0, 0) 60% 95%,
+      rgba(0, 0, 0, 0.5)
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255, 255, 255, 0.5);
+  transition:
+    box-shadow var(--anim-hover-time) var(--anim-hover-ease),
+    --music-angle-1 500ms ease;
+}
+
 .music-btn:hover {
-  transform: scale(1.05);
-  background: rgba(30, 30, 40, 0.15);
-  /* 悬停时彩虹偏光变亮 */
+  transform: perspective(700px) translate3d(4px, -6px, 20px) rotateX(13deg) rotateY(17deg) scale(1.04);
+  backdrop-filter: blur(0.01em);
+  -webkit-backdrop-filter: blur(0.01em);
   box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 1px rgba(200, 220, 255, 0.3),
-    inset 2px 4px 8px rgba(255, 255, 255, 0.25),
-    inset -3px -4px 10px rgba(150, 100, 255, 0.3);
+    inset 1px 0 0 rgba(116, 244, 255, 0.8),
+    inset -1px 0 0 rgba(205, 126, 255, 0.75),
+    inset 0 1px 0 rgba(255, 236, 166, 0.65),
+    inset 0 -1px 0 rgba(255, 125, 176, 0.58),
+    inset 0 0 0.32em rgba(116, 244, 255, 0.12),
+    inset 0 0 0.46em rgba(205, 126, 255, 0.1),
+    inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+    inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.5),
+    0 0.15em 0.05em -0.1em rgba(0, 0, 0, 0.25),
+    0 0 0.05em 0.1em inset rgba(255, 255, 255, 0.5),
+    0 0 0 0 rgba(255, 255, 255, 1);
+}
+
+.music-btn:hover::before {
+  background-position: 25% 50%;
+}
+
+.music-btn:hover::after {
+  --music-angle-1: -125deg;
+  background:
+    conic-gradient(
+      from var(--music-angle-1) at 50% 50%,
+      rgba(116, 244, 255, 0.78),
+      rgba(255, 255, 255, 0.12) 8% 34%,
+      rgba(205, 126, 255, 0.82) 46%,
+      rgba(255, 255, 255, 0.1) 58% 84%,
+      rgba(255, 222, 148, 0.72)
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.35));
+  box-shadow:
+    inset 0 0 0 calc(var(--border-width) / 2) rgba(255, 255, 255, 0.58),
+    inset 0 0 0.28em rgba(116, 244, 255, 0.16),
+    inset 0 0 0.42em rgba(205, 126, 255, 0.12);
 }
 
 .music-icon {
   position: relative;
-  width: 18px;
-  height: 18px;
+  z-index: 2;
+  width: 22px;
+  height: 24px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  transform: translateZ(18px);
 }
 
-.music-symbol {
-  width: 18px;
-  height: 18px;
-  overflow: visible;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.18));
-}
-
-.symbol-triangle,
-.symbol-bar {
-  fill: rgba(255, 255, 255, 0.92);
-  transform-box: fill-box;
+.music-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50%;
+  height: 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.18);
   transform-origin: center;
+  transition: transform 300ms ease, opacity 300ms ease;
 }
 
-.symbol-bar-left {
-  transform-origin: 9px 12px;
+.music-line-1 {
+  transform: translate(-50%, -50%) translate(-0.3rem, 0.1rem) rotate(90deg);
 }
 
-.symbol-bar-right {
-  transform-origin: 15px 12px;
+.music-line-2 {
+  transform: translate(-50%, -50%) translate(0.3rem, -0.05rem) rotate(90deg);
 }
 
-.symbol-triangle {
-  transform-origin: 12px 12px;
+.music-line-3 {
+  transform: translate(-50%, -50%) translate(0.3rem, -0.16rem) rotate(90deg);
 }
 
-.music-btn.is-playing:not(.morph-to-play):not(.morph-to-pause) .symbol-triangle {
-  transform: scale(1);
+.music-btn:not(.is-playing) .music-line-1 {
+  transform: translate(-50%, -50%) translate(-0.3rem, 0.1rem) rotate(90deg);
 }
 
-.music-btn.is-playing:not(.morph-to-play):not(.morph-to-pause) .symbol-bar-left {
-  transform: translate(2.8px, 0) scaleX(0.001);
+.music-btn:not(.is-playing) .music-line-2 {
+  transform: translate(-50%, -50%) translate(0.15rem, 0.22rem) rotate(-30deg);
 }
 
-.music-btn.is-playing:not(.morph-to-play):not(.morph-to-pause) .symbol-bar-right {
-  transform: translate(-2.8px, 0) scaleX(0.001);
-}
-
-.music-btn:not(.is-playing):not(.morph-to-play):not(.morph-to-pause) .symbol-triangle {
-  transform: scale(0.001);
-}
-
-.music-btn:not(.is-playing):not(.morph-to-play):not(.morph-to-pause) .symbol-bar-left,
-.music-btn:not(.is-playing):not(.morph-to-play):not(.morph-to-pause) .symbol-bar-right {
-  transform: translate(0, 0) scaleX(1);
-}
-
-.music-btn.morph-to-pause .symbol-triangle {
-  animation: tri-to-pause 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
-
-.music-btn.morph-to-pause .symbol-bar-left {
-  animation: bar-left-to-pause 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
-
-.music-btn.morph-to-pause .symbol-bar-right {
-  animation: bar-right-to-pause 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
-
-.music-btn.morph-to-play .symbol-triangle {
-  animation: tri-to-play 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
-
-.music-btn.morph-to-play .symbol-bar-left {
-  animation: bar-left-to-play 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
-
-.music-btn.morph-to-play .symbol-bar-right {
-  animation: bar-right-to-play 0.55s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
-
-@keyframes tri-to-pause {
-  0% { transform: scale(1); }
-  18% { transform: scale(0.82, 1.06); }
-  36% { transform: scale(0.58, 1.02); }
-  54% { transform: scale(0.34, 0.96); }
-  72% { transform: scale(0.14, 0.9); }
-  100% { transform: scale(0.001); }
-}
-
-@keyframes tri-to-play {
-  0% { transform: scale(0.001); }
-  18% { transform: scale(0.14, 0.9); }
-  36% { transform: scale(0.34, 0.96); }
-  54% { transform: scale(0.58, 1.02); }
-  72% { transform: scale(0.82, 1.06); }
-  100% { transform: scale(1); }
-}
-
-@keyframes bar-left-to-pause {
-  0% { transform: translate(2.8px, 0) scaleX(0.001); }
-  18% { transform: translate(2.1px, 0) scaleX(0.18); }
-  36% { transform: translate(1.2px, 0) scaleX(0.42); }
-  54% { transform: translate(0.5px, 0) scaleX(0.68); }
-  72% { transform: translate(0.1px, 0) scaleX(0.88); }
-  100% { transform: translate(0, 0) scaleX(1); }
-}
-
-@keyframes bar-right-to-pause {
-  0% { transform: translate(-2.8px, 0) scaleX(0.001); }
-  18% { transform: translate(-2.1px, 0) scaleX(0.18); }
-  36% { transform: translate(-1.2px, 0) scaleX(0.42); }
-  54% { transform: translate(-0.5px, 0) scaleX(0.68); }
-  72% { transform: translate(-0.1px, 0) scaleX(0.88); }
-  100% { transform: translate(0, 0) scaleX(1); }
-}
-
-@keyframes bar-left-to-play {
-  0% { transform: translate(0, 0) scaleX(1); }
-  18% { transform: translate(0.1px, 0) scaleX(0.88); }
-  36% { transform: translate(0.5px, 0) scaleX(0.68); }
-  54% { transform: translate(1.2px, 0) scaleX(0.42); }
-  72% { transform: translate(2.1px, 0) scaleX(0.18); }
-  100% { transform: translate(2.8px, 0) scaleX(0.001); }
-}
-
-@keyframes bar-right-to-play {
-  0% { transform: translate(0, 0) scaleX(1); }
-  18% { transform: translate(-0.1px, 0) scaleX(0.88); }
-  36% { transform: translate(-0.5px, 0) scaleX(0.68); }
-  54% { transform: translate(-1.2px, 0) scaleX(0.42); }
-  72% { transform: translate(-2.1px, 0) scaleX(0.18); }
-  100% { transform: translate(-2.8px, 0) scaleX(0.001); }
+.music-btn:not(.is-playing) .music-line-3 {
+  transform: translate(-50%, -50%) translate(0.15rem, -0.4rem) rotate(30deg);
 }
 

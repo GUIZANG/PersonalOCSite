@@ -3,18 +3,12 @@
     const btn = document.getElementById("musicBtn");
     let userPaused = false;
 
-    function setPlayingState(playing, animate) {
+    function setPlayingState(playing) {
         btn.classList.toggle("is-playing", playing);
-
-        if (!animate) return;
-
-        btn.classList.remove("morph-to-play", "morph-to-pause");
-        void btn.offsetWidth;
-        btn.classList.add(playing ? "morph-to-play" : "morph-to-pause");
     }
 
-    function syncUI(animate = false) {
-        setPlayingState(!audio.paused, animate);
+    function syncUI() {
+        setPlayingState(!audio.paused);
     }
 
     async function playAudio() {
@@ -25,7 +19,7 @@
         } catch {
             // Browser autoplay policy may block until user interaction.
         } finally {
-            syncUI(false);
+            syncUI();
         }
     }
 
@@ -33,11 +27,11 @@
         if (audio.paused) {
             userPaused = false;
             playAudio();
-            setPlayingState(true, true);
+            setPlayingState(true);
         } else {
             userPaused = true;
             audio.pause();
-            setPlayingState(false, true);
+            setPlayingState(false);
         }
     }
 
@@ -50,14 +44,8 @@
         toggle();
     });
 
-    btn.addEventListener("animationend", (event) => {
-        if (event.target.classList.contains("symbol-triangle")) {
-            btn.classList.remove("morph-to-play", "morph-to-pause");
-        }
-    });
-
-    audio.addEventListener("play", () => syncUI(false));
-    audio.addEventListener("pause", () => syncUI(false));
+    audio.addEventListener("play", () => syncUI());
+    audio.addEventListener("pause", () => syncUI());
     audio.addEventListener("canplay", unlockAudio);
 
     ["pointerdown", "keydown", "wheel", "touchstart"].forEach((eventName) => {
@@ -65,6 +53,6 @@
     });
 
     window.addEventListener("load", unlockAudio);
-    syncUI(false);
+    syncUI();
     playAudio();
 })();
