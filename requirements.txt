@@ -9,11 +9,18 @@
 #
 # Local development:
 #   npm run dev
+#   Open http://localhost:5173/Main/Main.html
 #   Open http://localhost:5173/homePage/homepage.html
 #
 # Production build:
 #   npm run build
 #   npm run preview
+#
+# Notes:
+# - This is a static multi-page Vite project with HTML entry files under public/.
+# - Main archive scene uses Three.js from the project dependency/local static script path.
+# - If a dev server was already running before new public files were added, restart Vite
+#   or use a fresh port so newly added static files are served.
 
 # npm dependencies (also declared in package.json)
 gsap>=3.14.2

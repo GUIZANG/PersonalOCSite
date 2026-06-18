@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRECOGNITIVE STRATA</title>
+  <link rel="icon" href="../../pics/logo/brain.svg" type="image/x-icon" />
+  <link rel="stylesheet" href="/fonts.css" />
+  <link rel="stylesheet" href="Main.css" />
+</head>
+<body>
+  <main id="hypercube-stage" class="hypercube-stage" aria-label="Main hypercube">
+    <section class="main-card-stream" id="mainCardStream" aria-label="Archive card stream">
+      <div class="main-scanner" aria-hidden="true"></div>
+      <div class="main-card-line" id="mainCardLine"></div>
+    </section>
+  </main>
+
+  <div class="cursor" aria-hidden="true">
+    <svg class="cursor__ball cursor__ball--big" width="30" height="30" viewBox="0 0 30 30">
+      <circle cx="15" cy="15" r="12"></circle>
+    </svg>
+    <svg class="cursor__ball cursor__ball--small" width="10" height="10" viewBox="0 0 10 10">
+      <circle cx="5" cy="5" r="4"></circle>
+    </svg>
+  </div>
+
+  <script src="/libs/three.min.js"></script>
+  <script src="/Main/mainCard.js"></script>
+  <script src="/Main/Main.js"></script>
+  <script src="/Main/mainCursor.js"></script>
+</body>
+</html>

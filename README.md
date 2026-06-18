@@ -22,6 +22,7 @@ npm run dev
 
 This project does not use a root `index.html`. After the dev server starts, open a specific page directly, for example:
 
+- Main archive scene: `http://localhost:5173/Main/Main.html`
 - Homepage: `http://localhost:5173/homePage/homepage.html`
 - Black Moon terminal: `http://localhost:5173/blackMoon/blackMoonTerminal/blackMoonTerminal.html`
 - Black Moon text: `http://localhost:5173/blackMoon/blackMoonText/blackMoonText.html`
@@ -37,8 +38,10 @@ npm run preview
 🔹 **Project Structure**
 
 - `public/` — main static multi-page site (HTML / CSS / JavaScript)
+- `public/Main/` — main archive scene with a Three.js particle hypercube, full-screen particle expansion, scanning card stream, and custom cursor
 - `public/homePage/` — homepage with scroll-driven narrative, shader scene, custom cursor, and music
 - `public/blackMoon/` — Black Moon narrative / terminal / text / main scene modules
+- `public/reference/` — reference experiments used for visual interaction prototypes
 - `libs/` — locally bundled third-party libraries loaded by static pages
 - `src/` — leftover Vue scaffold files (currently unused by the live site)
 - `fonts/`, `pics/`, `music/` — shared assets

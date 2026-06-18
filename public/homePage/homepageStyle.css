@@ -22,7 +22,7 @@ html {
   overflow-y: scroll;
   overflow-x: hidden;
   font-family: SupplyMono, monospace;
-  cursor: none;!important;
+  cursor: none !important;
 }
 
 body {
@@ -333,17 +333,17 @@ body.locked {
   background:
     linear-gradient(
       -75deg,
-      rgba(255, 255, 255, 0.04),
-      rgba(255, 255, 255, 0.2),
-      rgba(255, 255, 255, 0.04)
+      rgba(255, 255, 255, 0.015),
+      rgba(255, 255, 255, 0.105),
+      rgba(255, 255, 255, 0.015)
     );
-  backdrop-filter: blur(clamp(1px, 0.125em, 4px));
-  -webkit-backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+  backdrop-filter: blur(2px) saturate(135%);
+  -webkit-backdrop-filter: blur(2px) saturate(135%);
   box-shadow:
-    inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
-    inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.5),
-    0 0.25em 0.125em -0.125em rgba(0, 0, 0, 0.2),
-    0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.2),
+    inset 0 0.125em 0.125em rgba(0, 0, 0, 0.035),
+    inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.28),
+    0 0.25em 0.125em -0.125em rgba(0, 0, 0, 0.16),
+    0 0 0.08em 0.18em inset rgba(255, 255, 255, 0.12),
     0 0 0 0 rgba(255, 255, 255, 1);
   transition:
     transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -366,7 +366,7 @@ body.locked {
   background: linear-gradient(
     var(--music-angle-2),
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.45) 40% 50%,
+    rgba(255, 255, 255, 0.24) 42% 50%,
     rgba(255, 255, 255, 0) 55%
   );
   mix-blend-mode: screen;
@@ -396,7 +396,7 @@ body.locked {
       rgba(0, 0, 0, 0) 60% 95%,
       rgba(0, 0, 0, 0.5)
     ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.16));
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -406,7 +406,7 @@ body.locked {
     linear-gradient(#000 0 0);
   mask-composite: exclude;
   pointer-events: none;
-  box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255, 255, 255, 0.28);
   transition:
     box-shadow var(--anim-hover-time) var(--anim-hover-ease),
     --music-angle-1 500ms ease;
@@ -453,22 +453,25 @@ body.locked {
 }
 
 .music-icon {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   z-index: 2;
-  width: 22px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transform: translateZ(18px);
+  pointer-events: none;
+  transform: translate(-50%, -50%) translateZ(18px);
 }
 
 .music-line {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 50%;
+  width: 10px;
   height: 2px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.95);
@@ -478,26 +481,28 @@ body.locked {
 }
 
 .music-line-1 {
-  transform: translate(-50%, -50%) translate(-0.3rem, 0.1rem) rotate(90deg);
+  transform: translate(-50%, -50%) translate(-3px, 0) rotate(90deg);
 }
 
 .music-line-2 {
-  transform: translate(-50%, -50%) translate(0.3rem, -0.05rem) rotate(90deg);
+  transform: translate(-50%, -50%) translate(3px, 0) rotate(90deg);
 }
 
 .music-line-3 {
-  transform: translate(-50%, -50%) translate(0.3rem, -0.16rem) rotate(90deg);
+  opacity: 0;
+  transform: translate(-50%, -50%) translate(3px, 0) rotate(90deg);
 }
 
 .music-btn:not(.is-playing) .music-line-1 {
-  transform: translate(-50%, -50%) translate(-0.3rem, 0.1rem) rotate(90deg);
+  transform: translate(-50%, -50%) translate(-4px, 0) rotate(90deg);
 }
 
 .music-btn:not(.is-playing) .music-line-2 {
-  transform: translate(-50%, -50%) translate(0.15rem, 0.22rem) rotate(-30deg);
+  transform: translate(-50%, -50%) translate(0.5px, -2.5px) rotate(29deg);
 }
 
 .music-btn:not(.is-playing) .music-line-3 {
-  transform: translate(-50%, -50%) translate(0.15rem, -0.4rem) rotate(30deg);
+  opacity: 1;
+  transform: translate(-50%, -50%) translate(0.5px, 2.5px) rotate(-29deg);
 }
 
