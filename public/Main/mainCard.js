@@ -14,8 +14,8 @@
       this.active = false;
       this.lastTime = performance.now();
       this.isDragging = false;
+      this.isHoveringCard = false;
       this.lastPointerX = 0;
-      this.dragVelocity = 0;
       this.singleCycleWidth = 0;
 
       this.animate = this.animate.bind(this);
@@ -69,6 +69,11 @@
 
     setupEvents() {
       this.line.addEventListener("pointerdown", (event) => this.startDrag(event));
+      this.line.addEventListener("pointerover", (event) => this.onCardHover(event));
+      this.line.addEventListener("pointerout", (event) => this.onCardLeave(event));
+      this.line.addEventListener("pointerleave", () => {
+        this.isHoveringCard = false;
+      });
       this.line.addEventListener("contextmenu", (event) => event.preventDefault());
       window.addEventListener("pointermove", (event) => this.onDrag(event));
       window.addEventListener("pointerup", () => this.endDrag());
@@ -76,7 +81,6 @@
       this.line.addEventListener("wheel", (event) => {
         if (!this.active) return;
         event.preventDefault();
-        this.position += event.deltaY > 0 ? -42 : 42;
       }, { passive: false });
     }
 
@@ -84,7 +88,6 @@
       if (!this.active || event.button === 2) return;
       this.isDragging = true;
       this.lastPointerX = event.clientX;
-      this.dragVelocity = 0;
       this.line.classList.add("dragging");
       this.line.setPointerCapture?.(event.pointerId);
     }
@@ -93,17 +96,26 @@
       if (!this.isDragging) return;
       const delta = event.clientX - this.lastPointerX;
       this.position += delta;
-      this.dragVelocity = delta * 60;
       this.lastPointerX = event.clientX;
     }
 
     endDrag() {
       if (!this.isDragging) return;
       this.isDragging = false;
+      this.isHoveringCard = Boolean(this.line.querySelector(".main-card-wrapper:hover"));
       this.line.classList.remove("dragging");
-      if (Math.abs(this.dragVelocity) > 12) {
-        this.velocity = this.dragVelocity * 0.18;
-      }
+    }
+
+    onCardHover(event) {
+      const card = event.target.closest(".main-card-wrapper");
+      if (!card || card.contains(event.relatedTarget)) return;
+      this.isHoveringCard = true;
+    }
+
+    onCardLeave(event) {
+      const card = event.target.closest(".main-card-wrapper");
+      if (!card || card.contains(event.relatedTarget)) return;
+      this.isHoveringCard = false;
     }
 
     animate() {
@@ -111,7 +123,7 @@
       const dt = Math.min((now - this.lastTime) / 1000, 0.05);
       this.lastTime = now;
 
-      if (this.active && !this.isDragging) {
+      if (this.active && !this.isDragging && !this.isHoveringCard) {
         this.position += this.velocity * dt;
         this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
       }
@@ -167,7 +179,7 @@
             wrapper.dataset.scanned = "true";
             const flash = document.createElement("div");
             flash.className = "main-scan-effect";
-            wrapper.appendChild(flash);
+            normal.appendChild(flash);
             setTimeout(() => flash.remove(), 700);
           }
         } else {
