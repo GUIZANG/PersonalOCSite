@@ -232,14 +232,16 @@
         this.mat.uniforms.uBurst.value = this.burstAmount;
       }
 
+      const trailAmount = smoothstep(0.82, 0.96, this.burstAmount);
+
       if (this.trailMat) {
         this.trailMat.uniforms.uTime.value = time / 1000;
-        this.trailMat.uniforms.uBurst.value = this.burstAmount;
+        this.trailMat.uniforms.uBurst.value = trailAmount;
       }
 
-      if (this.burstAmount > 0.02) {
+      if (trailAmount > 0.001) {
         this.renderer.autoClear = false;
-        this.fadeMaterial.opacity = THREE.MathUtils.lerp(0.34, 0.08, this.burstAmount);
+        this.fadeMaterial.opacity = THREE.MathUtils.lerp(0.34, 0.08, trailAmount);
         this.renderer.render(this.fadeScene, this.fadeCamera);
         this.renderer.render(this.scene, this.camera);
       } else {
@@ -283,6 +285,8 @@
     onPointerDown() {
       if (this.hoverAmount < 0.18 || this.burstTarget > 0) return;
 
+      this.renderer.autoClear = true;
+      this.renderer.clear();
       this.hoverTarget = 1;
       this.burstTarget = 1;
       this.container.classList.remove("is-hypercube-hovered");
@@ -457,5 +461,11 @@
 
       return x - Math.floor(x);
     }
+  }
+
+  function smoothstep(edge0, edge1, value) {
+    const t = THREE.MathUtils.clamp((value - edge0) / (edge1 - edge0), 0, 1);
+
+    return t * t * (3 - 2 * t);
   }
 })();

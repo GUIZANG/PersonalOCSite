@@ -21,6 +21,7 @@
       this.animate = this.animate.bind(this);
       this.populate();
       this.setupEvents();
+      this.fitAsciiContent();
       this.calculateCycleWidth();
       this.position = -this.singleCycleWidth;
       this.animate();
@@ -43,6 +44,7 @@
     createCard(card, index) {
       const wrapper = document.createElement("article");
       wrapper.className = "main-card-wrapper hoverable";
+      wrapper.dataset.cardIndex = index;
 
       const normal = document.createElement("div");
       normal.className = "main-card main-card-normal";
@@ -59,7 +61,6 @@
       ascii.className = "main-card main-card-ascii";
       const asciiContent = document.createElement("pre");
       asciiContent.className = "main-ascii-content";
-      asciiContent.textContent = this.generateCode(card, index);
       ascii.appendChild(asciiContent);
 
       wrapper.appendChild(normal);
@@ -77,7 +78,10 @@
       this.line.addEventListener("contextmenu", (event) => event.preventDefault());
       window.addEventListener("pointermove", (event) => this.onDrag(event));
       window.addEventListener("pointerup", () => this.endDrag());
-      window.addEventListener("resize", () => this.calculateCycleWidth());
+      window.addEventListener("resize", () => {
+        this.fitAsciiContent();
+        this.calculateCycleWidth();
+      });
       this.line.addEventListener("wheel", (event) => {
         if (!this.active) return;
         event.preventDefault();
@@ -154,6 +158,64 @@
       this.singleCycleWidth = Math.max(fifth.left - first.left, 1);
     }
 
+    fitAsciiContent() {
+      const baseWidth = 380;
+      const baseHeight = 240;
+      const baseFontSize = 12;
+      const baseLineHeight = 14.4;
+      const minPadding = 2;
+
+      const firstWrapper = this.line.querySelector(".main-card-wrapper");
+      if (!firstWrapper) return;
+
+      const cardWidth = firstWrapper.offsetWidth;
+      const cardHeight = firstWrapper.offsetHeight;
+      if (!cardWidth || !cardHeight) return;
+
+      const scale = Math.min(cardWidth / baseWidth, cardHeight / baseHeight);
+      const fontSize = baseFontSize * scale;
+      const lineHeight = baseLineHeight * scale;
+      const verticalPadding = minPadding * scale;
+      const availableHeight = Math.max(cardHeight - verticalPadding * 2, lineHeight);
+      const rows = Math.max(Math.floor(availableHeight / lineHeight), 1);
+      const fittedPadding = Math.max((cardHeight - rows * lineHeight) / 2, 0);
+      const firstAsciiContent = firstWrapper.querySelector(".main-ascii-content");
+      if (!firstAsciiContent) return;
+
+      const charWidth = this.measureAsciiCharWidth(firstAsciiContent, fontSize, lineHeight);
+      const columns = Math.max(Math.floor(cardWidth / charWidth), 1);
+
+      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
+        const asciiContent = wrapper.querySelector(".main-ascii-content");
+        if (!asciiContent) return;
+
+        const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
+        const card = this.cards[cardIndex % this.cards.length];
+
+        asciiContent.style.fontSize = `${fontSize}px`;
+        asciiContent.style.lineHeight = `${lineHeight}px`;
+        asciiContent.style.padding = `${fittedPadding}px 0`;
+        asciiContent.textContent = this.generateCode(card, cardIndex, columns, rows);
+      });
+    }
+
+    measureAsciiCharWidth(asciiContent, fontSize, lineHeight) {
+      const probe = document.createElement("span");
+      probe.textContent = "M".repeat(20);
+      probe.style.position = "absolute";
+      probe.style.visibility = "hidden";
+      probe.style.whiteSpace = "pre";
+      probe.style.fontFamily = getComputedStyle(asciiContent).fontFamily;
+      probe.style.fontSize = `${fontSize}px`;
+      probe.style.lineHeight = `${lineHeight}px`;
+      document.body.appendChild(probe);
+
+      const charWidth = probe.getBoundingClientRect().width / 20;
+      probe.remove();
+
+      return Math.max(charWidth, 1);
+    }
+
     updateScanning() {
       if (!this.active) return;
       const scannerX = window.innerWidth / 2;
@@ -195,7 +257,7 @@
       });
     }
 
-    generateCode(card, index) {
+    generateCode(card, index, width = 54, height = 20) {
       const seeds = [
         `const ${card.title.toLowerCase()} = archive.open(${index + 1});`,
         "for (let i = 0; i < memory.length; i++) scan(memory[i]);",
@@ -203,8 +265,6 @@
         "return glyph.map(node => node.frequency).join(' ');",
         "entropy += vector.x * vector.y - threshold;",
       ];
-      const width = 54;
-      const height = 20;
       let text = "";
       for (let row = 0; row < height; row++) {
         const seed = seeds[(row + index) % seeds.length];
