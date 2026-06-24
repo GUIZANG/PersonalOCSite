@@ -118,10 +118,10 @@ vec4 cellsColor(vec2 p, float scale, float t) {
   vec2 d = vec2(0, 1);
 
   vec4 cc = vec4(0);
-  cc += cell(p, pi, scale, t, .2) * 6.;
-  cc += cell(p, pi + d.xy, scale, t, .9) *0.5;
-  cc += cell(p, pi - d.xy, scale, t, .9) *0.4;
-  cc += cell(p, pi + d.yx, scale, t, .9) *0.3;
+  cc += cell(p, pi, scale, t, .2) * 5.;
+  cc += cell(p, pi + d.xy, scale, t, .9) *0.8;
+  cc += cell(p, pi - d.xy, scale, t, .9) *0.6;
+  cc += cell(p, pi + d.yx, scale, t, .9) *0.4;
   cc += cell(p, pi - d.yx, scale, t, .9) *0.2;
 
   return cc / 8.;

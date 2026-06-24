@@ -209,9 +209,42 @@ body.is-screen-glitching .hypercube-stage {
   flex: 0 0 auto;
   width: min(38vw, 380px);
   height: min(24vw, 240px);
+  --clip-right: 0%;
+  --scan-fade-x: 50%;
+  --scan-fade-width: 8.5%;
+  border-radius: 18px;
   transform-origin: center;
-  transition: transform 220ms ease;
   will-change: transform;
+}
+
+.main-card-wrapper.is-scan-fading {
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    #000 0%,
+    #000 calc(var(--scan-fade-x) - var(--scan-fade-width)),
+    transparent var(--scan-fade-x),
+    #000 calc(var(--scan-fade-x) + var(--scan-fade-width)),
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    #000 0%,
+    #000 calc(var(--scan-fade-x) - var(--scan-fade-width)),
+    transparent var(--scan-fade-x),
+    #000 calc(var(--scan-fade-x) + var(--scan-fade-width)),
+    #000 100%
+  );
+}
+
+.main-card-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 18px;
+  pointer-events: none;
+  clip-path: inset(0 0 0 var(--clip-right, 0%));
 }
 
 .main-card {
@@ -230,7 +263,7 @@ body.is-screen-glitching .hypercube-stage {
   padding: 22px;
   color: rgba(255, 255, 255, 0.88);
   overflow: visible;
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: none;
   border-radius: 18px;
   background: rgba(0, 0, 0, 0.42);
   clip-path: inset(0 0 0 var(--clip-right, 0%));
@@ -307,7 +340,15 @@ body.is-screen-glitching .hypercube-stage {
   inset: 0;
   z-index: 5;
   border-radius: inherit;
+  overflow: hidden;
   pointer-events: none;
+  clip-path: inset(0 0 0 var(--clip-right, 0%));
+}
+
+.main-scan-effect::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
     transparent,
@@ -315,6 +356,7 @@ body.is-screen-glitching .hypercube-stage {
     transparent
   );
   animation: mainScanFlash 650ms ease-out forwards;
+  will-change: transform, opacity;
 }
 
 .main-scanner {

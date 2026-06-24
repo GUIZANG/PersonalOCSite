@@ -48,10 +48,10 @@ npm run preview
 
 🔹 **Recent Update (Main Scene)**
 
-- Refined the Main archive scanning-card dissolve effect with shader-based tuning
-- Improved edge clipping behavior and layer ordering for VFX overlays
-- Added controlled side-particle scatter and shorter tail fade for cleaner transitions
-- Updated Main card spacing and visual timing for smoother readability
+- Stabilized the Main archive card stream loop using layout-based cycle measurements
+- Refined card clipping so borders, reflections, and content stay bounded to each card
+- Added a narrow scanner-adjacent fade across card surfaces and internal content
+- Tuned scan-flash triggering and dissolve weighting for cleaner one-pass transitions
 
 🔹 **Project Goal**
 
