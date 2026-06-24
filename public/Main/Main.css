@@ -64,7 +64,7 @@ button,
   position: relative;
   display: flex;
   align-items: center;
-  gap: 76px;
+  gap: 152px;
   min-width: max-content;
   will-change: transform;
   user-select: none;
@@ -207,8 +207,8 @@ body.is-screen-glitching .hypercube-stage {
 .main-card-wrapper {
   position: relative;
   flex: 0 0 auto;
-  width: min(38vw, 380px);
-  height: min(24vw, 240px);
+  width: 380px;
+  height: 240px;
   --clip-right: 0%;
   --scan-fade-x: 50%;
   --scan-fade-width: 8.5%;
@@ -289,7 +289,7 @@ body.is-screen-glitching .hypercube-stage {
 .main-card-title {
   max-width: 10ch;
   margin: 0;
-  font-size: clamp(28px, 4vw, 46px);
+  font-size: 46px;
   font-weight: 300;
   line-height: 0.95;
   letter-spacing: -0.05em;
@@ -343,7 +343,6 @@ body.is-screen-glitching .hypercube-stage {
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
-  clip-path: inset(0 0 0 var(--clip-right, 0%));
 }
 
 .main-scan-effect::before {
@@ -358,6 +357,7 @@ body.is-screen-glitching .hypercube-stage {
   );
   animation: mainScanFlash 650ms ease-out forwards;
   will-change: transform, opacity;
+  transform: translate3d(-120%, 0, 0);
 }
 
 .main-scanner {
@@ -614,15 +614,19 @@ body.is-screen-glitching .hypercube-stage {
 @keyframes mainScanFlash {
   from {
     opacity: 0;
-    transform: translateX(-100%);
+    transform: translate3d(-120%, 0, 0);
   }
 
   45% {
     opacity: 1;
   }
 
+  78% {
+    opacity: 0.88;
+  }
+
   to {
     opacity: 0;
-    transform: translateX(100%);
+    transform: translate3d(120%, 0, 0);
   }
 }
