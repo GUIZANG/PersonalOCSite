@@ -19,6 +19,8 @@
 # Notes:
 # - This is a static multi-page Vite project with HTML entry files under public/.
 # - Main archive scene uses Three.js from the project dependency/local static script path.
+# - Local bundled static libraries are under libs/ and public/libs/.
+# - Main archive scan-card VFX now relies on bundled vfx-js and Three.js static scripts.
 # - If a dev server was already running before new public files were added, restart Vite
 #   or use a fresh port so newly added static files are served.
 

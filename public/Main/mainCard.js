@@ -12,6 +12,8 @@
       this.position = 0;
       this.velocity = -58;
       this.active = false;
+      this.revealAmount = 0;
+      this.revealTarget = 0;
       this.lastTime = performance.now();
       this.isDragging = false;
       this.isHoveringCard = false;
@@ -24,11 +26,26 @@
       this.fitAsciiContent();
       this.calculateCycleWidth();
       this.position = -this.singleCycleWidth;
+      this.bindVFX();
       this.animate();
     }
 
     activate() {
       this.active = true;
+      this.revealTarget = 1;
+    }
+
+    bindVFX() {
+      if (!window.MainCardVFX) return;
+      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
+        const normal = wrapper.querySelector(".main-card-normal");
+        if (!normal) return;
+        window.MainCardVFX.bind(
+          normal,
+          () => (typeof wrapper._scanQ === "number" ? wrapper._scanQ : 2),
+          () => this.revealAmount
+        );
+      });
     }
 
     populate() {
@@ -132,6 +149,8 @@
         this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
       }
 
+      this.revealAmount += (this.revealTarget - this.revealAmount) * 0.06;
+
       this.wrapPosition();
       this.line.style.transform = `translate3d(${this.position}px, 0, 0)`;
       this.updateScanning();
@@ -231,6 +250,10 @@
         const edgeAmount = Math.min(centerDistance / (window.innerWidth / 2), 1);
         wrapper.style.transform = `scaleX(${1 + edgeAmount * 0.1})`;
 
+        // Unclamped scanner position across the card in UV space, fed to the
+        // vfx dissolve shader. <0 = card fully right (intact), >1 = fully left (gone).
+        wrapper._scanQ = rect.width > 0 ? (scannerX - rect.left) / rect.width : 2;
+
         if (rect.left < scannerRight && rect.right > scannerLeft) {
           const scanLeft = Math.max(scannerLeft - rect.left, 0);
           const scanRight = Math.min(scannerRight - rect.left, rect.width);
@@ -241,7 +264,7 @@
             wrapper.dataset.scanned = "true";
             const flash = document.createElement("div");
             flash.className = "main-scan-effect";
-            normal.appendChild(flash);
+            wrapper.appendChild(flash);
             setTimeout(() => flash.remove(), 700);
           }
         } else {

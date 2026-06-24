@@ -42,9 +42,16 @@ npm run preview
 - `public/homePage/` — homepage with scroll-driven narrative, shader scene, custom cursor, and music
 - `public/blackMoon/` — Black Moon narrative / terminal / text / main scene modules
 - `public/reference/` — reference experiments used for visual interaction prototypes
-- `libs/` — locally bundled third-party libraries loaded by static pages
+- `libs/` / `public/libs/` — locally bundled third-party libraries loaded by static pages
 - `src/` — leftover Vue scaffold files (currently unused by the live site)
 - `fonts/`, `pics/`, `music/` — shared assets
+
+🔹 **Recent Update (Main Scene)**
+
+- Refined the Main archive scanning-card dissolve effect with shader-based tuning
+- Improved edge clipping behavior and layer ordering for VFX overlays
+- Added controlled side-particle scatter and shorter tail fade for cleaner transitions
+- Updated Main card spacing and visual timing for smoother readability
 
 🔹 **Project Goal**
 
