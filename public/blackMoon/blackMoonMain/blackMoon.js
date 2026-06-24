@@ -1,5 +1,5 @@
 (() => {
-  const imageUrl = "../../../pics/eye.jpg";
+  const imageUrl = "/assets/images/eye.jpg";
 
   // 字符集保持不变
   const charset = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J",

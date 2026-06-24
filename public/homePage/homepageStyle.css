@@ -1,4 +1,4 @@
-@import "../fonts.css";
+@import url("/styles/fonts.css");
 
 @property --music-angle-1 {
   syntax: "<angle>";

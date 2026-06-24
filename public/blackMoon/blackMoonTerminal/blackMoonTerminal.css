@@ -1,5 +1,5 @@
-@import url("../../fonts.css");
-@import url("../../scrollBar.css");
+@import url("/styles/fonts.css");
+@import url("/styles/scrollbar.css");
 
 html, body {
   margin: 0;

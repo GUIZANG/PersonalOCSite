@@ -42,9 +42,9 @@ npm run preview
 - `public/homePage/` — homepage with scroll-driven narrative, shader scene, custom cursor, and music
 - `public/blackMoon/` — Black Moon narrative / terminal / text / main scene modules
 - `public/reference/` — reference experiments used for visual interaction prototypes
-- `libs/` / `public/libs/` — locally bundled third-party libraries loaded by static pages
+- `public/libs/` — locally bundled third-party libraries loaded by static pages
 - `src/` — leftover Vue scaffold files (currently unused by the live site)
-- `fonts/`, `pics/`, `music/` — shared assets
+- `public/assets/` — shared static assets (`images/`, `fonts/`, `audio/`)
 
 🔹 **Recent Update (Main Scene)**
 

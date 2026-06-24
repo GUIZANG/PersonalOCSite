@@ -1,4 +1,4 @@
-@import url("../../fonts.css");
+@import url("/styles/fonts.css");
 .container {
   position: relative;
   margin-top: 1rem;
@@ -42,7 +42,7 @@
   font-family: "Formula", monospace;
 
   color: transparent; /* 文字透明 */
-  background-image: url("../../../pics/moon-letter.jpg");
+  background-image: url("/assets/images/moon-letter.jpg");
   background-repeat: no-repeat;
   background-size: 36rem 15rem;
   background-clip: text;

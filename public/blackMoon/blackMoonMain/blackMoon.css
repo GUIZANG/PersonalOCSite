@@ -1,5 +1,5 @@
-@import url("../../fonts.css");
-@import url("../../scrollBar.css");
+@import url("/styles/fonts.css");
+@import url("/styles/scrollbar.css");
 /* {
   outline: red solid 1px !important;
   box-sizing: border-box;
