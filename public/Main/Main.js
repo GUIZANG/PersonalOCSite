@@ -23,6 +23,9 @@
       this.trailMat = null;
       this.burstPositionAttribute = null;
       this.trailBurstPositionAttribute = null;
+      this.burstSourceIndices = [];
+      this.trailSourceIndices = [];
+      this.hoverTargetPoints = [];
 
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color(this.background);
@@ -54,8 +57,10 @@
       this.onPointerDown = this.onPointerDown.bind(this);
     }
 
-    init() {
-      const particlesPerEdge = 200;
+    async init() {
+      const cubeParticlesPerEdge = 400;
+      const burstParticlesPerEdge = 200;
+      const hoverParticlesPerEdge = 2400;
       const sizeOut = 0.5;
       const sizeIn = 0.25;
       const cubeEdges = [
@@ -65,13 +70,18 @@
       ];
       const unitCorners = [];
       const geo = new THREE.BufferGeometry();
-      const totalParticles = cubeEdges.length * particlesPerEdge;
+      const totalParticles = cubeEdges.length * hoverParticlesPerEdge;
       const posStart = new Float32Array(totalParticles * 3);
       const posEnd = new Float32Array(totalParticles * 3);
       const squarePos = new Float32Array(totalParticles * 3);
       const burstPos = new Float32Array(totalParticles * 3);
       const offsets = new Float32Array(totalParticles);
+      const cubeMask = new Float32Array(totalParticles);
+      const burstMask = new Float32Array(totalParticles);
       let pIdx = 0;
+      let burstVisibleIndex = 0;
+
+      this.hoverTargetPoints = await this.loadHoverTargetPoints(totalParticles);
 
       for (let x = -1; x <= 1; x += 2) {
         for (let y = -1; y <= 1; y += 2) {
@@ -85,13 +95,21 @@
         const [cornerA, cornerB] = edge;
         const vA = unitCorners[cornerA];
         const vB = unitCorners[cornerB];
+        const cubeStep = hoverParticlesPerEdge / cubeParticlesPerEdge;
+        const burstStep = hoverParticlesPerEdge / burstParticlesPerEdge;
 
-        for (let p = 0; p < particlesPerEdge; p++) {
-          const t = p / particlesPerEdge;
+        for (let p = 0; p < hoverParticlesPerEdge; p++) {
+          const t = p / hoverParticlesPerEdge;
           const edgePoint = new THREE.Vector3().lerpVectors(vA, vB, t);
           const start = edgePoint.clone().multiplyScalar(sizeOut);
           const end = edgePoint.clone().multiplyScalar(sizeIn);
-          const inward = pIdx % 2 === 0;
+          const cubeVisibleIndex = Math.floor(p / cubeStep);
+          const inward = cubeVisibleIndex % 2 === 0;
+          const isCubeVisible = p % cubeStep === 0;
+          const isBurstVisible = p % burstStep === 0;
+          const burst = isBurstVisible
+            ? this.getBurstPoint(burstVisibleIndex++, cubeEdges.length * burstParticlesPerEdge)
+            : this.getBurstPoint(pIdx, totalParticles);
 
           this.setParticleData(
             pIdx,
@@ -101,8 +119,11 @@
             posEnd,
             squarePos,
             burstPos,
-            offsets
+            offsets,
+            burst
           );
+          cubeMask[pIdx] = isCubeVisible ? 1 : 0;
+          burstMask[pIdx] = isBurstVisible ? 1 : 0;
           pIdx++;
         }
       });
@@ -112,6 +133,8 @@
       geo.setAttribute("squarePos", new THREE.BufferAttribute(squarePos, 3));
       geo.setAttribute("burstPos", new THREE.BufferAttribute(burstPos, 3));
       geo.setAttribute("offset", new THREE.BufferAttribute(offsets, 1));
+      geo.setAttribute("cubeMask", new THREE.BufferAttribute(cubeMask, 1));
+      geo.setAttribute("burstMask", new THREE.BufferAttribute(burstMask, 1));
       this.burstPositionAttribute = geo.getAttribute("burstPos");
 
       this.mat = new THREE.ShaderMaterial({
@@ -131,6 +154,9 @@
           attribute vec3 squarePos;
           attribute vec3 burstPos;
           attribute float offset;
+          attribute float cubeMask;
+          attribute float burstMask;
+          varying float vAlpha;
 
           float cubicBezierX(float t, float x1, float x2) {
             return 3.0 * (1.0 - t) * (1.0 - t) * t * x1 + 3.0 * (1.0 - t) * t * t * x2 + t * t * t;
@@ -165,8 +191,13 @@
             vec3 midDir = normalize(position + targetPos);
             float bulge = sin(easedProgress * 3.14159265) * 0.1;
             vec3 cubePos = mix(position, targetPos, easedProgress) + midDir * bulge;
-            vec3 squareTarget = squarePos + vec3(0.0, 0.0, sin(uTime * 1.5 + offset * 6.2831853) * 0.015);
-            vec3 collapsedPos = mix(cubePos, squareTarget, cubicBezierEase(uHover));
+            mat3 worldRotation = mat3(modelMatrix);
+            vec3 hoverTarget = vec3(
+              dot(worldRotation[0], squarePos),
+              dot(worldRotation[1], squarePos),
+              dot(worldRotation[2], squarePos)
+            );
+            vec3 collapsedPos = mix(cubePos, hoverTarget, cubicBezierEase(uHover));
 
             float radius = length(burstPos.xy);
             float orbitSpeed = mix(0.05, 0.2, fract(offset * 19.73));
@@ -174,13 +205,18 @@
             float angle = uTime * orbitSpeed + offset * 6.2831853;
             float ca = cos(angle);
             float sa = sin(angle);
-            vec3 rotatedBurst = vec3(
+            vec3 orbitBurst = vec3(
               burstPos.x * ca - burstPos.y * sa,
               burstPos.x * sa + burstPos.y * ca,
               burstPos.z
             );
             float burstEase = cubicBezierEase(uBurst);
-            vec3 currentPos = mix(collapsedPos, rotatedBurst, burstEase);
+            float orbitEase = smoothstep(0.96, 1.0, burstEase);
+            vec3 burstTarget = mix(burstPos, orbitBurst, orbitEase);
+            vec3 currentPos = mix(collapsedPos, burstTarget, burstEase);
+            float hoverEase = cubicBezierEase(uHover);
+            float stageAlpha = mix(cubeMask, 1.0, hoverEase);
+            vAlpha = mix(stageAlpha, burstMask, burstEase);
 
             vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
             float dustScale = mix(1.0, 0.72, burstEase);
@@ -190,10 +226,12 @@
         `,
         fragmentShader: `
           uniform vec3 uColor;
+          varying float vAlpha;
 
           void main() {
             if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
-            gl_FragColor = vec4(uColor, 1.0);
+            if (vAlpha <= 0.001) discard;
+            gl_FragColor = vec4(uColor, vAlpha);
           }
         `,
         transparent: true,
@@ -205,7 +243,7 @@
       this.tesseract.rotation.x = this.baseRotationX;
       this.scene.add(this.tesseract);
 
-      this.createTrails(burstPos, offsets);
+      this.createTrails(burstPos, offsets, burstMask);
 
       window.addEventListener("resize", this.onResize);
       this.container.addEventListener("pointermove", this.onPointerMove);
@@ -217,7 +255,7 @@
     animate(time) {
       if (this.tesseract) {
         const msToSeconds = this.duration / 1000;
-        const cubeRotationAmount = 1 - this.burstAmount;
+        const cubeRotationAmount = this.burstTarget > 0 ? 0 : 1;
         this.tesseract.rotation.x = this.baseRotationX * cubeRotationAmount;
         this.tesseract.rotation.y = (time / 1000) * (Math.PI * 2 / msToSeconds) * cubeRotationAmount;
         this.tesseract.rotation.y %= Math.PI * 2;
@@ -296,10 +334,9 @@
       }
     }
 
-    setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, offsets) {
+    setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, offsets, burst) {
       const index = i * 3;
-      const square = this.getSquarePoint(i, offsets.length);
-      const burst = this.getBurstPoint(i, offsets.length);
+      const square = this.getHoverTargetPoint(i, offsets.length);
 
       posStart[index] = start.x;
       posStart[index + 1] = start.y;
@@ -316,8 +353,16 @@
       offsets[i] = Utils.random();
     }
 
-    createTrails(burstPos, offsets) {
-      const total = offsets.length;
+    createTrails(burstPos, offsets, burstMask) {
+      const sourceIndices = [];
+      for (let i = 0; i < offsets.length; i++) {
+        if (burstMask[i] > 0) {
+          sourceIndices.push(i);
+        }
+      }
+      this.burstSourceIndices = sourceIndices;
+      this.trailSourceIndices = sourceIndices;
+      const total = sourceIndices.length;
       const trailGeo = new THREE.BufferGeometry();
       const positions = new Float32Array(total * 2 * 3);
       const trailBurstPos = new Float32Array(total * 2 * 3);
@@ -325,7 +370,8 @@
       const trailOffsets = new Float32Array(total * 2);
 
       for (let i = 0; i < total; i++) {
-        const srcIndex = i * 3;
+        const sourceIndex = sourceIndices[i];
+        const srcIndex = sourceIndex * 3;
         const dstIndex = i * 6;
         const stepIndex = i * 2;
 
@@ -333,7 +379,7 @@
           trailBurstPos[dstIndex + v * 3] = burstPos[srcIndex];
           trailBurstPos[dstIndex + v * 3 + 1] = burstPos[srcIndex + 1];
           trailBurstPos[dstIndex + v * 3 + 2] = burstPos[srcIndex + 2];
-          trailOffsets[stepIndex + v] = offsets[i];
+          trailOffsets[stepIndex + v] = offsets[sourceIndex];
         }
 
         trailStep[stepIndex] = 0;
@@ -396,6 +442,123 @@
       this.scene.add(this.trails);
     }
 
+    getHoverTargetPoint(i, total) {
+      if (this.hoverTargetPoints.length) {
+        return this.hoverTargetPoints[i % this.hoverTargetPoints.length];
+      }
+
+      return this.getSquarePoint(i, total);
+    }
+
+    async loadHoverTargetPoints(total) {
+      try {
+        const image = await this.loadImage("/assets/images/fullEye.svg");
+        const maxCanvasSide = 360;
+        const scale = maxCanvasSide / Math.max(image.naturalWidth, image.naturalHeight);
+        const width = Math.max(Math.round(image.naturalWidth * scale), 1);
+        const height = Math.max(Math.round(image.naturalHeight * scale), 1);
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        canvas.width = width;
+        canvas.height = height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(image, 0, 0, width, height);
+
+        const imageData = ctx.getImageData(0, 0, width, height).data;
+        const samples = [];
+        let totalWeight = 0;
+        let totalDarkWeight = 0;
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            const alpha = imageData[idx + 3] / 255;
+            const brightness = (
+              imageData[idx] * 0.2126 +
+              imageData[idx + 1] * 0.7152 +
+              imageData[idx + 2] * 0.0722
+            ) / 255;
+            const weight = brightness * alpha;
+            const darkWeight = (1 - brightness) * alpha;
+
+            totalWeight += weight * weight;
+            totalDarkWeight += darkWeight * darkWeight;
+            samples.push({ x, y, weight, darkWeight });
+          }
+        }
+
+        const useDarkWeight = totalWeight <= 0.001 && totalDarkWeight > 0.001;
+        const cumulative = [];
+        const weightedPixels = [];
+        let activeWeight = 0;
+
+        samples.forEach((sample) => {
+          const weight = useDarkWeight ? sample.darkWeight : sample.weight;
+
+          if (weight <= 0.03) return;
+
+          activeWeight += weight * weight;
+          weightedPixels.push(sample);
+          cumulative.push(activeWeight);
+        });
+
+        if (!weightedPixels.length || activeWeight <= 0) {
+          return [];
+        }
+
+        const targetSize = 0.92 * 4.0;
+        const aspect = width / height;
+        const targetWidth = aspect >= 1 ? targetSize : targetSize * aspect;
+        const targetHeight = aspect >= 1 ? targetSize / aspect : targetSize;
+        const points = [];
+
+        for (let i = 0; i < total; i++) {
+          const pick = Utils.hash(i * 19.73 + 3.17) * activeWeight;
+          const pixelIndex = this.findWeightedPixel(cumulative, pick);
+          const pixel = weightedPixels[pixelIndex];
+          const jitterX = Utils.hash(i * 31.11 + 7.91) - 0.5;
+          const jitterY = Utils.hash(i * 43.87 + 11.29) - 0.5;
+          const u = (pixel.x + 0.5 + jitterX) / width;
+          const v = (pixel.y + 0.5 + jitterY) / height;
+          const x = (u - 0.5) * targetWidth;
+          const y = (0.5 - v) * targetHeight;
+
+          points.push(new THREE.Vector3(x, y, 0));
+        }
+
+        return points;
+      } catch (error) {
+        console.warn("Failed to load hover target image", error);
+        return [];
+      }
+    }
+
+    loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = src;
+      });
+    }
+
+    findWeightedPixel(cumulative, value) {
+      let low = 0;
+      let high = cumulative.length - 1;
+
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+
+        if (cumulative[mid] < value) {
+          low = mid + 1;
+        } else {
+          high = mid;
+        }
+      }
+
+      return low;
+    }
+
     getSquarePoint(i, total) {
       const squareSize = 0.92;
       const side = Math.floor((i / total) * 4);
@@ -435,17 +598,18 @@
     updateBurstPositions() {
       if (!this.burstPositionAttribute) return;
 
-      const total = this.burstPositionAttribute.count;
-      for (let i = 0; i < total; i++) {
-        const point = this.getBurstPoint(i, total);
-        this.burstPositionAttribute.setXYZ(i, point.x, point.y, point.z);
-        if (this.trailBurstPositionAttribute) {
-          this.trailBurstPositionAttribute.setXYZ(i * 2, point.x, point.y, point.z);
-          this.trailBurstPositionAttribute.setXYZ(i * 2 + 1, point.x, point.y, point.z);
-        }
-      }
+      const visibleTotal = this.burstSourceIndices.length;
+      this.burstSourceIndices.forEach((sourceIndex, visibleIndex) => {
+        const point = this.getBurstPoint(visibleIndex, visibleTotal);
+        this.burstPositionAttribute.setXYZ(sourceIndex, point.x, point.y, point.z);
+      });
       this.burstPositionAttribute.needsUpdate = true;
       if (this.trailBurstPositionAttribute) {
+        this.trailSourceIndices.forEach((_, trailIndex) => {
+          const point = this.getBurstPoint(trailIndex, visibleTotal);
+          this.trailBurstPositionAttribute.setXYZ(trailIndex * 2, point.x, point.y, point.z);
+          this.trailBurstPositionAttribute.setXYZ(trailIndex * 2 + 1, point.x, point.y, point.z);
+        });
         this.trailBurstPositionAttribute.needsUpdate = true;
       }
     }

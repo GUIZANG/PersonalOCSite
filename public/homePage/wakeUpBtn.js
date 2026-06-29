@@ -1,6 +1,11 @@
 const textEl = document.querySelector("#wake-up-btn .text");
+const wakeUpBtn = document.getElementById("wake-up-btn");
 const text = textEl.textContent.trim();
 textEl.textContent = "";
+
+wakeUpBtn.addEventListener("click", () => {
+  window.location.href = "/Main/Main.html";
+});
 
 const total = text.length;
 

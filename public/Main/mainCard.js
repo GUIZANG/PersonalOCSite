@@ -19,6 +19,8 @@
       this.isHoveringCard = false;
       this.lastPointerX = 0;
       this.singleCycleWidth = 0;
+      this.hasStarted = false;
+      this.isIntroEntering = false;
 
       this.animate = this.animate.bind(this);
       this.populate();
@@ -33,6 +35,12 @@
     activate() {
       this.active = true;
       this.revealTarget = 1;
+
+      if (!this.hasStarted) {
+        this.position = window.innerWidth / 2 + window.innerWidth / 3;
+        this.isIntroEntering = true;
+        this.hasStarted = true;
+      }
     }
 
     bindVFX() {
@@ -43,7 +51,8 @@
         window.MainCardVFX.bind(
           normal,
           () => (typeof wrapper._scanQ === "number" ? wrapper._scanQ : -1),
-          () => this.revealAmount
+          () => this.revealAmount,
+          () => wrapper._dissolveSeed
         );
       });
     }
@@ -64,6 +73,7 @@
       wrapper.dataset.cardIndex = index;
       wrapper._scanQ = -1;
       wrapper._previousScanQ = -1;
+      wrapper._dissolveSeed = Math.random();
 
       const normal = document.createElement("div");
       normal.className = "main-card main-card-normal";
@@ -164,6 +174,11 @@
       const min = -this.singleCycleWidth * 2;
       const max = 0;
 
+      if (this.isIntroEntering) {
+        if (this.position > max) return;
+        this.isIntroEntering = false;
+      }
+
       if (this.position < min) {
         this.position += this.singleCycleWidth;
       } else if (this.position > max) {
@@ -240,9 +255,6 @@
     updateScanning() {
       if (!this.active) return;
       const scannerX = window.innerWidth / 2;
-      const scannerWidth = 8;
-      const scannerLeft = scannerX - scannerWidth / 2;
-      const scannerRight = scannerX + scannerWidth / 2;
 
       this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
         const rect = wrapper.getBoundingClientRect();
@@ -253,32 +265,21 @@
 
         // Unclamped scanner position across the card in UV space, fed to the
         // vfx dissolve shader. <0 = card fully right (intact), >1 = fully left (gone).
-        wrapper._scanQ = rect.width > 0 ? (scannerX - rect.left) / rect.width : 2;
+        wrapper._scanQ = rect.width > 0 ? (scannerX - rect.left) / rect.width : -1;
+        const scanAmount = Math.min(Math.max(wrapper._scanQ, 0), 1) * 100;
+        wrapper.style.setProperty("--clip-right", `${scanAmount}%`);
+        ascii.style.setProperty("--clip-left", `${scanAmount}%`);
         wrapper.style.setProperty("--scan-fade-x", `${wrapper._scanQ * 100}%`);
         wrapper.classList.toggle("is-scan-fading", wrapper._scanQ >= 0 && wrapper._scanQ <= 1);
 
         if (wrapper._previousScanQ < 0 && wrapper._scanQ >= 0) {
+          wrapper._dissolveSeed = Math.random();
           const flash = document.createElement("div");
           flash.className = "main-scan-effect";
           wrapper.appendChild(flash);
           setTimeout(() => flash.remove(), 700);
         }
         wrapper._previousScanQ = wrapper._scanQ;
-
-        if (rect.left < scannerRight && rect.right > scannerLeft) {
-          const scanLeft = Math.max(scannerLeft - rect.left, 0);
-          const scanRight = Math.min(scannerRight - rect.left, rect.width);
-          wrapper.style.setProperty("--clip-right", `${(scanLeft / rect.width) * 100}%`);
-          ascii.style.setProperty("--clip-left", `${(scanRight / rect.width) * 100}%`);
-        } else {
-          if (rect.right < scannerLeft) {
-            wrapper.style.setProperty("--clip-right", "100%");
-            ascii.style.setProperty("--clip-left", "100%");
-          } else if (rect.left > scannerRight) {
-            wrapper.style.setProperty("--clip-right", "0%");
-            ascii.style.setProperty("--clip-left", "0%");
-          }
-        }
       });
     }
 

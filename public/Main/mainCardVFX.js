@@ -18,6 +18,7 @@ uniform float progress;
 uniform float reveal;
 uniform float width;
 uniform float layers;
+uniform float seed;
 
 #define W width
 // Vertical overflow so the effect slightly covers the card top/bottom edges.
@@ -54,6 +55,7 @@ float cellX(vec2 pi, float scale) {
 
 vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
   vec2 pc = pi + .5;
+  vec2 s = vec2(seed * 17.13, seed * 41.71);
 
   vec2 uvc = pc / scale;
   uvc.y /= resolution.y / resolution.x;
@@ -69,12 +71,12 @@ vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
   float alpha = alphaTop * alphaBottom;
 
   // Monochrome cells: per-cell gray (black / white / gray).
-  float g = 0.35 + 0.65 * hash(pi + 7.);
+  float g = 0.35 + 0.65 * hash(pi + s + 7.);
   vec4 color = vec4(vec3(g), 1.);
 
   float x = cellX(pi, scale);
   // Straight left edge at the scanner (t); ragged right edge via per-cell reach.
-  float reach = W * (0.6 + 1.8 * hash(pi + 3.0));
+  float reach = W * (0.6 + 1.8 * hash(pi + s + 3.0));
   float anim = smoothstep(reach, 0.0, x - t);
 
   // Random tiny blocks around BOTH card side bands (left/right), so edges feel
@@ -84,7 +86,7 @@ vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
     smoothstep(0.88, 1.0, x)
   );
   float live = smoothstep(-0.03, 0.09, t) * (1.0 - smoothstep(1.02, 1.18, t));
-  float sideSeed = hash(pi + vec2(floor(t * 48.0), 31.7));
+  float sideSeed = hash(pi + s + vec2(floor(t * 48.0), 31.7));
   float smallOnly = smoothstep(11.0, 15.0, scale);
   float detachFront = smoothstep(0.10, 0.26, abs(x - t));
   float detachMain = 1.0 - smoothstep(0.05, 0.22, anim);
@@ -100,8 +102,8 @@ vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
   // Start reducing cell count slightly BEFORE the scanner reaches the right
   // edge (t ~= 1.0), then continue fading after crossing for a natural tail.
   float survive = 1.0 - smoothstep(0.86, 1.12, t);
-  float seed = hash(pi + vec2(17.3, 91.7));
-  float keep = smoothstep(seed - 0.12, seed + 0.12, survive);
+  float keepSeed = hash(pi + s + vec2(17.3, 91.7));
+  float keep = smoothstep(keepSeed - 0.12, keepSeed + 0.12, survive);
   color *= keep;
 
   color *= mix(
@@ -116,13 +118,14 @@ vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
 vec4 cellsColor(vec2 p, float scale, float t) {
   vec2 pi = floor(p);
   vec2 d = vec2(0, 1);
+  vec2 s = vec2(seed * 17.13, seed * 41.71);
 
   vec4 cc = vec4(0);
-  cc += cell(p, pi, scale, t, .2) * 5.;
-  cc += cell(p, pi + d.xy, scale, t, .9) *0.8;
-  cc += cell(p, pi - d.xy, scale, t, .9) *0.6;
-  cc += cell(p, pi + d.yx, scale, t, .9) *0.4;
-  cc += cell(p, pi - d.yx, scale, t, .9) *0.2;
+  cc += cell(p, pi, scale, t, .2) * mix(4., 7., hash(pi + s + vec2(11.3, 2.1)));
+  cc += cell(p, pi + d.xy, scale, t, .9) * mix(.4, 1., hash(pi + s + vec2(23.7, 5.9)));
+  cc += cell(p, pi - d.xy, scale, t, .9) * mix(.3, .8, hash(pi + s + vec2(31.1, 7.4)));
+  cc += cell(p, pi + d.yx, scale, t, .9) * mix(.2, .6, hash(pi + s + vec2(43.6, 13.2)));
+  cc += cell(p, pi - d.yx, scale, t, .9) * mix(.1, .4, hash(pi + s + vec2(59.8, 17.5)));
 
   return cc / 8.;
 }
@@ -131,13 +134,14 @@ vec4 draw(vec2 uv, vec2 p, float t, float scale) {
   vec4 c = readTex(uv);
 
   vec2 pi = floor(p * scale);
+  vec2 s = vec2(seed * 17.13, seed * 41.71);
   float x = cellX(pi, scale);
 
   // Ease in a bit slower so the effect doesn't pop too quickly on entry.
   float act = smoothstep(-0.03, 0.09, t);
 
   // Straight left edge at the scanner (t); ragged right edge via per-cell reach.
-  float reach = W * (0.6 + 1.8 * hash(pi + 3.0));
+  float reach = W * (0.6 + 1.8 * hash(pi + s + 3.0));
   float a1 = mix(1.0, smoothstep(t, t + reach, x), act);
   c *= a1;
 
@@ -186,7 +190,7 @@ window.MainCardVFX = {
   // Bind a `.main-card-normal` element to the pixel-scan dissolve.
   // getProgress(): scanner position across the card in UV space (can be <0 / >1).
   // getReveal():   stream activation fade amount [0,1].
-  bind(element, getProgress, getReveal) {
+  bind(element, getProgress, getReveal, getSeed) {
     getVFX().add(element, {
       shader,
       // Extra right overflow prevents clipping when the front reaches card edge.
@@ -198,6 +202,7 @@ window.MainCardVFX = {
         reveal: () => getReveal(),
         width: 0.12,
         layers: 2,
+        seed: () => getSeed(),
       },
     });
   },
