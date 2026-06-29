@@ -60,7 +60,9 @@
     async init() {
       const cubeParticlesPerEdge = 400;
       const burstParticlesPerEdge = 200;
-      const hoverParticlesPerEdge = 2400;
+      const hoverCoreParticlesPerEdge = 600;
+      const hoverScatterParticlesPerEdge = 1200;
+      const hoverParticlesPerEdge = hoverCoreParticlesPerEdge + hoverScatterParticlesPerEdge;
       const sizeOut = 0.5;
       const sizeIn = 0.25;
       const cubeEdges = [
@@ -80,8 +82,12 @@
       const burstMask = new Float32Array(totalParticles);
       let pIdx = 0;
       let burstVisibleIndex = 0;
+      let cubeVisibleIndex = 0;
 
-      this.hoverTargetPoints = await this.loadHoverTargetPoints(totalParticles);
+      this.hoverTargetPoints = await this.loadHoverTargetPoints(
+        totalParticles,
+        cubeEdges.length * hoverCoreParticlesPerEdge
+      );
 
       for (let x = -1; x <= 1; x += 2) {
         for (let y = -1; y <= 1; y += 2) {
@@ -95,18 +101,15 @@
         const [cornerA, cornerB] = edge;
         const vA = unitCorners[cornerA];
         const vB = unitCorners[cornerB];
-        const cubeStep = hoverParticlesPerEdge / cubeParticlesPerEdge;
-        const burstStep = hoverParticlesPerEdge / burstParticlesPerEdge;
 
         for (let p = 0; p < hoverParticlesPerEdge; p++) {
           const t = p / hoverParticlesPerEdge;
           const edgePoint = new THREE.Vector3().lerpVectors(vA, vB, t);
           const start = edgePoint.clone().multiplyScalar(sizeOut);
           const end = edgePoint.clone().multiplyScalar(sizeIn);
-          const cubeVisibleIndex = Math.floor(p / cubeStep);
-          const inward = cubeVisibleIndex % 2 === 0;
-          const isCubeVisible = p % cubeStep === 0;
-          const isBurstVisible = p % burstStep === 0;
+          const isCubeVisible = this.isVisibleSample(p, hoverParticlesPerEdge, cubeParticlesPerEdge);
+          const isBurstVisible = this.isVisibleSample(p, hoverParticlesPerEdge, burstParticlesPerEdge);
+          const inward = isCubeVisible ? cubeVisibleIndex % 2 === 0 : pIdx % 2 === 0;
           const burst = isBurstVisible
             ? this.getBurstPoint(burstVisibleIndex++, cubeEdges.length * burstParticlesPerEdge)
             : this.getBurstPoint(pIdx, totalParticles);
@@ -124,6 +127,7 @@
           );
           cubeMask[pIdx] = isCubeVisible ? 1 : 0;
           burstMask[pIdx] = isBurstVisible ? 1 : 0;
+          if (isCubeVisible) cubeVisibleIndex++;
           pIdx++;
         }
       });
@@ -197,7 +201,14 @@
               dot(worldRotation[1], squarePos),
               dot(worldRotation[2], squarePos)
             );
-            vec3 collapsedPos = mix(cubePos, hoverTarget, cubicBezierEase(uHover));
+            float hoverEase = cubicBezierEase(uHover);
+            float hoverMotion = smoothstep(0.72, 1.0, hoverEase) * (1.0 - uBurst);
+            vec2 hoverDir = normalize(squarePos.xy + vec2(0.0001));
+            vec2 hoverTangent = vec2(-hoverDir.y, hoverDir.x);
+            float drift = sin(uTime * 2.4 + offset * 18.8496) * 0.012;
+            float shimmer = cos(uTime * 3.1 + offset * 11.73) * 0.006;
+            vec3 hoverWiggle = vec3(hoverTangent * drift + hoverDir * shimmer, 0.0) * hoverMotion;
+            vec3 collapsedPos = mix(cubePos, hoverTarget + hoverWiggle, hoverEase);
 
             float radius = length(burstPos.xy);
             float orbitSpeed = mix(0.05, 0.2, fract(offset * 19.73));
@@ -214,7 +225,6 @@
             float orbitEase = smoothstep(0.96, 1.0, burstEase);
             vec3 burstTarget = mix(burstPos, orbitBurst, orbitEase);
             vec3 currentPos = mix(collapsedPos, burstTarget, burstEase);
-            float hoverEase = cubicBezierEase(uHover);
             float stageAlpha = mix(cubeMask, 1.0, hoverEase);
             vAlpha = mix(stageAlpha, burstMask, burstEase);
 
@@ -320,7 +330,8 @@
       this.container.classList.remove("is-hypercube-hovered");
     }
 
-    onPointerDown() {
+    onPointerDown(event) {
+      if (event.button !== 0) return;
       if (this.hoverAmount < 0.18 || this.burstTarget > 0) return;
 
       this.renderer.autoClear = true;
@@ -450,7 +461,7 @@
       return this.getSquarePoint(i, total);
     }
 
-    async loadHoverTargetPoints(total) {
+    async loadHoverTargetPoints(total, coreTotal) {
       try {
         const image = await this.loadImage("/assets/images/fullEye.svg");
         const maxCanvasSide = 360;
@@ -497,7 +508,7 @@
 
           if (weight <= 0.03) return;
 
-          activeWeight += weight * weight;
+          activeWeight += Math.pow(weight, 1.35);
           weightedPixels.push(sample);
           cumulative.push(activeWeight);
         });
@@ -506,18 +517,21 @@
           return [];
         }
 
-        const targetSize = 0.92 * 4.0;
+        const targetSize = 0.92 * 3.6;
         const aspect = width / height;
         const targetWidth = aspect >= 1 ? targetSize : targetSize * aspect;
         const targetHeight = aspect >= 1 ? targetSize / aspect : targetSize;
         const points = [];
 
         for (let i = 0; i < total; i++) {
-          const pick = Utils.hash(i * 19.73 + 3.17) * activeWeight;
+          const isScatterLayer = i >= coreTotal;
+          const seedOffset = isScatterLayer ? 97.31 : 0;
+          const pick = Utils.hash(i * 19.73 + 3.17 + seedOffset) * activeWeight;
           const pixelIndex = this.findWeightedPixel(cumulative, pick);
           const pixel = weightedPixels[pixelIndex];
-          const jitterX = Utils.hash(i * 31.11 + 7.91) - 0.5;
-          const jitterY = Utils.hash(i * 43.87 + 11.29) - 0.5;
+          const jitterScale = isScatterLayer ? 2.4 : 0;
+          const jitterX = (Utils.hash(i * 31.11 + 7.91 + seedOffset) - 0.5) * jitterScale;
+          const jitterY = (Utils.hash(i * 43.87 + 11.29 + seedOffset) - 0.5) * jitterScale;
           const u = (pixel.x + 0.5 + jitterX) / width;
           const v = (pixel.y + 0.5 + jitterY) / height;
           const x = (u - 0.5) * targetWidth;
@@ -531,6 +545,15 @@
         console.warn("Failed to load hover target image", error);
         return [];
       }
+    }
+
+    isVisibleSample(index, sourceCount, visibleCount) {
+      if (visibleCount >= sourceCount) return true;
+
+      const currentBucket = Math.floor((index * visibleCount) / sourceCount);
+      const previousBucket = Math.floor(((index - 1) * visibleCount) / sourceCount);
+
+      return index === 0 || currentBucket !== previousBucket;
     }
 
     loadImage(src) {
