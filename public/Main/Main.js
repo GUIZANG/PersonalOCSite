@@ -16,9 +16,22 @@
       this.hoverTarget = 0;
       this.burstAmount = 0;
       this.burstTarget = 0;
+      this.pressAmount = 0;
+      this.pressStartTime = 0;
+      this.pressPointerId = null;
+      this.longPressDuration = 3000;
+      this.hoverEnterRadiusRatio = 0.16;
+      this.hoverExitRadiusRatio = 0.4;
+      this.pressRadiusRatio = 0.06;
+      this.pressOffsetXRatio = -0.015;
+      this.pressOffsetYRatio = 0.015;
       this.baseRotationX = Math.sin(45 * Math.PI / 180);
       this.tesseract = null;
       this.mat = null;
+      this.hoverDust = null;
+      this.hoverDustMat = null;
+      this.hoverDustRays = null;
+      this.hoverDustRayMat = null;
       this.trails = null;
       this.trailMat = null;
       this.burstPositionAttribute = null;
@@ -49,19 +62,24 @@
       this.renderer.setClearColor(this.background, 1);
 
       this.container.insertBefore(this.renderer.domElement, this.container.firstChild);
+      this.pressTargetGuide = document.createElement("div");
+      this.pressTargetGuide.className = "hypercube-press-target-guide";
+      this.container.appendChild(this.pressTargetGuide);
 
       this.animate = this.animate.bind(this);
       this.onResize = this.onResize.bind(this);
       this.onPointerMove = this.onPointerMove.bind(this);
       this.onPointerLeave = this.onPointerLeave.bind(this);
       this.onPointerDown = this.onPointerDown.bind(this);
+      this.onPointerUp = this.onPointerUp.bind(this);
     }
 
     async init() {
       const cubeParticlesPerEdge = 400;
       const burstParticlesPerEdge = 200;
-      const hoverCoreParticlesPerEdge = 600;
-      const hoverScatterParticlesPerEdge = 1200;
+      const initialHoverCoreParticlesPerEdge = 1800;
+      const hoverCoreParticlesPerEdge = 10800;
+      const hoverScatterParticlesPerEdge = 0;
       const hoverParticlesPerEdge = hoverCoreParticlesPerEdge + hoverScatterParticlesPerEdge;
       const sizeOut = 0.5;
       const sizeIn = 0.25;
@@ -80,13 +98,16 @@
       const offsets = new Float32Array(totalParticles);
       const cubeMask = new Float32Array(totalParticles);
       const burstMask = new Float32Array(totalParticles);
+      const hoverMask = new Float32Array(totalParticles);
+      const pressThreshold = new Float32Array(totalParticles);
       let pIdx = 0;
       let burstVisibleIndex = 0;
       let cubeVisibleIndex = 0;
 
       this.hoverTargetPoints = await this.loadHoverTargetPoints(
         totalParticles,
-        cubeEdges.length * hoverCoreParticlesPerEdge
+        hoverCoreParticlesPerEdge,
+        hoverParticlesPerEdge
       );
 
       for (let x = -1; x <= 1; x += 2) {
@@ -109,6 +130,10 @@
           const end = edgePoint.clone().multiplyScalar(sizeIn);
           const isCubeVisible = this.isVisibleSample(p, hoverParticlesPerEdge, cubeParticlesPerEdge);
           const isBurstVisible = this.isVisibleSample(p, hoverParticlesPerEdge, burstParticlesPerEdge);
+          const isCoreLayer = p < hoverCoreParticlesPerEdge;
+          const isInitialCoreVisible = isCoreLayer &&
+            this.isVisibleSample(p, hoverCoreParticlesPerEdge, initialHoverCoreParticlesPerEdge);
+          const isScatterLayer = !isCoreLayer;
           const inward = isCubeVisible ? cubeVisibleIndex % 2 === 0 : pIdx % 2 === 0;
           const burst = isBurstVisible
             ? this.getBurstPoint(burstVisibleIndex++, cubeEdges.length * burstParticlesPerEdge)
@@ -127,6 +152,8 @@
           );
           cubeMask[pIdx] = isCubeVisible ? 1 : 0;
           burstMask[pIdx] = isBurstVisible ? 1 : 0;
+          hoverMask[pIdx] = (isInitialCoreVisible || isScatterLayer) ? 1 : 0;
+          pressThreshold[pIdx] = isCoreLayer ? Math.max(Utils.hash(pIdx * 23.17 + 5.91), 0.001) : 2;
           if (isCubeVisible) cubeVisibleIndex++;
           pIdx++;
         }
@@ -139,6 +166,8 @@
       geo.setAttribute("offset", new THREE.BufferAttribute(offsets, 1));
       geo.setAttribute("cubeMask", new THREE.BufferAttribute(cubeMask, 1));
       geo.setAttribute("burstMask", new THREE.BufferAttribute(burstMask, 1));
+      geo.setAttribute("hoverMask", new THREE.BufferAttribute(hoverMask, 1));
+      geo.setAttribute("pressThreshold", new THREE.BufferAttribute(pressThreshold, 1));
       this.burstPositionAttribute = geo.getAttribute("burstPos");
 
       this.mat = new THREE.ShaderMaterial({
@@ -146,6 +175,7 @@
           uTime: { value: 0 },
           uHover: { value: 0 },
           uBurst: { value: 0 },
+          uPress: { value: 0 },
           uColor: { value: new THREE.Color(this.foreground) },
           uResolution: { value: window.innerHeight * Math.min(window.devicePixelRatio, 2) },
         },
@@ -153,6 +183,7 @@
           uniform float uTime;
           uniform float uHover;
           uniform float uBurst;
+          uniform float uPress;
           uniform float uResolution;
           attribute vec3 targetPos;
           attribute vec3 squarePos;
@@ -160,6 +191,8 @@
           attribute float offset;
           attribute float cubeMask;
           attribute float burstMask;
+          attribute float hoverMask;
+          attribute float pressThreshold;
           varying float vAlpha;
 
           float cubicBezierX(float t, float x1, float x2) {
@@ -200,7 +233,7 @@
               dot(worldRotation[0], squarePos),
               dot(worldRotation[1], squarePos),
               dot(worldRotation[2], squarePos)
-            );
+            ) * (1.5 + uPress * 0.12);
             float hoverEase = cubicBezierEase(uHover);
             float hoverMotion = smoothstep(0.72, 1.0, hoverEase) * (1.0 - uBurst);
             vec2 hoverDir = normalize(squarePos.xy + vec2(0.0001));
@@ -225,7 +258,11 @@
             float orbitEase = smoothstep(0.96, 1.0, burstEase);
             vec3 burstTarget = mix(burstPos, orbitBurst, orbitEase);
             vec3 currentPos = mix(collapsedPos, burstTarget, burstEase);
-            float stageAlpha = mix(cubeMask, 1.0, hoverEase);
+            float pressReveal = step(pressThreshold, uPress);
+            float edgeAmount = smoothstep(1.08, 1.66, max(abs(squarePos.x), abs(squarePos.y)));
+            float edgeAlpha = mix(1.0, 0.5, edgeAmount);
+            float hoverAlpha = max(hoverMask, pressReveal) * edgeAlpha;
+            float stageAlpha = mix(cubeMask, hoverAlpha, hoverEase);
             vAlpha = mix(stageAlpha, burstMask, burstEase);
 
             vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
@@ -251,6 +288,8 @@
 
       this.tesseract = new THREE.Points(geo, this.mat);
       this.tesseract.rotation.x = this.baseRotationX;
+      this.tesseract.renderOrder = 2;
+      this.createHoverDust();
       this.scene.add(this.tesseract);
 
       this.createTrails(burstPos, offsets, burstMask);
@@ -259,6 +298,9 @@
       this.container.addEventListener("pointermove", this.onPointerMove);
       this.container.addEventListener("pointerleave", this.onPointerLeave);
       this.container.addEventListener("pointerdown", this.onPointerDown);
+      this.container.addEventListener("pointerup", this.onPointerUp);
+      this.container.addEventListener("pointercancel", this.onPointerUp);
+      this.updatePressTargetGuide();
       this.animate(0);
     }
 
@@ -274,10 +316,33 @@
       this.hoverAmount += (this.hoverTarget - this.hoverAmount) * 0.08;
       this.burstAmount += (this.burstTarget - this.burstAmount) * 0.025;
 
+      if (this.pressPointerId !== null && this.burstTarget === 0) {
+        this.pressAmount = Math.min((performance.now() - this.pressStartTime) / this.longPressDuration, 1);
+        if (this.pressAmount >= 1) {
+          this.activateBurst();
+        }
+      } else if (this.burstTarget > 0) {
+        this.pressAmount = 1;
+      } else {
+        this.pressAmount += (0 - this.pressAmount) * 0.12;
+      }
+
       if (this.mat) {
         this.mat.uniforms.uTime.value = time / 1000;
         this.mat.uniforms.uHover.value = this.hoverAmount;
         this.mat.uniforms.uBurst.value = this.burstAmount;
+        this.mat.uniforms.uPress.value = this.pressAmount;
+      }
+
+      if (this.hoverDustMat) {
+        this.hoverDustMat.uniforms.uTime.value = time / 1000;
+        this.hoverDustMat.uniforms.uHover.value = this.hoverAmount;
+        this.hoverDustMat.uniforms.uBurst.value = this.burstAmount;
+        this.hoverDustMat.uniforms.uPress.value = this.pressAmount;
+      }
+      if (this.hoverDustRayMat) {
+        this.hoverDustRayMat.uniforms.uHover.value = this.hoverAmount;
+        this.hoverDustRayMat.uniforms.uBurst.value = this.burstAmount;
       }
 
       const trailAmount = smoothstep(0.82, 0.96, this.burstAmount);
@@ -308,34 +373,61 @@
       if (this.mat) {
         this.mat.uniforms.uResolution.value = window.innerHeight * Math.min(window.devicePixelRatio, 2);
       }
+      if (this.hoverDustMat) {
+        this.hoverDustMat.uniforms.uResolution.value = window.innerHeight * Math.min(window.devicePixelRatio, 2);
+      }
+      this.updatePressTargetGuide();
       this.updateBurstPositions();
     }
 
     onPointerMove(event) {
       if (this.burstTarget > 0) return;
 
-      const rect = this.renderer.domElement.getBoundingClientRect();
-      const x = event.clientX - rect.left - rect.width / 2;
-      const y = event.clientY - rect.top - rect.height / 2;
-      const distance = Math.hypot(x, y);
-      const hitRadius = Math.min(rect.width, rect.height) * 0.16;
+      const { distance, rect } = this.getCenterDistance(event);
+      const base = Math.min(rect.width, rect.height);
+      const isHovering = this.hoverTarget === 1 || this.hoverAmount > 0.18;
+      const hitRadius = base * (isHovering ? this.hoverExitRadiusRatio : this.hoverEnterRadiusRatio);
+
       this.hoverTarget = distance < hitRadius ? 1 : 0;
       this.container.classList.toggle("is-hypercube-hovered", this.hoverTarget === 1);
+
+      if (this.pressPointerId === event.pointerId && !this.isInPressCenter(event)) {
+        this.cancelLongPress();
+      }
     }
 
     onPointerLeave() {
       if (this.burstTarget > 0) return;
 
+      this.cancelLongPress();
       this.hoverTarget = 0;
       this.container.classList.remove("is-hypercube-hovered");
     }
 
     onPointerDown(event) {
       if (event.button !== 0) return;
-      if (this.hoverAmount < 0.18 || this.burstTarget > 0) return;
+      if (this.burstTarget > 0 || !this.isInPressCenter(event)) return;
+
+      this.pressStartTime = performance.now();
+      this.pressPointerId = event.pointerId;
+      this.hoverTarget = 1;
+      this.container.setPointerCapture?.(event.pointerId);
+    }
+
+    onPointerUp(event) {
+      if (this.pressPointerId !== event.pointerId) return;
+
+      this.cancelLongPress();
+      this.container.releasePointerCapture?.(event.pointerId);
+    }
+
+    activateBurst() {
+      if (this.burstTarget > 0) return;
 
       this.renderer.autoClear = true;
       this.renderer.clear();
+      this.pressPointerId = null;
+      this.pressAmount = 1;
       this.hoverTarget = 1;
       this.burstTarget = 1;
       this.container.classList.remove("is-hypercube-hovered");
@@ -343,6 +435,65 @@
       if (this.cardStream) {
         this.cardStream.activate();
       }
+    }
+
+    cancelLongPress() {
+      this.pressStartTime = 0;
+      this.pressPointerId = null;
+    }
+
+    isInPressCenter(event) {
+      const { distance, rect } = this.getPressDistance(event);
+      const pressRadius = this.getPressRadius(rect);
+
+      return distance < pressRadius;
+    }
+
+    updatePressTargetGuide() {
+      if (!this.pressTargetGuide) return;
+
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      const diameter = this.getPressRadius(rect) * 2;
+      const center = this.getPressCenter(rect);
+
+      this.pressTargetGuide.style.left = `${center.x}px`;
+      this.pressTargetGuide.style.top = `${center.y}px`;
+      this.pressTargetGuide.style.width = `${diameter}px`;
+      this.pressTargetGuide.style.height = `${diameter}px`;
+    }
+
+    getPressRadius(rect) {
+      return Math.min(rect.width, rect.height) * this.pressRadiusRatio;
+    }
+
+    getPressCenter(rect) {
+      const base = Math.min(rect.width, rect.height);
+
+      return {
+        x: rect.left + rect.width / 2 + base * this.pressOffsetXRatio,
+        y: rect.top + rect.height / 2 + base * this.pressOffsetYRatio,
+      };
+    }
+
+    getPressDistance(event) {
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      const center = this.getPressCenter(rect);
+
+      return {
+        distance: Math.hypot(event.clientX - center.x, event.clientY - center.y),
+        rect,
+      };
+    }
+
+    getCenterDistance(event) {
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      const x = event.clientX - rect.left - rect.width / 2;
+      const y = event.clientY - rect.top - rect.height / 2;
+
+      return {
+        distance: Math.hypot(x, y),
+        rect,
+      };
     }
 
     setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, offsets, burst) {
@@ -362,6 +513,177 @@
       burstPos[index + 1] = burst.y;
       burstPos[index + 2] = burst.z;
       offsets[i] = Utils.random();
+    }
+
+    createHoverDust() {
+      const count = 6400;
+      const positions = new Float32Array(count * 3);
+      const offsets = new Float32Array(count);
+      const alpha = new Float32Array(count);
+      const rayStrength = new Float32Array(count);
+      const base = this.getHoverDustBaseSize();
+      const centerX = base * this.pressOffsetXRatio;
+      const centerY = -base * this.pressOffsetYRatio;
+      const innerRadius = base * 0.32;
+      const outerRadius = base * 0.82;
+      const fadeStartRadius = base * 0.59 * 1.2;
+      const rayCount = 108;
+
+      for (let i = 0; i < count; i++) {
+        const radiusT = Math.pow(Utils.hash(i * 17.91 + 4.13), 1.35);
+        const rayIndex = Math.floor(Utils.hash(i * 29.37 + 9.61) * rayCount);
+        const rayBaseAngle = (rayIndex / rayCount) * Math.PI * 2;
+        const angle = rayBaseAngle;
+        const radius = THREE.MathUtils.lerp(innerRadius, outerRadius, radiusT);
+        const maxBlur = base * 0.01 * (0.3 + radiusT);
+        const blur = (Utils.hash(i * 53.79 + 8.43) - 0.5) * maxBlur;
+        const index = i * 3;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const outerFade = smoothstep(fadeStartRadius, outerRadius, radius);
+        const keepChance = THREE.MathUtils.lerp(1, 0.34, outerFade);
+        const visible = Utils.hash(i * 67.33 + 12.07) <= keepChance ? 1 : 0;
+        const edgeAlpha = THREE.MathUtils.lerp(1, 0.3, outerFade) * visible;
+
+        positions[index] = centerX + cos * radius + Math.cos(angle + Math.PI / 2) * blur;
+        positions[index + 1] = centerY + sin * radius + Math.sin(angle + Math.PI / 2) * blur;
+        positions[index + 2] = -0.08;
+        offsets[i] = Utils.hash(i * 37.19 + 2.71);
+        alpha[i] = 0.8 * edgeAlpha;
+        rayStrength[i] = 1 - Math.abs(blur) / (maxBlur * 0.5);
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute("offset", new THREE.BufferAttribute(offsets, 1));
+      geo.setAttribute("alpha", new THREE.BufferAttribute(alpha, 1));
+      geo.setAttribute("rayStrength", new THREE.BufferAttribute(rayStrength, 1));
+
+      this.hoverDustMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uHover: { value: 0 },
+          uBurst: { value: 0 },
+          uPress: { value: 0 },
+          uColor: { value: new THREE.Color(this.foreground) },
+          uDustCenter: { value: new THREE.Vector2(centerX, centerY) },
+          uResolution: { value: window.innerHeight * Math.min(window.devicePixelRatio, 2) },
+        },
+        vertexShader: `
+          uniform float uTime;
+          uniform float uHover;
+          uniform float uBurst;
+          uniform float uPress;
+          uniform float uResolution;
+          uniform vec2 uDustCenter;
+          attribute float offset;
+          attribute float alpha;
+          attribute float rayStrength;
+          varying float vAlpha;
+
+          void main() {
+            float fade = uHover * (1.0 - uBurst);
+            vec3 currentPos = position;
+            vec2 fromCenter = currentPos.xy - uDustCenter;
+            vec2 dustDir = normalize(fromCenter + vec2(0.0001));
+            vec2 dustTangent = vec2(-dustDir.y, dustDir.x);
+            float dustScale = 1.0 + uPress * 0.08;
+            float hoverMotion = smoothstep(0.72, 1.0, uHover) * (1.0 - uBurst);
+            float drift = sin(uTime * 2.4 + offset * 18.8496) * 0.012;
+            float shimmer = cos(uTime * 3.1 + offset * 11.73) * 0.006;
+            float pressMotion = smoothstep(0.0, 1.0, uPress) * (1.0 - uBurst);
+            float rayLength = (0.05 + offset * 0.09) * pressMotion;
+            float rayNoise = sin(uTime * 1.35 + offset * 37.6991) * 0.012 * pressMotion;
+
+            currentPos.xy = uDustCenter + fromCenter * dustScale;
+            currentPos.xy += (dustTangent * drift + dustDir * shimmer) * hoverMotion;
+            currentPos.xy += dustDir * (rayLength + rayNoise) + dustTangent * rayNoise * 0.45;
+
+            vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
+            gl_PointSize = (uResolution / 185.0) * (1.0 / -mvPosition.z);
+            gl_Position = projectionMatrix * mvPosition;
+            float pressGlow = 1.0 + uPress * 0.55;
+            vAlpha = alpha * pressGlow * mix(0.42, 1.0, clamp(rayStrength, 0.0, 1.0)) * fade;
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uColor;
+          varying float vAlpha;
+
+          void main() {
+            if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
+            gl_FragColor = vec4(uColor, vAlpha);
+          }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+      });
+
+      this.hoverDust = new THREE.Points(geo, this.hoverDustMat);
+      this.hoverDust.renderOrder = 1;
+      this.scene.add(this.hoverDust);
+      this.createHoverDustRayGuides(centerX, centerY, innerRadius, outerRadius, rayCount);
+    }
+
+    createHoverDustRayGuides(centerX, centerY, innerRadius, outerRadius, rayCount) {
+      const positions = new Float32Array(rayCount * 2 * 3);
+
+      for (let i = 0; i < rayCount; i++) {
+        const angle = (i / rayCount) * Math.PI * 2;
+        const start = i * 6;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        positions[start] = centerX + cos * innerRadius;
+        positions[start + 1] = centerY + sin * innerRadius;
+        positions[start + 2] = -0.06;
+        positions[start + 3] = centerX + cos * outerRadius;
+        positions[start + 4] = centerY + sin * outerRadius;
+        positions[start + 5] = -0.06;
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+      this.hoverDustRayMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uHover: { value: 0 },
+          uBurst: { value: 0 },
+          uColor: { value: new THREE.Color(0xffff00) },
+        },
+        vertexShader: `
+          void main() {
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uColor;
+          uniform float uHover;
+          uniform float uBurst;
+
+          void main() {
+            gl_FragColor = vec4(uColor, uHover * (1.0 - uBurst) * 0.55);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+      });
+
+      this.hoverDustRays = new THREE.LineSegments(geo, this.hoverDustRayMat);
+      this.hoverDustRays.renderOrder = 3;
+      this.hoverDustRays.visible = false;
+      this.scene.add(this.hoverDustRays);
+    }
+
+    getHoverDustBaseSize() {
+      const vFov = THREE.MathUtils.degToRad(this.camera.fov);
+      const visibleHeight = 2 * Math.tan(vFov / 2) * this.camera.position.z;
+      const visibleWidth = visibleHeight * this.camera.aspect;
+
+      return Math.min(visibleWidth, visibleHeight);
     }
 
     createTrails(burstPos, offsets, burstMask) {
@@ -461,7 +783,7 @@
       return this.getSquarePoint(i, total);
     }
 
-    async loadHoverTargetPoints(total, coreTotal) {
+    async loadHoverTargetPoints(total, coreParticlesPerEdge, particlesPerEdge) {
       try {
         const image = await this.loadImage("/assets/images/fullEye.svg");
         const maxCanvasSide = 360;
@@ -506,9 +828,9 @@
         samples.forEach((sample) => {
           const weight = useDarkWeight ? sample.darkWeight : sample.weight;
 
-          if (weight <= 0.03) return;
+          if (weight <= 0.06) return;
 
-          activeWeight += Math.pow(weight, 1.35);
+          activeWeight += Math.pow(weight, 1.7);
           weightedPixels.push(sample);
           cumulative.push(activeWeight);
         });
@@ -524,12 +846,12 @@
         const points = [];
 
         for (let i = 0; i < total; i++) {
-          const isScatterLayer = i >= coreTotal;
+          const isScatterLayer = (i % particlesPerEdge) >= coreParticlesPerEdge;
           const seedOffset = isScatterLayer ? 97.31 : 0;
           const pick = Utils.hash(i * 19.73 + 3.17 + seedOffset) * activeWeight;
           const pixelIndex = this.findWeightedPixel(cumulative, pick);
           const pixel = weightedPixels[pixelIndex];
-          const jitterScale = isScatterLayer ? 2.4 : 0;
+          const jitterScale = isScatterLayer ? 1.5 : 0;
           const jitterX = (Utils.hash(i * 31.11 + 7.91 + seedOffset) - 0.5) * jitterScale;
           const jitterY = (Utils.hash(i * 43.87 + 11.29 + seedOffset) - 0.5) * jitterScale;
           const u = (pixel.x + 0.5 + jitterX) / width;

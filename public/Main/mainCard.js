@@ -284,18 +284,36 @@
     }
 
     generateCode(card, index, width = 54, height = 20) {
-      const seeds = [
-        `const ${card.title.toLowerCase()} = archive.open(${index + 1});`,
-        "for (let i = 0; i < memory.length; i++) scan(memory[i]);",
-        "if (signal.visible) route('precognitive-strata');",
-        "return glyph.map(node => node.frequency).join(' ');",
-        "entropy += vector.x * vector.y - threshold;",
-      ];
+      const passage =
+        "If someone sees the One of Proper Enlightenment as liberated and free from all outflows, and as not being attached to all worlds, that person still has not certified to the Way-eye. If someone knows that the Thus Come One’s body and marks do not exist, and cultivates and attains this understanding, then that person will quickly become a Buddha. If one can look upon this world with a mind that is unmoving, and see Buddhas and living beings as the same, then such a one will accomplish supreme wisdom. If, with regard to the Buddha and the Dharma, one’s mind is completely level and equal, and the two thoughts do not manifest, then one will realize the position which is hard to conceive of. If there is someone who sees the Buddha and living beings as level and equal, and peacefully dwelling, yet without dwelling and without a place of entering, then that person will become one who is difficult to encounter. Forms and feelings are without number; thinking, processes, and consciousness are also like this. If one is able to know this, then one can become a great muni. If worldly and world-transcending views are leapt far beyond, and if one is well able to know all Dharmas, then such a one will accomplish great brilliance. If someone produces a mind of transference toward all-wisdom, and sees the mind as not being produced, then such a one will obtain great renown. Living beings are without production and also without extinction. If one is able to obtain this kind of wisdom, then one will accomplish the Unsurpassed Way. Within one there are the limitless, and within the limitless there is one. If one understands that they mutually arise, then one will accomplish fearlessness.";
+      const lines = [];
+
+      for (const sentence of passage.split("\n")) {
+        const words = sentence.split(" ");
+        let current = "";
+
+        for (const word of words) {
+          const candidate = current ? `${current} ${word}` : word;
+          if (candidate.length <= width) {
+            current = candidate;
+          } else {
+            if (current) lines.push(current);
+            current = word.slice(0, width);
+          }
+        }
+        if (current) lines.push(current);
+      }
+
       let text = "";
       for (let row = 0; row < height; row++) {
-        const seed = seeds[(row + index) % seeds.length];
-        const noise = ` // ${hash(row * 17 + index).toString().slice(2, 10)}`;
-        text += (seed + noise).padEnd(width, " ").slice(0, width);
+        const line = lines[(row + index) % lines.length] || "";
+        const raggedStart = Math.floor(width / 2);
+        const raggedRange = Math.max(width - raggedStart, 1);
+        const visibleWidth = raggedStart + Math.floor(hash(index * 131 + row * 29) * raggedRange);
+        const cutAt = line.length > visibleWidth ? line.lastIndexOf(" ", visibleWidth) : line.length;
+        const displayLine = line.slice(0, cutAt > 0 ? cutAt : line.length);
+
+        text += displayLine.padEnd(width, " ").slice(0, width);
         if (row < height - 1) text += "\n";
       }
       return text;

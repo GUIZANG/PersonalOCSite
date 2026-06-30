@@ -43,6 +43,21 @@ button,
   height: 100%;
 }
 
+.hypercube-press-target-guide {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.hypercube-stage.is-hypercube-bursting .hypercube-press-target-guide {
+  opacity: 0;
+}
+
 .main-card-stream {
   position: fixed;
   inset: 0;
