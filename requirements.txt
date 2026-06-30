@@ -21,7 +21,8 @@
 # - Main archive scene uses Three.js from the project dependency/local static script path.
 # - Local bundled static libraries are under public/libs/.
 # - Shared static assets are under public/assets/images, public/assets/fonts, public/assets/audio.
-# - Main archive scan-card VFX now relies on bundled vfx-js and Three.js static scripts.
+# - Main archive cursor, hover particles, and scan-card VFX rely on bundled static scripts
+#   plus the npm dependencies listed below.
 # - If a dev server was already running before new public files were added, restart Vite
 #   or use a fresh port so newly added static files are served.
 
@@ -33,3 +34,4 @@ vue>=3.5.24
 # npm devDependencies
 vite>=7.2.4
 @vitejs/plugin-vue>=6.0.1
+puppeteer-core>=23.11.1

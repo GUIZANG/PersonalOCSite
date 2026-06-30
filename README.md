@@ -48,10 +48,10 @@ npm run preview
 
 🔹 **Recent Update (Main Scene)**
 
-- Stabilized the Main archive card stream loop using layout-based cycle measurements
-- Refined card clipping so borders, reflections, and content stay bounded to each card
-- Added a narrow scanner-adjacent fade across card surfaces and internal content
-- Tuned scan-flash triggering and dissolve weighting for cleaner one-pass transitions
+- Refined the Main archive cursor with responsive sizing, hover scaling, press glitch, and right-click screen glitch feedback
+- Tuned the hypercube hover state with dust rays, hover particles, and clearer pointer-target response
+- Stabilized the scanning archive card stream with drag support, loop measurement, clipped card reflections, and scanner-adjacent fade
+- Kept VFX dependencies local to the static multi-page Vite flow for predictable development and preview behavior
 
 🔹 **Project Goal**
 
