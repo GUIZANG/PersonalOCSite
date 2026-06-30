@@ -101,7 +101,12 @@ button,
   --outer-y: 0px;
   --dot-x: 0px;
   --dot-y: 0px;
-  --cursor-scale: 1;
+  --cursor-outer-size: 25px;
+  --cursor-outer-half-size: 12.5px;
+  --cursor-outer-scaled-half-size: 12.5px;
+  --cursor-dot-size: 6px;
+  --cursor-dot-half-size: 3px;
+  --cursor-render-scale: 1;
   --cursor-shadow: 0 0 0 #00feff, 0 0 0 #ff4f71;
   pointer-events: none;
   isolation: isolate;
@@ -113,17 +118,18 @@ button,
   position: absolute;
   top: 0;
   left: 0;
-  width: 25px;
-  height: 25px;
+  width: var(--cursor-outer-size);
+  height: var(--cursor-outer-size);
   border-radius: 50%;
   background-color: rgba(34, 34, 34, 0.88);
   box-shadow: var(--cursor-shadow);
+  transform-origin: top left;
   transform: translate3d(
-      calc(var(--outer-x) - 12.5px),
-      calc(var(--outer-y) - 12.5px),
+      calc(var(--outer-x) - var(--cursor-outer-scaled-half-size)),
+      calc(var(--outer-y) - var(--cursor-outer-scaled-half-size)),
       0
     )
-    scale(var(--cursor-scale));
+    scale(var(--cursor-render-scale));
   transition: box-shadow 80ms ease;
   will-change: transform, box-shadow;
 }
@@ -133,13 +139,13 @@ button,
   position: absolute;
   top: 0;
   left: 0;
-  width: 6px;
-  height: 6px;
+  width: var(--cursor-dot-size);
+  height: var(--cursor-dot-size);
   border-radius: 50%;
   background: #f7f8fa;
   transform: translate3d(
-    calc(var(--dot-x) - 3px),
-    calc(var(--dot-y) - 3px),
+    calc(var(--dot-x) - var(--cursor-dot-half-size)),
+    calc(var(--dot-y) - var(--cursor-dot-half-size)),
     0
   );
   z-index: 1;

@@ -37,10 +37,14 @@
       this.revealTarget = 1;
 
       if (!this.hasStarted) {
-        this.position = window.innerWidth / 2 + window.innerWidth / 3;
+        this.position = this.getIntroStartPosition();
         this.isIntroEntering = true;
         this.hasStarted = true;
       }
+    }
+
+    getIntroStartPosition() {
+      return window.innerWidth * (2 / 3);
     }
 
     bindVFX() {
@@ -110,6 +114,9 @@
       window.addEventListener("resize", () => {
         this.fitAsciiContent();
         this.calculateCycleWidth();
+        if (this.isIntroEntering) {
+          this.position = this.getIntroStartPosition();
+        }
       });
       this.line.addEventListener("wheel", (event) => {
         if (!this.active) return;

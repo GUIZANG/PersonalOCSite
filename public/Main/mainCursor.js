@@ -16,6 +16,9 @@
     const glitchColorB = "#00feff";
     const glitchColorR = "#ff4f71";
     const defaultShadow = `0 0 0 ${glitchColorB}, 0 0 0 ${glitchColorR}`;
+    const desktopReferenceHeight = 1080;
+    const desktopOuterSize = 25;
+    const desktopDotSize = 6;
     let targetX = 0;
     let targetY = 0;
     let dotX = 0;
@@ -34,6 +37,7 @@
     let screenGlitchUntil = 0;
     let hasPointerPosition = false;
     let animationFrame = null;
+    let cursorOuterSize = desktopOuterSize;
 
     cursor.removeAttribute("hidden");
     screenGlitch?.removeAttribute("hidden");
@@ -42,7 +46,9 @@
     document.addEventListener("pointerup", endPressGlitch);
     document.addEventListener("pointercancel", endPressGlitch);
     document.addEventListener("contextmenu", (event) => event.preventDefault());
+    window.addEventListener("resize", updateCursorSize);
     window.addEventListener("blur", endPressGlitch);
+    updateCursorSize();
 
     function moveCursor(event) {
       const nextPointerX = event.clientX;
@@ -111,11 +117,26 @@
 
     function renderCursor() {
       const clickScale = isClicking ? 0.75 : 1;
+      const renderScale = hoverScale * clickScale;
       cursor.style.setProperty("--dot-x", `${dotX}px`);
       cursor.style.setProperty("--dot-y", `${dotY}px`);
       cursor.style.setProperty("--outer-x", `${outerX}px`);
       cursor.style.setProperty("--outer-y", `${outerY}px`);
-      cursor.style.setProperty("--cursor-scale", hoverScale * clickScale);
+      cursor.style.setProperty("--cursor-render-scale", renderScale);
+      cursor.style.setProperty("--cursor-outer-scaled-half-size", `${(cursorOuterSize * renderScale) / 2}px`);
+    }
+
+    function updateCursorSize() {
+      const scale = window.innerHeight / desktopReferenceHeight;
+      const outerSize = desktopOuterSize * scale;
+      const dotSize = desktopDotSize * scale;
+      cursorOuterSize = outerSize;
+
+      cursor.style.setProperty("--cursor-outer-size", `${outerSize}px`);
+      cursor.style.setProperty("--cursor-outer-half-size", `${outerSize / 2}px`);
+      cursor.style.setProperty("--cursor-outer-scaled-half-size", `${(outerSize * hoverScale) / 2}px`);
+      cursor.style.setProperty("--cursor-dot-size", `${dotSize}px`);
+      cursor.style.setProperty("--cursor-dot-half-size", `${dotSize / 2}px`);
     }
 
     function animateCursor() {

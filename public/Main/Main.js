@@ -14,6 +14,9 @@
       this.duration = 16000;
       this.hoverAmount = 0;
       this.hoverTarget = 0;
+      this.hoverDustAmount = 0;
+      this.hoverDustTarget = 0;
+      this.isHoverDustExiting = false;
       this.burstAmount = 0;
       this.burstTarget = 0;
       this.pressAmount = 0;
@@ -314,6 +317,8 @@
       }
 
       this.hoverAmount += (this.hoverTarget - this.hoverAmount) * 0.08;
+      this.updateHoverDustState();
+      this.hoverDustAmount += (this.hoverDustTarget - this.hoverDustAmount) * 0.12;
       this.burstAmount += (this.burstTarget - this.burstAmount) * 0.025;
 
       if (this.pressPointerId !== null && this.burstTarget === 0) {
@@ -336,12 +341,12 @@
 
       if (this.hoverDustMat) {
         this.hoverDustMat.uniforms.uTime.value = time / 1000;
-        this.hoverDustMat.uniforms.uHover.value = this.hoverAmount;
+        this.hoverDustMat.uniforms.uHover.value = this.hoverDustAmount;
         this.hoverDustMat.uniforms.uBurst.value = this.burstAmount;
         this.hoverDustMat.uniforms.uPress.value = this.pressAmount;
       }
       if (this.hoverDustRayMat) {
-        this.hoverDustRayMat.uniforms.uHover.value = this.hoverAmount;
+        this.hoverDustRayMat.uniforms.uHover.value = this.hoverDustAmount;
         this.hoverDustRayMat.uniforms.uBurst.value = this.burstAmount;
       }
 
@@ -388,8 +393,11 @@
       const isHovering = this.hoverTarget === 1 || this.hoverAmount > 0.18;
       const hitRadius = base * (isHovering ? this.hoverExitRadiusRatio : this.hoverEnterRadiusRatio);
 
-      this.hoverTarget = distance < hitRadius ? 1 : 0;
-      this.container.classList.toggle("is-hypercube-hovered", this.hoverTarget === 1);
+      if (distance < hitRadius) {
+        this.enterHover();
+      } else {
+        this.exitHover();
+      }
 
       if (this.pressPointerId === event.pointerId && !this.isInPressCenter(event)) {
         this.cancelLongPress();
@@ -400,8 +408,7 @@
       if (this.burstTarget > 0) return;
 
       this.cancelLongPress();
-      this.hoverTarget = 0;
-      this.container.classList.remove("is-hypercube-hovered");
+      this.exitHover();
     }
 
     onPointerDown(event) {
@@ -410,7 +417,7 @@
 
       this.pressStartTime = performance.now();
       this.pressPointerId = event.pointerId;
-      this.hoverTarget = 1;
+      this.enterHover();
       this.container.setPointerCapture?.(event.pointerId);
     }
 
@@ -419,6 +426,41 @@
 
       this.cancelLongPress();
       this.container.releasePointerCapture?.(event.pointerId);
+    }
+
+    enterHover() {
+      this.isHoverDustExiting = false;
+      this.hoverTarget = 1;
+      this.container.classList.add("is-hypercube-hovered");
+    }
+
+    exitHover() {
+      this.hoverDustTarget = 0;
+      this.isHoverDustExiting = this.hoverDustAmount > 0.02;
+
+      if (!this.isHoverDustExiting) {
+        this.hoverTarget = 0;
+        this.container.classList.remove("is-hypercube-hovered");
+      }
+    }
+
+    updateHoverDustState() {
+      if (this.burstTarget > 0) {
+        this.hoverDustTarget = 0;
+        return;
+      }
+
+      if (this.isHoverDustExiting) {
+        this.hoverDustTarget = 0;
+        if (this.hoverDustAmount <= 0.035) {
+          this.isHoverDustExiting = false;
+          this.hoverTarget = 0;
+          this.container.classList.remove("is-hypercube-hovered");
+        }
+        return;
+      }
+
+      this.hoverDustTarget = this.hoverTarget === 1 && this.hoverAmount > 0.86 ? 1 : 0;
     }
 
     activateBurst() {
@@ -582,20 +624,21 @@
           varying float vAlpha;
 
           void main() {
-            float fade = uHover * (1.0 - uBurst);
+            float dustReveal = smoothstep(0.0, 1.0, uHover);
+            float fade = dustReveal * (1.0 - uBurst);
             vec3 currentPos = position;
             vec2 fromCenter = currentPos.xy - uDustCenter;
             vec2 dustDir = normalize(fromCenter + vec2(0.0001));
             vec2 dustTangent = vec2(-dustDir.y, dustDir.x);
             float dustScale = 1.0 + uPress * 0.08;
-            float hoverMotion = smoothstep(0.72, 1.0, uHover) * (1.0 - uBurst);
+            float hoverMotion = smoothstep(0.72, 1.0, dustReveal) * (1.0 - uBurst);
             float drift = sin(uTime * 2.4 + offset * 18.8496) * 0.012;
             float shimmer = cos(uTime * 3.1 + offset * 11.73) * 0.006;
             float pressMotion = smoothstep(0.0, 1.0, uPress) * (1.0 - uBurst);
             float rayLength = (0.05 + offset * 0.09) * pressMotion;
             float rayNoise = sin(uTime * 1.35 + offset * 37.6991) * 0.012 * pressMotion;
 
-            currentPos.xy = uDustCenter + fromCenter * dustScale;
+            currentPos.xy = uDustCenter + fromCenter * dustReveal * dustScale;
             currentPos.xy += (dustTangent * drift + dustDir * shimmer) * hoverMotion;
             currentPos.xy += dustDir * (rayLength + rayNoise) + dustTangent * rayNoise * 0.45;
 
@@ -629,18 +672,21 @@
 
     createHoverDustRayGuides(centerX, centerY, innerRadius, outerRadius, rayCount) {
       const positions = new Float32Array(rayCount * 2 * 3);
+      const guideCenterX = centerX + this.getHoverDustBaseSize() * 0.025;
+      const guideCenterY = centerY + this.getHoverDustBaseSize() * 0.015;
 
       for (let i = 0; i < rayCount; i++) {
         const angle = (i / rayCount) * Math.PI * 2;
         const start = i * 6;
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
+        const guideInnerRadius = innerRadius * 0.8;
 
-        positions[start] = centerX + cos * innerRadius;
-        positions[start + 1] = centerY + sin * innerRadius;
+        positions[start] = guideCenterX + cos * guideInnerRadius;
+        positions[start + 1] = guideCenterY + sin * guideInnerRadius;
         positions[start + 2] = -0.06;
-        positions[start + 3] = centerX + cos * outerRadius;
-        positions[start + 4] = centerY + sin * outerRadius;
+        positions[start + 3] = guideCenterX + cos * outerRadius;
+        positions[start + 4] = guideCenterY + sin * outerRadius;
         positions[start + 5] = -0.06;
       }
 
