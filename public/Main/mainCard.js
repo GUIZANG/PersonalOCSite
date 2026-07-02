@@ -3,6 +3,8 @@
     constructor() {
       this.stream = document.getElementById("mainCardStream");
       this.line = document.getElementById("mainCardLine");
+      this.hudLeft = document.getElementById("mainScannerHudLeft");
+      this.hudRight = document.getElementById("mainScannerHudRight");
       this.cards = [
         { kicker: "Archive 01", title: "Signal", meta: "Memory / A" },
         { kicker: "Archive 02", title: "Vector", meta: "Trace / B" },
@@ -262,6 +264,8 @@
     updateScanning() {
       if (!this.active) return;
       const scannerX = window.innerWidth / 2;
+      let nearestCard = null;
+      let nearestDistance = Infinity;
 
       this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
         const rect = wrapper.getBoundingClientRect();
@@ -269,6 +273,10 @@
         const centerDistance = Math.abs(rect.left + rect.width / 2 - scannerX);
         const edgeAmount = Math.min(centerDistance / (window.innerWidth / 2), 1);
         wrapper.style.transform = `scaleX(${1 + edgeAmount * 0.1})`;
+        if (centerDistance < nearestDistance) {
+          nearestDistance = centerDistance;
+          nearestCard = wrapper;
+        }
 
         // Unclamped scanner position across the card in UV space, fed to the
         // vfx dissolve shader. <0 = card fully right (intact), >1 = fully left (gone).
@@ -288,6 +296,19 @@
         }
         wrapper._previousScanQ = wrapper._scanQ;
       });
+
+      this.updateScannerHud(nearestCard, nearestDistance, scannerX);
+    }
+
+    updateScannerHud(wrapper, distance, scannerX) {
+      if (!this.hudLeft || !this.hudRight || !wrapper) return;
+      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
+      const scanQ = typeof wrapper._scanQ === "number" ? wrapper._scanQ : 0;
+      const scanPercent = Math.round(Math.min(Math.max(scanQ, 0), 1) * 100);
+      const distancePercent = Math.round(Math.min(distance / Math.max(window.innerWidth / 2, 1), 1) * 100);
+
+      this.hudLeft.textContent = `${this.cards[cardIndex]?.kicker || "Archive"} / Q${String(scanPercent).padStart(3, "0")}`;
+      this.hudRight.textContent = `X${String(Math.round(scannerX)).padStart(4, "0")} / D${String(distancePercent).padStart(3, "0")}`;
     }
 
     generateCode(card, index, width = 54, height = 20) {
