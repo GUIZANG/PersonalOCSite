@@ -163,7 +163,7 @@
       const dt = Math.min((now - this.lastTime) / 1000, 0.05);
       this.lastTime = now;
 
-      if (this.active && !this.isDragging && !this.isHoveringCard) {
+      if (this.active && !this.isDragging) {
         this.position += this.velocity * dt;
         this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
       }

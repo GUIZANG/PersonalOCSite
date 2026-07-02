@@ -18,7 +18,7 @@
     const defaultShadow = `0 0 0 ${glitchColorB}, 0 0 0 ${glitchColorR}`;
     const desktopReferenceHeight = 1080;
     const desktopOuterSize = 25;
-    const desktopDotSize = 6;
+    const desktopDotSize = 8;
     let targetX = 0;
     let targetY = 0;
     let dotX = 0;
@@ -28,6 +28,7 @@
     let previousTargetX = 0;
     let previousTargetY = 0;
     let hoverScale = 1;
+    let renderHoverScale = 1;
     let isClicking = false;
     let isMoving = false;
     let isPressing = false;
@@ -117,24 +118,27 @@
 
     function renderCursor() {
       const clickScale = isClicking ? 0.75 : 1;
-      const renderScale = hoverScale * clickScale;
-      cursor.style.setProperty("--dot-x", `${dotX}px`);
-      cursor.style.setProperty("--dot-y", `${dotY}px`);
-      cursor.style.setProperty("--outer-x", `${outerX}px`);
-      cursor.style.setProperty("--outer-y", `${outerY}px`);
-      cursor.style.setProperty("--cursor-render-scale", renderScale);
-      cursor.style.setProperty("--cursor-outer-scaled-half-size", `${(cursorOuterSize * renderScale) / 2}px`);
+      const renderScale = renderHoverScale * clickScale;
+      const renderOuterSize = snapEvenPixel(cursorOuterSize * renderScale);
+      const snappedRenderScale = renderOuterSize / cursorOuterSize;
+
+      cursor.style.setProperty("--dot-x", `${Math.round(dotX)}px`);
+      cursor.style.setProperty("--dot-y", `${Math.round(dotY)}px`);
+      cursor.style.setProperty("--outer-x", `${Math.round(outerX)}px`);
+      cursor.style.setProperty("--outer-y", `${Math.round(outerY)}px`);
+      cursor.style.setProperty("--cursor-render-scale", snappedRenderScale);
+      cursor.style.setProperty("--cursor-outer-scaled-half-size", `${renderOuterSize / 2}px`);
     }
 
     function updateCursorSize() {
       const scale = window.innerHeight / desktopReferenceHeight;
-      const outerSize = desktopOuterSize * scale;
-      const dotSize = desktopDotSize * scale;
+      const outerSize = snapEvenPixel(desktopOuterSize * scale);
+      const dotSize = snapEvenPixel(desktopDotSize * scale);
       cursorOuterSize = outerSize;
 
       cursor.style.setProperty("--cursor-outer-size", `${outerSize}px`);
       cursor.style.setProperty("--cursor-outer-half-size", `${outerSize / 2}px`);
-      cursor.style.setProperty("--cursor-outer-scaled-half-size", `${(outerSize * hoverScale) / 2}px`);
+      cursor.style.setProperty("--cursor-outer-scaled-half-size", `${(outerSize * renderHoverScale) / 2}px`);
       cursor.style.setProperty("--cursor-dot-size", `${dotSize}px`);
       cursor.style.setProperty("--cursor-dot-half-size", `${dotSize / 2}px`);
     }
@@ -144,11 +148,13 @@
       dotY += (targetY - dotY) * 0.34;
       outerX += (dotX - outerX) * 0.18;
       outerY += (dotY - outerY) * 0.18;
+      renderHoverScale += (hoverScale - renderHoverScale) * 0.16;
 
       if (Math.abs(targetX - dotX) < 0.01) dotX = targetX;
       if (Math.abs(targetY - dotY) < 0.01) dotY = targetY;
       if (Math.abs(dotX - outerX) < 0.01) outerX = dotX;
       if (Math.abs(dotY - outerY) < 0.01) outerY = dotY;
+      if (Math.abs(hoverScale - renderHoverScale) < 0.001) renderHoverScale = hoverScale;
 
       renderCursor();
       updatePressGlitch(performance.now());
@@ -203,8 +209,8 @@
     }
 
     function applyPressGlitch(now) {
-      const x = Math.round(Math.sin(now * 0.095) * 9 + Math.sin(now * 0.033) * 4);
-      const y = Math.round(Math.cos(now * 0.081) * 7 + Math.sin(now * 0.047) * 3);
+      const x = Math.round(Math.sin(now * 0.095) * 5 + Math.sin(now * 0.033) * 2);
+      const y = Math.round(Math.cos(now * 0.081) * 4 + Math.sin(now * 0.047) * 2);
 
       cursor.style.setProperty("--cursor-shadow", `
         ${x}px ${y}px 0 ${glitchColorB},
@@ -240,6 +246,10 @@
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
+    }
+
+    function snapEvenPixel(value) {
+      return Math.max(2, Math.round(value / 2) * 2);
     }
   }
 })();
