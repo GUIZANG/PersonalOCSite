@@ -62,6 +62,10 @@ button,
   position: fixed;
   inset: 0;
   z-index: 3;
+  --main-card-width: clamp(274px, 35vmin, 486px);
+  --main-card-height: calc(var(--main-card-width) * 0.6316);
+  --main-card-gap: calc(var(--main-card-width) * 0.4);
+  --main-scanner-height: calc(var(--main-card-width) * 0.8158);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -79,7 +83,7 @@ button,
   position: relative;
   display: flex;
   align-items: center;
-  gap: 152px;
+  gap: var(--main-card-gap);
   min-width: max-content;
   will-change: transform;
   user-select: none;
@@ -628,8 +632,8 @@ body.is-screen-glitching .hypercube-stage {
 .main-card-wrapper {
   position: relative;
   flex: 0 0 auto;
-  width: 380px;
-  height: 240px;
+  width: var(--main-card-width);
+  height: var(--main-card-height);
   --clip-right: 0%;
   --scan-fade-x: 50%;
   --scan-fade-width: 8.5%;
@@ -787,7 +791,7 @@ body.is-screen-glitching .hypercube-stage {
   left: calc(50% - 3px);
   z-index: 4;
   width: 2px;
-  height: 310px;
+  height: var(--main-scanner-height);
   border-radius: 99px;
   transform: translate(-50%, -50%);
   background: linear-gradient(
