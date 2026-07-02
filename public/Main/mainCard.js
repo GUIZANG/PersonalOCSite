@@ -3,6 +3,7 @@
     constructor() {
       this.stream = document.getElementById("mainCardStream");
       this.line = document.getElementById("mainCardLine");
+      this.scanner = this.stream?.querySelector(".main-scanner");
       this.hudLeft = document.getElementById("mainScannerHudLeft");
       this.hudRight = document.getElementById("mainScannerHudRight");
       this.cards = [
@@ -23,6 +24,21 @@
       this.singleCycleWidth = 0;
       this.hasStarted = false;
       this.isIntroEntering = false;
+      this.pointerDownCard = null;
+      this.pointerDownX = 0;
+      this.pointerDownY = 0;
+      this.hasPointerMoved = false;
+      this.focusedCard = null;
+      this.focusMode = null;
+      this.focusSettled = false;
+      this.isSwitchingFocus = false;
+      this.preFocusPosition = 0;
+      this.focusTargetPosition = 0;
+      this.scannerX = window.innerWidth / 2;
+      this.scannerTargetX = this.scannerX;
+      this.referenceBackground = window.MainReferenceBackground
+        ? new window.MainReferenceBackground(document.getElementById("hypercube-stage") || document.body)
+        : null;
 
       this.animate = this.animate.bind(this);
       this.populate();
@@ -30,6 +46,7 @@
       this.fitAsciiContent();
       this.calculateCycleWidth();
       this.position = -this.singleCycleWidth;
+      this.createDialog();
       this.bindVFX();
       this.animate();
     }
@@ -104,7 +121,7 @@
     }
 
     setupEvents() {
-      this.line.addEventListener("pointerdown", (event) => this.startDrag(event));
+      this.stream.addEventListener("pointerdown", (event) => this.startPointer(event));
       this.line.addEventListener("pointerover", (event) => this.onCardHover(event));
       this.line.addEventListener("pointerout", (event) => this.onCardLeave(event));
       this.line.addEventListener("pointerleave", () => {
@@ -112,13 +129,15 @@
       });
       this.line.addEventListener("contextmenu", (event) => event.preventDefault());
       window.addEventListener("pointermove", (event) => this.onDrag(event));
-      window.addEventListener("pointerup", () => this.endDrag());
+      window.addEventListener("pointerup", (event) => this.endPointer(event));
       window.addEventListener("resize", () => {
         this.fitAsciiContent();
         this.calculateCycleWidth();
         if (this.isIntroEntering) {
           this.position = this.getIntroStartPosition();
         }
+        this.scannerX = this.focusMode ? this.scannerX : window.innerWidth / 2;
+        this.updateFocusTargets();
       });
       this.line.addEventListener("wheel", (event) => {
         if (!this.active) return;
@@ -126,26 +145,50 @@
       }, { passive: false });
     }
 
-    startDrag(event) {
+    startPointer(event) {
       if (!this.active || event.button === 2) return;
-      this.isDragging = true;
+      this.pointerDownCard = event.target.closest(".main-card-wrapper");
+      this.pointerDownX = event.clientX;
+      this.pointerDownY = event.clientY;
+      this.hasPointerMoved = false;
+
+      if (this.focusMode) return;
+
       this.lastPointerX = event.clientX;
       this.line.classList.add("dragging");
-      this.line.setPointerCapture?.(event.pointerId);
+      this.stream.setPointerCapture?.(event.pointerId);
+      this.isDragging = true;
     }
 
     onDrag(event) {
-      if (!this.isDragging) return;
+      if (this.pointerDownCard || this.isDragging) {
+        const moved = Math.hypot(event.clientX - this.pointerDownX, event.clientY - this.pointerDownY);
+        this.hasPointerMoved = this.hasPointerMoved || moved > 5;
+      }
+
+      if (!this.isDragging || this.focusMode) return;
       const delta = event.clientX - this.lastPointerX;
       this.position += delta;
       this.lastPointerX = event.clientX;
     }
 
-    endDrag() {
-      if (!this.isDragging) return;
+    endPointer(event) {
+      const clickedCard = this.hasPointerMoved ? null : this.pointerDownCard;
+
+      if (this.focusMode && !this.hasPointerMoved) {
+        this.handleFocusedClick(clickedCard, event);
+      } else if (clickedCard) {
+        this.focusCard(clickedCard);
+      }
+
       this.isDragging = false;
       this.isHoveringCard = Boolean(this.line.querySelector(".main-card-wrapper:hover"));
       this.line.classList.remove("dragging");
+      this.pointerDownCard = null;
+      this.hasPointerMoved = false;
+      if (this.stream.hasPointerCapture?.(event.pointerId)) {
+        this.stream.releasePointerCapture(event.pointerId);
+      }
     }
 
     onCardHover(event) {
@@ -165,15 +208,25 @@
       const dt = Math.min((now - this.lastTime) / 1000, 0.05);
       this.lastTime = now;
 
-      if (this.active && !this.isDragging) {
+      if (this.focusMode) {
+        const focusEase = this.isSwitchingFocus && this.focusMode === "enter" ? 0.12 : 0.22;
+        const scannerEase = this.isSwitchingFocus && this.focusMode === "enter" ? 0.14 : 0.24;
+        this.position += (this.focusTargetPosition - this.position) * focusEase;
+        this.scannerX += (this.scannerTargetX - this.scannerX) * scannerEase;
+        this.updateFocusProgress();
+      } else if (this.active && !this.isDragging) {
         this.position += this.velocity * dt;
         this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
+        this.scannerX += (window.innerWidth / 2 - this.scannerX) * 0.18;
       }
 
       this.revealAmount += (this.revealTarget - this.revealAmount) * 0.06;
 
-      this.wrapPosition();
+      if (!this.focusMode) {
+        this.wrapPosition();
+      }
       this.line.style.transform = `translate3d(${this.position}px, 0, 0)`;
+      this.updateScannerPosition();
       this.updateScanning();
       requestAnimationFrame(this.animate);
     }
@@ -263,7 +316,8 @@
 
     updateScanning() {
       if (!this.active) return;
-      const scannerX = window.innerWidth / 2;
+      const scannerX = this.scannerX;
+      const suppressScanEffects = this.focusMode === "exit";
       let nearestCard = null;
       let nearestDistance = Infinity;
 
@@ -272,7 +326,9 @@
         const ascii = wrapper.querySelector(".main-card-ascii");
         const centerDistance = Math.abs(rect.left + rect.width / 2 - scannerX);
         const edgeAmount = Math.min(centerDistance / (window.innerWidth / 2), 1);
-        wrapper.style.transform = `scaleX(${1 + edgeAmount * 0.1})`;
+        wrapper.style.transform = wrapper === this.focusedCard && this.focusMode
+          ? `scale(${this.focusMode === "exit" ? 1 : 1.2})`
+          : `scaleX(${1 + edgeAmount * 0.1})`;
         if (centerDistance < nearestDistance) {
           nearestDistance = centerDistance;
           nearestCard = wrapper;
@@ -281,13 +337,23 @@
         // Unclamped scanner position across the card in UV space, fed to the
         // vfx dissolve shader. <0 = card fully right (intact), >1 = fully left (gone).
         wrapper._scanQ = rect.width > 0 ? (scannerX - rect.left) / rect.width : -1;
+        if (this.focusMode && wrapper !== this.focusedCard) {
+          wrapper._scanQ = -1;
+        }
+        if (wrapper === this.focusedCard && this.focusSettled) {
+          wrapper._scanQ = -1;
+        }
         const scanAmount = Math.min(Math.max(wrapper._scanQ, 0), 1) * 100;
         wrapper.style.setProperty("--clip-right", `${scanAmount}%`);
         ascii.style.setProperty("--clip-left", `${scanAmount}%`);
         wrapper.style.setProperty("--scan-fade-x", `${wrapper._scanQ * 100}%`);
-        wrapper.classList.toggle("is-scan-fading", wrapper._scanQ >= 0 && wrapper._scanQ <= 1);
+        wrapper.classList.toggle(
+          "is-scan-fading",
+          !suppressScanEffects && wrapper._scanQ >= 0 && wrapper._scanQ <= 1
+        );
 
-        if (wrapper._previousScanQ < 0 && wrapper._scanQ >= 0) {
+        const canTriggerScanFlash = !suppressScanEffects && !this.focusMode && wrapper._previousScanQ < 0 && wrapper._scanQ >= 0;
+        if (canTriggerScanFlash) {
           wrapper._dissolveSeed = Math.random();
           const flash = document.createElement("div");
           flash.className = "main-scan-effect";
@@ -298,6 +364,182 @@
       });
 
       this.updateScannerHud(nearestCard, nearestDistance, scannerX);
+    }
+
+    focusCard(wrapper) {
+      if (!wrapper || !this.active) return;
+
+      const wasFocused = Boolean(this.focusedCard) && this.focusMode !== "exit";
+      if (!this.focusMode) {
+        this.preFocusPosition = this.position;
+      }
+
+      this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
+      this.focusedCard = wrapper;
+      this.focusMode = "enter";
+      this.focusSettled = false;
+      this.isSwitchingFocus = wasFocused;
+      this.isIntroEntering = false;
+      this.isDragging = false;
+      this.pointerDownCard = null;
+      this.line.classList.remove("dragging");
+      wrapper.classList.add("is-main-card-focused");
+      this.stream.classList.add("is-card-focusing");
+      this.stream.classList.remove("is-card-focus-settled");
+      wrapper._dissolveSeed = Math.random();
+      if (!wasFocused) {
+        this.referenceBackground?.activate();
+      }
+      this.updateFocusTargets();
+    }
+
+    handleFocusedClick(clickedCard, event) {
+      const dialog = event.target.closest(".main-card-dialog");
+      if (dialog) return;
+
+      if (!clickedCard) {
+        this.exitFocus();
+        return;
+      }
+
+      if (clickedCard === this.focusedCard && this.focusSettled) {
+        this.openDialog(clickedCard);
+        return;
+      }
+
+      this.focusCard(clickedCard);
+    }
+
+    exitFocus() {
+      if (!this.focusMode || this.focusMode === "exit") return;
+
+      this.closeDialog();
+      this.focusMode = "exit";
+      this.focusSettled = false;
+      this.stream.classList.remove("is-card-focus-settled");
+      this.focusedCard?.classList.remove("is-main-card-focus-settled");
+      this.clearScanEffects();
+      this.position = this.getFocusedCardCenterPosition();
+      this.focusTargetPosition = this.getFocusExitPosition();
+      this.scannerTargetX = window.innerWidth / 2;
+      this.referenceBackground?.deactivate();
+    }
+
+    updateFocusTargets() {
+      if (!this.focusedCard || !this.focusMode) {
+        this.scannerTargetX = window.innerWidth / 2;
+        return;
+      }
+
+      const cardCenterInLine = this.focusedCard.offsetLeft + this.focusedCard.offsetWidth / 2;
+      this.focusTargetPosition = this.focusMode === "exit"
+        ? this.getFocusExitPosition()
+        : window.innerWidth / 2 - cardCenterInLine;
+      this.scannerTargetX = this.focusMode === "exit"
+        ? window.innerWidth / 2
+        : this.getScannerExitX();
+    }
+
+    updateFocusProgress() {
+      const positionDone = Math.abs(this.position - this.focusTargetPosition) < 0.45;
+      const scannerDone = Math.abs(this.scannerX - this.scannerTargetX) < 0.45;
+
+      if (!positionDone || !scannerDone) return;
+
+      this.position = this.focusTargetPosition;
+      this.scannerX = this.scannerTargetX;
+
+      if (this.focusMode === "enter") {
+        this.focusMode = "settled";
+        this.focusSettled = true;
+        this.isSwitchingFocus = false;
+        this.stream.classList.add("is-card-focus-settled");
+        this.focusedCard?.classList.add("is-main-card-focus-settled");
+        return;
+      }
+
+      if (this.focusMode === "exit") {
+        this.wrapPosition();
+        this.line.style.transform = `translate3d(${this.position}px, 0, 0)`;
+        this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
+        this.focusedCard = null;
+        this.focusMode = null;
+        this.focusSettled = false;
+        this.isSwitchingFocus = false;
+        this.stream.classList.remove("is-card-focusing", "is-card-focus-settled");
+      }
+    }
+
+    getScannerExitX() {
+      return -Math.max(40, window.innerWidth * 0.08);
+    }
+
+    getFocusedCardCenterPosition() {
+      if (!this.focusedCard) return this.position;
+
+      return window.innerWidth / 2 - (this.focusedCard.offsetLeft + this.focusedCard.offsetWidth / 2);
+    }
+
+    getFocusExitPosition() {
+      if (!this.focusedCard) return this.position;
+
+      const centerPosition = this.getFocusedCardCenterPosition();
+      const travel = this.singleCycleWidth
+        ? Math.min(this.singleCycleWidth, window.innerWidth + this.focusedCard.offsetWidth)
+        : window.innerWidth + this.focusedCard.offsetWidth;
+
+      return centerPosition - travel;
+    }
+
+    clearScanEffects() {
+      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
+        wrapper.classList.remove("is-scan-fading");
+        wrapper.querySelectorAll(".main-scan-effect").forEach((effect) => effect.remove());
+      });
+    }
+
+    updateScannerPosition() {
+      if (!this.scanner) return;
+      this.scanner.style.left = `${this.scannerX}px`;
+    }
+
+    createDialog() {
+      this.dialog = document.createElement("div");
+      this.dialog.className = "main-card-dialog";
+      this.dialog.hidden = true;
+      this.dialog.innerHTML = `
+        <div class="main-card-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="mainCardDialogTitle">
+          <button class="main-card-dialog__close hoverable" type="button" aria-label="Close">&times;</button>
+          <span class="main-card-dialog__kicker" id="mainCardDialogKicker"></span>
+          <h2 class="main-card-dialog__title" id="mainCardDialogTitle"></h2>
+          <p class="main-card-dialog__copy" id="mainCardDialogCopy"></p>
+        </div>
+      `;
+      this.dialog.addEventListener("pointerdown", (event) => {
+        if (event.target === this.dialog || event.target.closest(".main-card-dialog__close")) {
+          event.stopPropagation();
+          this.closeDialog();
+        }
+      });
+      document.body.appendChild(this.dialog);
+    }
+
+    openDialog(wrapper) {
+      if (!this.dialog) return;
+      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
+      const card = this.cards[cardIndex % this.cards.length];
+
+      this.dialog.querySelector("#mainCardDialogKicker").textContent = card.kicker;
+      this.dialog.querySelector("#mainCardDialogTitle").textContent = card.title;
+      this.dialog.querySelector("#mainCardDialogCopy").textContent = `${card.meta} is locked at center.`;
+      this.dialog.hidden = false;
+      document.body.classList.add("is-main-card-dialog-open");
+    }
+
+    closeDialog() {
+      if (!this.dialog) return;
+      this.dialog.hidden = true;
+      document.body.classList.remove("is-main-card-dialog-open");
     }
 
     updateScannerHud(wrapper, distance, scannerX) {
