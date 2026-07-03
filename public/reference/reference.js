@@ -1,204 +1,153 @@
-// Recreating Smertimba Graphics's Pixel Scan effect using VFX-JS
-// https://www.youtube.com/watch?v=JFn2kK8GhUQ
-import { VFX } from "https://esm.sh/@vfx-js/core@0.5.2";
-
-const shader = `
-precision highp float;
-uniform sampler2D src;
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float time;
-uniform float enterTime;
-uniform float leaveTime;
-
-uniform int mode;
-uniform float layers;
-uniform float speed;
-uniform float delay;
-uniform float width;
-
-#define W width
-#define LAYERS layers
-
-vec4 readTex(vec2 uv) {
-  if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) {
-    return vec4(0);
-  }
-  return texture(src, uv);
-}
-
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(4859., 3985.))) * 3984.);
-}
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-/** Get distance from a box */
-float sdBox(vec2 p, float r) {
-  vec2 q = abs(p) - r;
-  return min(length(q), max(q.y, q.x));
-}
+/**
+ * requestAnimationFrame
+ */
+window.requestAnimationFrame = (function(){
+  return  window.requestAnimationFrame       ||
+          window.webkitRequestAnimationFrame ||
+          window.mozRequestAnimationFrame    ||
+          window.oRequestAnimationFrame      ||
+          window.msRequestAnimationFrame     ||
+          function (callback) {
+              window.setTimeout(callback, 1000 / 60);
+          };
+})();
 
 
-float dir = 1.;
+/**
+* Returns a random number between min (inclusive) and max (exclusive)
+*/
+function random(min, max) { return Math.floor(Math.random() * (max - min) + min); }
+function array_random(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-/** Remap to animation range [0, 1] */
-float toRangeT(vec2 p, float scale) {
-  float d;
-  
-  if (mode == 0) {
-    d = p.x / (scale * 2.) + .5; // Left-to-right
-  }
-  else if (mode == 1) {
-    d = 1. - (p.y / (scale * 2.) + .5); // Top-to-bottom
-  }
-  else if (mode == 2) {
-    d = length(p) / scale; // Radial
-  }
-  
-  d = dir > 0. ? d : (1. - d);
-    
-  return d;
-}
 
-vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
-  vec2 pc = pi + .5;
-
-  // Get cell alpha
-  vec2 uvc = pc / scale;
-  uvc.y /= resolution.y / resolution.x;
-  uvc = uvc * 0.5 + 0.5;
-  if (uvc.x < 0. || uvc.x > 1. || uvc.y < 0. || uvc.y > 1.) {
-    return vec4(0);
-  }
-  float alpha = smoothstep(.0, .1, texture2D(src, uvc, 3.).a);
-    
-  // Get random color for cell
-  vec4 color = vec4(hsv2rgb(vec3((pc.x * 13. / pc.y * 17.) * 0.3, 1, 1)), 1);
-  
-  // Fade the color by animation    
-  float x = toRangeT(pi, scale);
-  float n = hash(pi);
-  float anim = smoothstep(W * 2., .0, abs(x + n * W - t));
-  color *= anim;    
-    
-  // Add edge light
-  color *= mix(
-    1., 
-    clamp(.3 / abs(sdBox(p - pc, .5)), 0., 10.),
-    edge * pow(anim, 10.)
-  ); 
-  
-  return color * alpha;
-}
-
-vec4 cellsColor(vec2 p, float scale, float t) {
-  vec2 pi = floor(p);
-  vec2 pf = fract(p);
-  
-  float l = 0.;
-  vec2 pc;
- 
-  vec2 d = vec2(0, 1);
-
-  vec4 cc = vec4(0);
-  cc += cell(p, pi, scale, t, .2) * 4.;
-  cc += cell(p, pi + d.xy, scale, t, .9);
-  cc += cell(p, pi - d.xy, scale, t, .9);
-  cc += cell(p, pi + d.yx, scale, t, .9);
-  cc += cell(p, pi - d.yx, scale, t, .9);
-   
-  return cc / 8.;
-}
-
-vec4 draw(vec2 uv, vec2 p, float t, float scale) {
-  vec4 c = readTex(uv);
-
-  // Create cells
-  vec2 pi = floor(p * scale);
-  vec2 pf = fract(p * scale);
-
-  // Get alpha
-  float n = hash(pi);
-  t = t * (1. + W * 4.) - W * 2.; // remap to [-2W, 1. + 2W]
-    
-  float x = toRangeT(pi, scale);
-  float a1 = smoothstep(t, t - W, x + n * W);    
-  c *= a1;
-
-  // Get cell color;  
-  c += cellsColor(p * scale, scale, t) * 1.5;
-  
-  return c;
-}
-
-void main() {
-  vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-  vec2 p = uv * 2. - 1.;
-  p.y *= resolution.y / resolution.x;
-
-  float t;
-  
-  if (leaveTime > 0.) {
-    dir = -1.;
-    t = clamp(leaveTime * speed, 0., 1.);
-  } else {
-    t = clamp((enterTime - delay) * speed, 0., 1.);  
-  }      
-  // Flip t by dir
-  t = (fract(t * .99999) - 0.5) * dir + 0.5;      
-    
-  for (float i = 0.; i < LAYERS; i++) {
-    float s = cos(i) * 7.3 + 10.; 
-    gl_FragColor += draw(uv, p, t, abs(s));
-  }
-  gl_FragColor /= LAYERS;  
-  
-  gl_FragColor *= smoothstep(0., 0.01, t);
-}
-`;
-
-// util
-const getDataAttributes = (e) => {
-  return Object.entries(e.attributes).reduce((acc, [_,d]) => {
-    if (d.name.match(/^data-(.*)$/) && d.value != null) {
-      acc[RegExp.$1] = parseFloat(d.value);
-    }
-    return acc;
-  }, {}); 
+/**
+* Global config
+*/
+var Config = {
+background : "#590000",
+particleSpeed : 10,
 };
 
-// main
-const vfx = new VFX();
 
-for (const e of document.querySelectorAll('img,h2')) {      
-  const data = getDataAttributes(e);
-      
-  vfx.add(e, { 
-    shader, 
-    overflow: 30, 
-    intersection: { threshold: 0.99 },
-    uniforms: {      
-      
-      // Animation mode.
-      // - 0: left-to-right
-      // - 1: top-to-bottom
-      // - 2: radial       
-      mode: data.mode ?? 0,
-      
-      // Width of effect area.
-      width: data.width ?? 0.2,
-      
-      // Number of pixel layers.
-      layers: data.layers ?? 3,
-            
-      speed: data.speed ?? 0.75, 
-      delay: data.delay ?? 0,      
-      
-    }
-  });  
+/**
+* Global vars
+*/
+var canvas, gui, context, layers = [];
+
+
+/**
+* Global initializer
+*/
+function init(){
+canvas = document.getElementById('c');
+
+//Init events
+window.addEventListener('resize', onWindowResize, false);
+onWindowResize(null);
+
+//Init dat.gui
+gui = new dat.GUI();
+gui.addColor(Config, "background").onChange(function() {
+  document.getElementsByTagName("body")[0].style.backgroundColor = Config.background;
+});
+gui.add(Config, "particleSpeed", 1, 20).step(1);
+gui.close();
+
+//Create layers
+var layer1 = new ParallaxLayer(1, 4000, ["#830006","#680106","#63000b"], [50, 100], [10,20]); layer1.init(); layers.push(layer1);
+var layer2 = new ParallaxLayer(1.2, 2000, ["#830006","#680106","#63000b"], [20,100], [10,20]); layer2.init(); layers.push(layer2);
+var layer3 = new ParallaxLayer(1.4, 300, ["#dc0015","#e81227","#f21e33"], [5,100], [5,20]); layer3.init(); layers.push(layer3);
+
+var dust1 = new ParallaxLayer(1.5, 1000, ["#e80742","#d5073d", "#ba0736"], [1,5], [1,5]); dust1.init(); layers.push(dust1);
+
+var layer4 = new ParallaxLayer(1.6, 200, ["#e80742","#d5073d", "#ba0736"], [5,100], [5,20]); layer4.init(); layers.push(layer4);
+var layer5 = new ParallaxLayer(1.8, 100, ["#e80742","#d5073d", "#ba0736"], [5,100], [1,20]); layer5.init(); layers.push(layer5);
+
+var dust2 = new ParallaxLayer(1.9, 1000, ["#830006","#680106","#63000b"], [1,1], [1,1]); dust2.init(); layers.push(dust2);
+
+
+
+update();
 }
+
+
+/**
+* Global update
+*/
+function update(){
+context.clearRect(0,0,canvas.width, canvas.height);
+for(var i in layers) layers[i].update();
+requestAnimationFrame(update);
+}
+
+
+/**
+* Object : Particle
+*/
+function Particle(layerSpeed, colors, widthRange, heightRange){
+
+this.init = function(reinit){
+  this.x = (reinit) ? random(canvas.width, canvas.width * 2) : random(0, canvas.width * 2);
+   this.y = random(0, canvas.height);
+   this.width = random(widthRange[0], widthRange[1]);
+   this.height = random(heightRange[0], heightRange[1]);
+   this.color = array_random(colors);
+};
+
+
+this.update = function(){
+  this.x-= Config.particleSpeed * layerSpeed;
+  
+  //Re-randomize positions & size to get a better efficiency
+  if(this.x + this.width < 0){
+    this.init(true);
+    return;
+  }
+};
+
+this.draw = function(){
+   context.fillStyle = this.color;
+  context.fillRect(this.x,this.y,this.width,this.height);
+}
+}
+
+
+/** 
+* Object : Parallax layer
+*/
+function ParallaxLayer(speed, count, colors, widthRange, heightRange){
+this.particles = [];
+
+this.init = function(){
+  //Create particles
+  for(var i = 0; i < count; i++){
+     var particle = new Particle(speed, colors, widthRange, heightRange);
+     particle.init();
+     this.particles.push(particle);
+   }
+}
+
+
+this.update = function(){
+  for(var i in this.particles){
+    this.particles[i].update();
+    this.particles[i].draw();
+  }
+}
+}
+
+
+/**
+* Event : onResize
+*/
+function onWindowResize(e) {
+  screenWidth  = canvas.width  = window.innerWidth;
+  screenHeight = canvas.height = window.innerHeight;
+
+  centerX = screenWidth / 2;
+  centerY = screenHeight / 2;
+
+  context = canvas.getContext('2d');
+}
+
+init();

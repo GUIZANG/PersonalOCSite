@@ -92,7 +92,7 @@ button,
   position: fixed;
   inset: 0;
   z-index: 3;
-  --main-card-width: clamp(274px, 35vmin, 486px);
+  --main-card-width: min(clamp(274px, 35vmin, 486px), 68vw);
   --main-card-height: calc(var(--main-card-width) * 0.6316);
   --main-card-gap: calc(var(--main-card-width) * 0.4);
   --main-scanner-height: calc(var(--main-card-width) * 0.8158);

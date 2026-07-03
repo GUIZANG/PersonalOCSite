@@ -32,7 +32,6 @@
       this.focusMode = null;
       this.focusSettled = false;
       this.isSwitchingFocus = false;
-      this.preFocusPosition = 0;
       this.focusTargetPosition = 0;
       this.scannerX = window.innerWidth / 2;
       this.scannerTargetX = this.scannerX;
@@ -133,10 +132,10 @@
       window.addEventListener("resize", () => {
         this.fitAsciiContent();
         this.calculateCycleWidth();
-        if (this.isIntroEntering) {
+        if (this.isIntroEntering && !this.focusMode) {
           this.position = this.getIntroStartPosition();
         }
-        this.scannerX = this.focusMode ? this.scannerX : window.innerWidth / 2;
+        this.applyResponsiveFocusLayout();
         this.updateFocusTargets();
       });
       this.line.addEventListener("wheel", (event) => {
@@ -208,8 +207,18 @@
       const dt = Math.min((now - this.lastTime) / 1000, 0.05);
       this.lastTime = now;
 
-      if (this.focusMode) {
-        const focusEase = this.isSwitchingFocus && this.focusMode === "enter" ? 0.12 : 0.22;
+      if (this.focusMode === "exit") {
+        // Release the card back into the ambient leftward drift from its centered
+        // position; the scanner glides slowly back to center meanwhile. No forced
+        // slide/wrap, so the focused copy stays continuous (the first card keeps
+        // its empty left side and the clicked card never jumps to a neighbour).
+        this.position += this.velocity * dt;
+        this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
+        this.scannerX += (this.scannerTargetX - this.scannerX) * 0.12;
+        this.wrapPosition();
+        this.updateFocusProgress();
+      } else if (this.focusMode) {
+        const focusEase = this.isSwitchingFocus && this.focusMode === "enter" ? 0.20 : 0.22;
         const scannerEase = this.isSwitchingFocus && this.focusMode === "enter" ? 0.14 : 0.24;
         this.position += (this.focusTargetPosition - this.position) * focusEase;
         this.scannerX += (this.scannerTargetX - this.scannerX) * scannerEase;
@@ -317,7 +326,6 @@
     updateScanning() {
       if (!this.active) return;
       const scannerX = this.scannerX;
-      const suppressScanEffects = this.focusMode === "exit";
       let nearestCard = null;
       let nearestDistance = Infinity;
 
@@ -337,12 +345,17 @@
         // Unclamped scanner position across the card in UV space, fed to the
         // vfx dissolve shader. <0 = card fully right (intact), >1 = fully left (gone).
         wrapper._scanQ = rect.width > 0 ? (scannerX - rect.left) / rect.width : -1;
-        if (this.focusMode && wrapper !== this.focusedCard) {
+        // While entering/settled, non-focused cards stay intact. During exit they
+        // scan normally so they convert back to ascii progressively as the scanner
+        // returns to center, instead of all snapping at once when the exit ends.
+        if (this.focusMode && this.focusMode !== "exit" && wrapper !== this.focusedCard) {
           wrapper._scanQ = -1;
         }
         if (wrapper === this.focusedCard && this.focusSettled) {
           wrapper._scanQ = -1;
         }
+        // Only keep the focused card free of scan effects while it dissolves out.
+        const suppressScanEffects = this.focusMode === "exit" && wrapper === this.focusedCard;
         const scanAmount = Math.min(Math.max(wrapper._scanQ, 0), 1) * 100;
         wrapper.style.setProperty("--clip-right", `${scanAmount}%`);
         ascii.style.setProperty("--clip-left", `${scanAmount}%`);
@@ -370,16 +383,12 @@
       if (!wrapper || !this.active) return;
 
       const wasFocused = Boolean(this.focusedCard) && this.focusMode !== "exit";
-      if (!this.focusMode) {
-        this.preFocusPosition = this.position;
-      }
 
       this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
       this.focusedCard = wrapper;
       this.focusMode = "enter";
       this.focusSettled = false;
       this.isSwitchingFocus = wasFocused;
-      this.isIntroEntering = false;
       this.isDragging = false;
       this.pointerDownCard = null;
       this.line.classList.remove("dragging");
@@ -419,8 +428,9 @@
       this.stream.classList.remove("is-card-focus-settled");
       this.focusedCard?.classList.remove("is-main-card-focus-settled");
       this.clearScanEffects();
-      this.position = this.getFocusedCardCenterPosition();
-      this.focusTargetPosition = this.getFocusExitPosition();
+      // Keep scannerX where it is (off to the left); it glides back to center in
+      // animate() while the card drifts. Position is left untouched so the card
+      // resumes the ambient conveyor from exactly where it was centered.
       this.scannerTargetX = window.innerWidth / 2;
       this.referenceBackground?.deactivate();
     }
@@ -431,16 +441,29 @@
         return;
       }
 
-      const cardCenterInLine = this.focusedCard.offsetLeft + this.focusedCard.offsetWidth / 2;
-      this.focusTargetPosition = this.focusMode === "exit"
-        ? this.getFocusExitPosition()
-        : window.innerWidth / 2 - cardCenterInLine;
-      this.scannerTargetX = this.focusMode === "exit"
-        ? window.innerWidth / 2
-        : this.getScannerExitX();
+      if (this.focusMode === "exit") {
+        this.scannerTargetX = window.innerWidth / 2;
+        return;
+      }
+
+      this.focusTargetPosition = this.getFocusCenterPosition();
+      this.scannerTargetX = this.getScannerExitX();
     }
 
     updateFocusProgress() {
+      if (this.focusMode === "exit") {
+        // The card is free-drifting; finish once the scanner is back at center.
+        if (Math.abs(this.scannerX - this.scannerTargetX) >= 0.45) return;
+        this.scannerX = this.scannerTargetX;
+        this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
+        this.focusedCard = null;
+        this.focusMode = null;
+        this.focusSettled = false;
+        this.isSwitchingFocus = false;
+        this.stream.classList.remove("is-card-focusing", "is-card-focus-settled");
+        return;
+      }
+
       const positionDone = Math.abs(this.position - this.focusTargetPosition) < 0.45;
       const scannerDone = Math.abs(this.scannerX - this.scannerTargetX) < 0.45;
 
@@ -455,18 +478,6 @@
         this.isSwitchingFocus = false;
         this.stream.classList.add("is-card-focus-settled");
         this.focusedCard?.classList.add("is-main-card-focus-settled");
-        return;
-      }
-
-      if (this.focusMode === "exit") {
-        this.wrapPosition();
-        this.line.style.transform = `translate3d(${this.position}px, 0, 0)`;
-        this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
-        this.focusedCard = null;
-        this.focusMode = null;
-        this.focusSettled = false;
-        this.isSwitchingFocus = false;
-        this.stream.classList.remove("is-card-focusing", "is-card-focus-settled");
       }
     }
 
@@ -474,21 +485,28 @@
       return -Math.max(40, window.innerWidth * 0.08);
     }
 
-    getFocusedCardCenterPosition() {
+    getFocusCenterPosition() {
       if (!this.focusedCard) return this.position;
 
-      return window.innerWidth / 2 - (this.focusedCard.offsetLeft + this.focusedCard.offsetWidth / 2);
+      return window.innerWidth / 2 -
+        (this.focusedCard.offsetLeft + this.focusedCard.offsetWidth / 2);
     }
 
-    getFocusExitPosition() {
-      if (!this.focusedCard) return this.position;
+    applyResponsiveFocusLayout() {
+      if (!this.focusMode) {
+        this.scannerX = window.innerWidth / 2;
+        return;
+      }
 
-      const centerPosition = this.getFocusedCardCenterPosition();
-      const travel = this.singleCycleWidth
-        ? Math.min(this.singleCycleWidth, window.innerWidth + this.focusedCard.offsetWidth)
-        : window.innerWidth + this.focusedCard.offsetWidth;
+      if (this.focusMode === "exit") {
+        this.scannerX = window.innerWidth / 2;
+        return;
+      }
 
-      return centerPosition - travel;
+      if (this.focusMode === "settled" && this.focusedCard) {
+        this.position = this.getFocusCenterPosition();
+      }
+      this.scannerX = this.getScannerExitX();
     }
 
     clearScanEffects() {
