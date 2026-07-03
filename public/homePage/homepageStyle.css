@@ -79,10 +79,11 @@ canvas {
   left: 10px;
   font-family: "Cavier", monospace;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.4);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.65);
   transition: color 0.3s ease;
 }
 
@@ -100,7 +101,7 @@ canvas {
 }
 
 .scroll-marker.active {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .curzr-cursor-wrap {
@@ -108,7 +109,7 @@ canvas {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 99999;
+  z-index: 2147483647;
   opacity: 0;
 }
 
@@ -504,5 +505,286 @@ body.locked {
 .music-btn:not(.is-playing) .music-line-3 {
   opacity: 1;
   transform: translate(-50%, -50%) translate(0.5px, 2.5px) rotate(-29deg);
+}
+
+/* ============ Top-edge overlay (shared logic with Main scene) ============ */
+.main-overlay-mask {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.main-overlay-page {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483645;
+  --main-overlay-edge-y: 0.1%;
+  --main-overlay-pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: rgba(238, 247, 255, 0.92);
+  background: linear-gradient(180deg, #050710 0%, #02030a 48%, #000 100%);
+  font-family: "supplyMono", monospace;
+  -webkit-clip-path: url(#mainOverlayClipPath);
+  clip-path: url(#mainOverlayClipPath);
+  opacity: var(--main-overlay-opacity, 0);
+  pointer-events: var(--main-overlay-pointer-events);
+  transition: opacity 160ms ease;
+  will-change: clip-path, opacity;
+}
+
+.main-overlay-page,
+.main-overlay-page * {
+  cursor: none;
+}
+
+.main-overlay-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.045) 0,
+      rgba(255, 255, 255, 0.045) 1px,
+      transparent 1px,
+      transparent 11px
+    );
+  opacity: 0.52;
+}
+
+/* Twilight horizon scene as the overlay background (replaces the star field). */
+.main-overlay-horizon {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.main-overlay-horizon canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.main-overlay-page::after {
+  content: "";
+  position: absolute;
+  top: var(--main-overlay-edge-y);
+  left: -8%;
+  width: 116%;
+  height: clamp(72px, 12vh, 150px);
+  border-top: 2px solid rgba(255, 255, 255, 0.96);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.2) 28%, transparent 78%),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.46), transparent 64%);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.82),
+    0 0 18px rgba(255, 255, 255, 0.38),
+    0 0 42px rgba(255, 255, 255, 0.22);
+  filter: blur(0.2px);
+  opacity: var(--main-overlay-edge-shadow, 0);
+  transform: translateY(-1px);
+  transform-origin: center top;
+}
+
+.main-overlay-scroll-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 100%;
+  height: 1px;
+  background: #fff;
+  opacity: var(--main-overlay-scroll-opacity, 0);
+  pointer-events: none;
+  transform: scaleX(var(--main-overlay-scroll-progress, 0));
+  transform-origin: left center;
+}
+
+.main-overlay-scroll-percent {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 5;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  opacity: var(--main-overlay-readout-opacity, 0);
+  pointer-events: none;
+  mix-blend-mode: difference;
+}
+
+.main-overlay-scan-readout {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 18px;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  opacity: var(--main-overlay-readout-opacity, 0);
+  pointer-events: none;
+  text-transform: uppercase;
+  mix-blend-mode: difference;
+}
+
+.main-overlay-page__inner {
+  position: relative;
+  z-index: 3;
+  width: min(78vw, 880px);
+  max-height: min(78vh, 760px);
+  padding: 0 clamp(24px, 4vw, 48px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  text-align: center;
+  text-transform: uppercase;
+  mix-blend-mode: difference;
+}
+
+.main-overlay-page__inner::-webkit-scrollbar {
+  display: none;
+}
+
+.main-overlay-page__kicker {
+  display: block;
+  margin-bottom: clamp(12px, 2vh, 18px);
+  font-size: clamp(9px, 0.9vw, 13px);
+  letter-spacing: clamp(0.18em, 0.7vw, 0.34em);
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.main-overlay-page__title {
+  margin: 0;
+  font-size: clamp(32px, 6.6vw, 92px);
+  line-height: 0.92;
+  letter-spacing: -0.055em;
+  color: rgba(248, 252, 255, 0.96);
+}
+
+.main-overlay-page__copy {
+  max-width: 56em;
+  margin: clamp(14px, 2.6vh, 22px) auto 0;
+  font-size: clamp(11px, 1vw, 14px);
+  line-height: 1.6;
+  letter-spacing: clamp(0.04em, 0.2vw, 0.08em);
+  color: rgba(220, 231, 242, 0.72);
+}
+
+.main-overlay-credits {
+  width: min(680px, 100%);
+  margin: clamp(20px, 4vh, 34px) auto 0;
+  padding: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
+  list-style: none;
+  text-align: left;
+}
+
+.main-overlay-credits li {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: clamp(16px, 3vw, 28px);
+  padding: clamp(9px, 1.6vh, 13px) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: clamp(10px, 0.9vw, 13px);
+  line-height: 1.35;
+  letter-spacing: clamp(0.06em, 0.24vw, 0.14em);
+}
+
+.main-overlay-credits span {
+  color: rgba(226, 232, 240, 0.58);
+}
+
+.main-overlay-credits a {
+  color: rgba(255, 255, 255, 0.9);
+  text-align: right;
+  text-decoration: none;
+}
+
+.main-overlay-credits a:hover,
+.main-overlay-credits a:focus-visible {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+@media (max-width: 760px) {
+  .main-overlay-page__inner {
+    width: min(92vw, 560px);
+    max-height: 82vh;
+    padding: 0 18px;
+  }
+
+  .main-overlay-page__title {
+    font-size: clamp(30px, 12vw, 58px);
+    letter-spacing: -0.04em;
+  }
+
+  .main-overlay-credits li {
+    display: block;
+    text-align: center;
+  }
+
+  .main-overlay-credits span,
+  .main-overlay-credits a {
+    display: block;
+  }
+
+  .main-overlay-credits a {
+    margin-top: 5px;
+    text-align: center;
+  }
+
+  .main-overlay-scan-readout {
+    top: 9px;
+    right: 10px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    font-size: 7px;
+    letter-spacing: 0.1em;
+  }
+}
+
+@media (max-width: 460px) {
+  .main-overlay-scroll-percent {
+    top: 8px;
+    left: 10px;
+    font-size: 8px;
+  }
+
+  .main-overlay-scan-readout {
+    top: 22px;
+    right: auto;
+    left: 10px;
+    align-items: flex-start;
+    font-size: 6px;
+    letter-spacing: 0.08em;
+  }
+}
+
+@media (max-height: 620px) {
+  .main-overlay-page__inner {
+    max-height: 76vh;
+  }
+
+  .main-overlay-page__copy {
+    line-height: 1.45;
+  }
+
+  .main-overlay-credits {
+    margin-top: 16px;
+  }
 }
 

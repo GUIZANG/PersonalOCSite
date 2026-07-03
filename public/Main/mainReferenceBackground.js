@@ -1,12 +1,38 @@
 (function () {
+  // Drifting rectangle field rendered behind a selected card. Independent
+  // implementation: a flat "mote" pool advanced by per-band parallax factors,
+  // with an enter/exit reveal driven from CSS and a ragged edge mask so the
+  // field dissolves toward the screen sides.
+  const INK = ["#050505", "#101010", "#1b1b1b"];
+  const ASH = ["#ffffff", "#d7d7d7", "#a8a8a8"];
+
+  // Each band describes one parallax plane: how fast it slides, how many motes
+  // it carries, its palette, and the min/max span/thickness of each mote.
+  const BANDS = [
+    { factor: 1.0, motes: 4000, palette: INK, span: [50, 100], thick: [10, 20] },
+    { factor: 1.2, motes: 2000, palette: INK, span: [20, 100], thick: [10, 20] },
+    { factor: 1.4, motes: 300, palette: ASH, span: [5, 100], thick: [5, 20] },
+    { factor: 1.5, motes: 1000, palette: ASH, span: [1, 5], thick: [1, 5] },
+    { factor: 1.6, motes: 200, palette: ASH, span: [5, 100], thick: [5, 20] },
+    { factor: 1.8, motes: 100, palette: ASH, span: [5, 100], thick: [1, 20] },
+    { factor: 1.9, motes: 1000, palette: INK, span: [1, 1], thick: [1, 1] },
+  ];
+
+  const BASE_SLIDE = 2;
+
+  const intBetween = (lo, hi) => Math.floor(Math.random() * (hi - lo) + lo);
+  const oneOf = (list) => list[(Math.random() * list.length) | 0];
+  const wrap01 = (v) => v - Math.floor(v);
+  const jitter = (seed) => wrap01(Math.sin(seed * 12.9898) * 43758.5453);
+
   class MainReferenceBackground {
     constructor(container = document.body) {
       this.container = container;
       this.canvas = document.createElement("canvas");
       this.canvas.className = "main-reference-background";
       this.context = this.canvas.getContext("2d");
-      this.layers = [];
-      this.speed = 2;
+      this.motes = [];
+      this.slide = BASE_SLIDE;
       this.animationFrame = null;
       this.isRunning = false;
       this.isEntering = false;
@@ -27,16 +53,12 @@
       this.container.insertBefore(this.canvas, this.container.firstChild);
       window.addEventListener("resize", this.onResize);
       this.onResize();
-      this.createLayers();
+      this.seedField();
       this.update();
     }
 
     activate() {
-      if (this.isEntering) {
-        this.pendingAction = "activate";
-        return;
-      }
-      if (this.isExiting) {
+      if (this.isEntering || this.isExiting) {
         this.pendingAction = "activate";
         return;
       }
@@ -65,11 +87,7 @@
     }
 
     deactivate() {
-      if (this.isEntering) {
-        this.pendingAction = "deactivate";
-        return;
-      }
-      if (this.isExiting) {
+      if (this.isEntering || this.isExiting) {
         this.pendingAction = "deactivate";
         return;
       }
@@ -157,139 +175,92 @@
       return Math.min(window.innerWidth * 0.17, 210);
     }
 
-    createLayers() {
-      const white = ["#ffffff", "#d7d7d7", "#a8a8a8"];
-      const black = ["#050505", "#101010", "#1b1b1b"];
-      const configs = [
-        [1, 4000, black, [50, 100], [10, 20]],
-        [1.2, 2000, black, [20, 100], [10, 20]],
-        [1.4, 300, white, [5, 100], [5, 20]],
-        [1.5, 1000, white, [1, 5], [1, 5]],
-        [1.6, 200, white, [5, 100], [5, 20]],
-        [1.8, 100, white, [5, 100], [1, 20]],
-        [1.9, 1000, black, [1, 1], [1, 1]],
-      ];
+    // Build the flat mote pool up front. Motes are tagged with their band factor
+    // so a single pass can advance the whole field.
+    seedField() {
+      const span = this.drawWidth || window.innerWidth;
+      const tall = window.innerHeight;
+      const pool = [];
 
-      this.layers = configs.map((config) => new ParallaxLayer(this, ...config));
+      for (const band of BANDS) {
+        for (let i = 0; i < band.motes; i++) {
+          pool.push({
+            factor: band.factor,
+            x: intBetween(0, span * 2),
+            y: intBetween(0, tall),
+            w: intBetween(band.span[0], band.span[1]),
+            h: intBetween(band.thick[0], band.thick[1]),
+            color: oneOf(band.palette),
+            seed: Math.random(),
+          });
+        }
+      }
+
+      this.motes = pool;
+    }
+
+    // Respawn a mote just off the right edge once it has slid past the left.
+    recycle(mote) {
+      const span = this.drawWidth || window.innerWidth;
+      mote.x = intBetween(span, span * 2);
+      mote.y = intBetween(0, window.innerHeight);
     }
 
     update() {
       const width = this.drawWidth;
       const height = window.innerHeight;
+      const ctx = this.context;
 
-      this.context.clearRect(0, 0, width, height);
-      const isExiting = this.canvas.classList.contains("is-exiting");
-      if (this.isRunning || isExiting) {
-        this.layers.forEach((layer) => layer.update());
+      ctx.clearRect(0, 0, width, height);
+      const live = this.isRunning || this.canvas.classList.contains("is-exiting");
+
+      if (live) {
+        for (let i = 0; i < this.motes.length; i++) {
+          const mote = this.motes[i];
+          mote.x -= this.slide * mote.factor;
+          if (mote.x + mote.w < 0) {
+            this.recycle(mote);
+          }
+
+          const alpha = this.getParticleAlpha(mote);
+          if (alpha <= 0) continue;
+
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = mote.color;
+          ctx.fillRect(mote.x, mote.y, mote.w, mote.h);
+        }
+        ctx.globalAlpha = 1;
       }
 
       this.animationFrame = window.requestAnimationFrame(this.update);
     }
 
-    getParticleAlpha(particle) {
-      return this.getSpatialDensity(particle);
+    getParticleAlpha(mote) {
+      return this.getSpatialDensity(mote);
     }
 
-    getSpatialDensity(particle) {
+    getSpatialDensity(mote) {
       const width = this.drawWidth;
       const edgeWidth = this.edgeWidth || this.getEdgeWidth();
-      const leftDistance = particle.x;
-      const rightDistance = width - (particle.x + particle.width);
+      const leftDistance = mote.x;
+      const rightDistance = width - (mote.x + mote.w);
       const edgeDistance = Math.min(leftDistance, rightDistance);
       if (edgeDistance > edgeWidth) return 1;
       if (edgeDistance < 0) return 0;
 
-      return this.getEdgeVisibility(particle, edgeDistance, edgeWidth);
+      return this.getEdgeVisibility(mote, edgeDistance, edgeWidth);
     }
 
-    getEdgeVisibility(particle, edgeDistance, edgeWidth) {
+    getEdgeVisibility(mote, edgeDistance, edgeWidth) {
       const amount = 1 - Math.min(Math.max(edgeDistance / edgeWidth, 0), 1);
-      const row = Math.floor(particle.y / 18);
-      const cell = Math.floor(particle.x / 22);
-      const ragged = hash(row * 31.7 + cell * 13.9 + particle.seed * 19.3);
+      const row = Math.floor(mote.y / 18);
+      const cell = Math.floor(mote.x / 22);
+      const ragged = jitter(row * 31.7 + cell * 13.9 + mote.seed * 19.3);
       const edge = amount + (ragged - 0.5) * 0.42;
       const threshold = 0.62;
-      const keep = edge < threshold;
 
-      return keep ? 1 : 0;
+      return edge < threshold ? 1 : 0;
     }
-  }
-
-  class Particle {
-    constructor(host, layerSpeed, colors, widthRange, heightRange) {
-      this.host = host;
-      this.layerSpeed = layerSpeed;
-      this.colors = colors;
-      this.widthRange = widthRange;
-      this.heightRange = heightRange;
-      this.seed = Math.random();
-      this.init();
-    }
-
-    init(reinit = false) {
-      const width = this.host.drawWidth || window.innerWidth;
-      const height = window.innerHeight;
-
-      this.x = reinit ? random(width, width * 2) : random(0, width * 2);
-      this.y = random(0, height);
-      this.width = random(this.widthRange[0], this.widthRange[1]);
-      this.height = random(this.heightRange[0], this.heightRange[1]);
-      this.color = arrayRandom(this.colors);
-    }
-
-    update() {
-      this.x -= this.host.speed * this.layerSpeed;
-      if (this.x + this.width < 0) {
-        this.init(true);
-      }
-    }
-
-    draw() {
-      const alpha = this.host.getParticleAlpha(this);
-      if (alpha <= 0) return;
-
-      this.host.context.globalAlpha = alpha;
-      this.host.context.fillStyle = this.color;
-      this.host.context.fillRect(this.x, this.y, this.width, this.height);
-      this.host.context.globalAlpha = 1;
-    }
-  }
-
-  class ParallaxLayer {
-    constructor(host, speed, count, colors, widthRange, heightRange) {
-      this.particles = [];
-
-      for (let i = 0; i < count; i++) {
-        this.particles.push(new Particle(host, speed, colors, widthRange, heightRange));
-      }
-    }
-
-    update() {
-      this.particles.forEach((particle) => {
-        particle.update();
-        particle.draw();
-      });
-    }
-  }
-
-  function random(min, max) {
-    return Math.floor(Math.random() * (max - min) + min);
-  }
-
-  function arrayRandom(items) {
-    return items[Math.floor(Math.random() * items.length)];
-  }
-
-  function smoothstep(edge0, edge1, value) {
-    const t = Math.min(Math.max((value - edge0) / (edge1 - edge0), 0), 1);
-
-    return t * t * (3 - 2 * t);
-  }
-
-  function hash(value) {
-    const next = Math.sin(value * 12.9898) * 43758.5453;
-
-    return next - Math.floor(next);
   }
 
   window.MainReferenceBackground = MainReferenceBackground;

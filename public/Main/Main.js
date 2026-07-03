@@ -29,7 +29,7 @@
       this.pressOffsetXRatio = -0.015;
       this.pressOffsetYRatio = 0.015;
       this.baseRotationX = Math.sin(45 * Math.PI / 180);
-      this.tesseract = null;
+      this.cubeCloud = null;
       this.mat = null;
       this.hoverDust = null;
       this.hoverDustMat = null;
@@ -84,16 +84,17 @@
       const hoverCoreParticlesPerEdge = 10800;
       const hoverScatterParticlesPerEdge = 0;
       const hoverParticlesPerEdge = hoverCoreParticlesPerEdge + hoverScatterParticlesPerEdge;
-      const sizeOut = 0.5;
-      const sizeIn = 0.25;
-      const cubeEdges = [
+      const outerScale = 0.5;
+      const innerScale = 0.25;
+      // 12 wireframe edges expressed as ordered corner-index pairs.
+      const edgeLinks = [
         [0, 1], [1, 3], [3, 2], [2, 0],
         [4, 5], [5, 7], [7, 6], [6, 4],
         [0, 4], [1, 5], [2, 6], [3, 7],
       ];
-      const unitCorners = [];
+      const cornerNodes = [];
       const geo = new THREE.BufferGeometry();
-      const totalParticles = cubeEdges.length * hoverParticlesPerEdge;
+      const totalParticles = edgeLinks.length * hoverParticlesPerEdge;
       const posStart = new Float32Array(totalParticles * 3);
       const posEnd = new Float32Array(totalParticles * 3);
       const squarePos = new Float32Array(totalParticles * 3);
@@ -113,24 +114,26 @@
         hoverParticlesPerEdge
       );
 
-      for (let x = -1; x <= 1; x += 2) {
-        for (let y = -1; y <= 1; y += 2) {
-          for (let z = -1; z <= 1; z += 2) {
-            unitCorners.push(new THREE.Vector3(x, y, z));
-          }
-        }
+      // Derive the 8 cube corners from the bits of their index so corner N maps
+      // to the same coordinate the edge table expects (bit4=x, bit2=y, bit1=z).
+      for (let n = 0; n < 8; n++) {
+        cornerNodes.push(new THREE.Vector3(
+          n & 4 ? 1 : -1,
+          n & 2 ? 1 : -1,
+          n & 1 ? 1 : -1
+        ));
       }
 
-      cubeEdges.forEach((edge) => {
+      edgeLinks.forEach((edge) => {
         const [cornerA, cornerB] = edge;
-        const vA = unitCorners[cornerA];
-        const vB = unitCorners[cornerB];
+        const vA = cornerNodes[cornerA];
+        const vB = cornerNodes[cornerB];
 
         for (let p = 0; p < hoverParticlesPerEdge; p++) {
           const t = p / hoverParticlesPerEdge;
           const edgePoint = new THREE.Vector3().lerpVectors(vA, vB, t);
-          const start = edgePoint.clone().multiplyScalar(sizeOut);
-          const end = edgePoint.clone().multiplyScalar(sizeIn);
+          const start = edgePoint.clone().multiplyScalar(outerScale);
+          const end = edgePoint.clone().multiplyScalar(innerScale);
           const isCubeVisible = this.isVisibleSample(p, hoverParticlesPerEdge, cubeParticlesPerEdge);
           const isBurstVisible = this.isVisibleSample(p, hoverParticlesPerEdge, burstParticlesPerEdge);
           const isCoreLayer = p < hoverCoreParticlesPerEdge;
@@ -139,7 +142,7 @@
           const isScatterLayer = !isCoreLayer;
           const inward = isCubeVisible ? cubeVisibleIndex % 2 === 0 : pIdx % 2 === 0;
           const burst = isBurstVisible
-            ? this.getBurstPoint(burstVisibleIndex++, cubeEdges.length * burstParticlesPerEdge)
+            ? this.getBurstPoint(burstVisibleIndex++, edgeLinks.length * burstParticlesPerEdge)
             : this.getBurstPoint(pIdx, totalParticles);
 
           this.setParticleData(
@@ -289,11 +292,11 @@
         depthWrite: false,
       });
 
-      this.tesseract = new THREE.Points(geo, this.mat);
-      this.tesseract.rotation.x = this.baseRotationX;
-      this.tesseract.renderOrder = 2;
+      this.cubeCloud = new THREE.Points(geo, this.mat);
+      this.cubeCloud.rotation.x = this.baseRotationX;
+      this.cubeCloud.renderOrder = 2;
       this.createHoverDust();
-      this.scene.add(this.tesseract);
+      this.scene.add(this.cubeCloud);
 
       this.createTrails(burstPos, offsets, burstMask);
 
@@ -308,12 +311,12 @@
     }
 
     animate(time) {
-      if (this.tesseract) {
+      if (this.cubeCloud) {
         const msToSeconds = this.duration / 1000;
         const cubeRotationAmount = this.burstTarget > 0 ? 0 : 1;
-        this.tesseract.rotation.x = this.baseRotationX * cubeRotationAmount;
-        this.tesseract.rotation.y = (time / 1000) * (Math.PI * 2 / msToSeconds) * cubeRotationAmount;
-        this.tesseract.rotation.y %= Math.PI * 2;
+        this.cubeCloud.rotation.x = this.baseRotationX * cubeRotationAmount;
+        this.cubeCloud.rotation.y = (time / 1000) * (Math.PI * 2 / msToSeconds) * cubeRotationAmount;
+        this.cubeCloud.rotation.y %= Math.PI * 2;
       }
 
       this.hoverAmount += (this.hoverTarget - this.hoverAmount) * 0.08;
