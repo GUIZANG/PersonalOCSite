@@ -92,3 +92,14 @@ In the future, the project will continue to seek a balance between visual experi
 This process is itself part of the project: constant experimentation, iteration, and adjustment, discovering unexpected effects and new possibilities along the way.
 
 This project is a dynamically growing experimental space, both a technical and a visual experiment. Updates are welcome, and so are ideas or inspirations for the experimental process. Each adjustment may bring new surprises, and every iteration is a fresh exploration.
+
+🔹 **License**
+
+This project is dual-licensed:
+
+- **Source code** (HTML / CSS / JavaScript / shaders / config) — [MIT License](LICENSE).
+- **Original creative content** (OC, text, visual designs, artwork, images, audio) — [CC BY-NC-ND 4.0](LICENSE-CONTENT.md): sharing with attribution is allowed, but commercial use and derivative works are not.
+
+Third-party libraries under `public/libs/` and other dependencies remain under their own respective licenses.
+
+© 2026 ZhuiYuYu.
