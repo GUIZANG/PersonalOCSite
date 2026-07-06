@@ -5,7 +5,11 @@ import { VFX } from "/libs/vfx-js.min.js";
 // a spatial boundary `progress` (the scanner position across the card, in card
 // UV space). Card content stays intact to the RIGHT of the front, dissolves
 // into colorful pixel cells at the front, and is gone (transparent) to the LEFT.
-const shader = `
+//
+// The card front is an empty glass pane (no text), so only the dissolving
+// pixel cells are rendered here, on a canvas above the glass layer (z 8 vs
+// z 2, see Main.css) to keep the dissolve crisp on top of the refraction.
+const shaderLib = `
 precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;
@@ -130,60 +134,39 @@ vec4 cellsColor(vec2 p, float scale, float t) {
   return cc / 8.;
 }
 
-vec4 draw(vec2 uv, vec2 p, float t, float scale) {
-  vec4 c = readTex(uv);
+`;
 
-  vec2 pi = floor(p * scale);
-  vec2 s = vec2(seed * 17.13, seed * 41.71);
-  float x = cellX(pi, scale);
-
-  // Ease in a bit slower so the effect doesn't pop too quickly on entry.
-  float act = smoothstep(-0.03, 0.09, t);
-
-  // Straight left edge at the scanner (t); ragged right edge via per-cell reach.
-  float reach = W * (0.6 + 1.8 * hash(pi + s + 3.0));
-  float a1 = mix(1.0, smoothstep(t, t + reach, x), act);
-  c *= a1;
-
-  // Monochrome pixel cells dissolving at the front.
-  c += cellsColor(p * scale, scale, t) * 1.2 * act;
-
-  return c;
-}
-
+// Cells pass: only the dissolving pixel cells at the front.
+const shaderCells = shaderLib + `
 void main() {
   vec2 uv = (gl_FragCoord.xy - offset) / resolution;
   vec2 p = uv * 2. - 1.;
   p.y *= resolution.y / resolution.x;
 
   float t = progress;
+  float act = smoothstep(-0.03, 0.09, t);
 
   vec4 col = vec4(0);
   for (float i = 0.; i < 10.; i++) {
     if (i >= layers) break;
-    float s = cos(i) * 7.3 + 10.;
-    col += draw(uv, p, t, abs(s));
+    float scale = abs(cos(i) * 7.3 + 10.);
+    col += cellsColor(p * scale, scale, t) * 1.2 * act;
   }
   col /= layers;
 
-  // Hard cut at the scanner line: nothing renders to the LEFT of it (clean cut),
-  // and a thin gutter just right of it keeps the scanner line itself uncovered.
-  // Let the scanner front keep moving beyond the right edge, so the tail fades
-  // naturally by cell-count decay instead of being squeezed at card boundary.
   col *= step(progress, uv.x);
-
   col *= clamp(reveal, 0., 1.);
 
   gl_FragColor = col;
 }
 `;
 
-let vfx = null;
-function getVFX() {
-  if (!vfx) {
-    vfx = new VFX();
+let vfxCells = null;
+function getVFXCells() {
+  if (!vfxCells) {
+    vfxCells = new VFX({ zIndex: 80 });
   }
-  return vfx;
+  return vfxCells;
 }
 
 window.MainCardVFX = {
@@ -191,12 +174,10 @@ window.MainCardVFX = {
   // getProgress(): scanner position across the card in UV space (can be <0 / >1).
   // getReveal():   stream activation fade amount [0,1].
   bind(element, getProgress, getReveal, getSeed) {
-    getVFX().add(element, {
-      shader,
+    getVFXCells().add(element, {
+      shader: shaderCells,
       // Extra right overflow prevents clipping when the front reaches card edge.
       overflow: [40, 72, 40, 32],
-      // Keep effect layer above the card surface/content.
-      zIndex: 6,
       uniforms: {
         progress: () => getProgress(),
         reveal: () => getReveal(),

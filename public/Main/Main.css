@@ -91,7 +91,7 @@ button,
 .main-card-stream {
   position: fixed;
   inset: 0;
-  z-index: 3;
+  z-index: 30;
   --main-card-width: min(clamp(274px, 35vmin, 486px), 68vw);
   --main-card-height: calc(var(--main-card-width) * 0.6316);
   --main-card-gap: calc(var(--main-card-width) * 0.4);
@@ -684,17 +684,6 @@ body.is-screen-glitching .hypercube-stage {
   will-change: transform;
 }
 
-.main-card-wrapper::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  background: rgba(0, 0, 0, 0.48);
-  pointer-events: none;
-  clip-path: inset(0 0 0 var(--clip-right, 0%) round 5px);
-}
-
 .main-card-wrapper.is-scan-fading {
   -webkit-mask-image: linear-gradient(
     90deg,
@@ -712,17 +701,6 @@ body.is-screen-glitching .hypercube-stage {
     #000 calc(var(--scan-fade-x) + var(--scan-fade-width)),
     #000 100%
   );
-}
-
-.main-card-wrapper::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 7;
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: inherit;
-  pointer-events: none;
-  clip-path: inset(0 0 0 var(--clip-right, 0%) round 5px);
 }
 
 .main-card-stream.is-card-focusing .main-card-wrapper {
@@ -756,17 +734,11 @@ body.is-screen-glitching .hypercube-stage {
 
 .main-card-normal {
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 22px;
-  color: rgba(255, 255, 255, 0.88);
   overflow: hidden;
   border: none;
   border-radius: 5px;
   background: transparent;
   clip-path: inset(0 0 0 var(--clip-right, 0%) round 5px);
-  backdrop-filter: blur(2px);
 }
 
 .main-card-ascii {
@@ -841,30 +813,6 @@ body.is-screen-glitching .hypercube-stage {
     rgba(0, 0, 0, 0.86) 38%,
     rgba(0, 0, 0, 0.42) 100%
   );
-}
-
-.main-scan-effect {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  border-radius: inherit;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.main-scan-effect::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(200, 255, 255, 0.3),
-    transparent
-  );
-  animation: mainScanFlash 650ms ease-out forwards;
-  will-change: transform, opacity;
-  transform: translate3d(-120%, 0, 0);
 }
 
 .main-scanner {
@@ -1193,22 +1141,50 @@ body.is-screen-glitching .hypercube-stage {
   }
 }
 
-@keyframes mainScanFlash {
-  from {
-    opacity: 0;
-    transform: translate3d(-120%, 0, 0);
-  }
 
-  45% {
-    opacity: 1;
-  }
+.main-card-glass-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
 
-  78% {
-    opacity: 0.88;
-  }
+.main-card-glass {
+  --main-card-glass-overscan: 90px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: none;
+  pointer-events: none;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  will-change: transform, clip-path;
+  -webkit-backdrop-filter: url(#glassPillFilter) saturate(1.05);
+  backdrop-filter: url(#glassPillFilter) saturate(1.05);
+}
 
-  to {
-    opacity: 0;
-    transform: translate3d(120%, 0, 0);
+/* Beveled edge = glass thickness. Fixed to the real card box (inset by the
+   overscan) as a child of the glass, so the glass clip-path trims it to the
+   visible region without it sweeping across during a scan. Bright top rim,
+   dim bottom rim, soft top sheen and bottom shade read as a thick glass slab. */
+.main-card-glass-edge {
+  position: absolute;
+  inset: var(--main-card-glass-overscan);
+  border-radius: 5px;
+  pointer-events: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 1px 0 0 rgba(255, 255, 255, 0.28),
+    inset -1px 0 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 10px 20px -12px rgba(255, 255, 255, 0.4),
+    inset 0 -16px 26px -16px rgba(0, 0, 0, 0.55);
+}
+
+/* Fallback when SVG backdrop-filter is unsupported (Safari/Firefox). */
+@supports not (backdrop-filter: url("#glassPillFilter")) {
+  .main-card-glass {
+    -webkit-backdrop-filter: blur(6px) saturate(1.2);
+    backdrop-filter: blur(6px) saturate(1.2);
   }
 }

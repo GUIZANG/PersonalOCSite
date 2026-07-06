@@ -1,4 +1,4 @@
-const downPhrases = [
+/*const downPhrases = [
     "There is nothing. Only warm, primordial blackness.",
     "Your conscience ferments in it.",
     "You don't have to do anything anymore.",
@@ -18,6 +18,11 @@ const downPhrases = [
     "something attached to your sore neck.",
     "However, no one answers.",
     "Yes. Yes. You are poured into the desperate...",
+    "*REALITY*",
+    "Cruelly.",
+    "Achingly."
+];*/
+const downPhrases = [
     "*REALITY*",
     "Cruelly.",
     "Achingly."

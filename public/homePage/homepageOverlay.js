@@ -17,8 +17,10 @@ function initHomepageOverlay() {
 
   const expandThreshold = 10;
   const retractThreshold = 60;
+  const expandDwell = 2000;
   const expandDuration = 820;
   const retractDuration = 980;
+  let dwellTimer = null;
   let progress = 0;
   let startProgress = 0;
   let targetProgress = 0;
@@ -41,9 +43,28 @@ function initHomepageOverlay() {
     updatePointerReadout(event.clientX, event.clientY);
 
     if (event.clientY <= expandThreshold) {
+      scheduleExpand();
+    } else {
+      cancelDwell();
+      if (event.clientY >= height - retractThreshold) {
+        animateTo(0);
+      }
+    }
+  }
+
+  // Expand only after the pointer dwells at the top edge for a beat.
+  function scheduleExpand() {
+    if (targetProgress === 1 || dwellTimer) return;
+    dwellTimer = setTimeout(() => {
+      dwellTimer = null;
       animateTo(1);
-    } else if (event.clientY >= height - retractThreshold) {
-      animateTo(0);
+    }, expandDwell);
+  }
+
+  function cancelDwell() {
+    if (dwellTimer) {
+      clearTimeout(dwellTimer);
+      dwellTimer = null;
     }
   }
 

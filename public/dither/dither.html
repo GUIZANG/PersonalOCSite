@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DITHER — preview</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #dither-stage { position: fixed; inset: 0; width: 100vw; height: 100dvh; }
+  </style>
+</head>
+<body>
+  <div id="dither-stage"></div>
+
+  <script src="/libs/three.min.js"></script>
+  <script type="module">
+    import { createDitherBackground } from "/scripts/ditherBackground.js";
+
+    createDitherBackground({
+      container: document.getElementById("dither-stage"),
+      waveColor: [1, 1, 1],
+      disableAnimation: false,
+      enableMouseInteraction: true,
+      mouseRadius: 0.3,
+      colorNum: 2,
+      pixelSize: 1,
+      waveAmplitude: 0.3,
+      waveFrequency: 3,
+      waveSpeed: 0.05,
+    });
+  </script>
+</body>
+</html>
