@@ -551,6 +551,8 @@ body.is-main-overlay-open .hypercube-stage {
   --cursor-dot-size: 6px;
   --cursor-dot-half-size: 3px;
   --cursor-render-scale: 1;
+  --cursor-outer-color: #f7f8fa;
+  --cursor-dot-color: #f7f8fa;
   --cursor-shadow: 0 0 0 #00feff, 0 0 0 #ff4f71;
   pointer-events: none;
   isolation: isolate;
@@ -586,7 +588,7 @@ body.is-main-overlay-open .hypercube-stage {
   width: var(--cursor-dot-size);
   height: var(--cursor-dot-size);
   border-radius: 50%;
-  background: #f7f8fa;
+  background: var(--cursor-dot-color);
   transform: translate3d(
     calc(var(--dot-x) - var(--cursor-dot-half-size)),
     calc(var(--dot-y) - var(--cursor-dot-half-size)),
@@ -601,6 +603,11 @@ body.is-main-overlay-open .hypercube-stage {
   .curzr::after {
     background-color: transparent;
     backdrop-filter: invert(1);
+  }
+
+  .curzr.is-hypercube-pressing::before {
+    background-color: var(--cursor-outer-color);
+    backdrop-filter: none;
   }
 }
 
@@ -751,7 +758,7 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 .main-card-wrapper.is-main-card-focus-settled .main-card-normal {
-  clip-path: inset(0);
+  clip-path: inset(0 round 5px);
 }
 
 .main-card-wrapper.is-main-card-focus-settled .main-card-ascii {
@@ -1138,53 +1145,5 @@ body.is-screen-glitching .hypercube-stage {
 
   52% {
     opacity: 0.95;
-  }
-}
-
-
-.main-card-glass-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  pointer-events: none;
-}
-
-.main-card-glass {
-  --main-card-glass-overscan: 90px;
-  position: fixed;
-  left: 0;
-  top: 0;
-  display: none;
-  pointer-events: none;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.12);
-  will-change: transform, clip-path;
-  -webkit-backdrop-filter: url(#glassPillFilter) saturate(1.05);
-  backdrop-filter: url(#glassPillFilter) saturate(1.05);
-}
-
-/* Beveled edge = glass thickness. Fixed to the real card box (inset by the
-   overscan) as a child of the glass, so the glass clip-path trims it to the
-   visible region without it sweeping across during a scan. Bright top rim,
-   dim bottom rim, soft top sheen and bottom shade read as a thick glass slab. */
-.main-card-glass-edge {
-  position: absolute;
-  inset: var(--main-card-glass-overscan);
-  border-radius: 5px;
-  pointer-events: none;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 1px 0 0 rgba(255, 255, 255, 0.28),
-    inset -1px 0 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 10px 20px -12px rgba(255, 255, 255, 0.4),
-    inset 0 -16px 26px -16px rgba(0, 0, 0, 0.55);
-}
-
-/* Fallback when SVG backdrop-filter is unsupported (Safari/Firefox). */
-@supports not (backdrop-filter: url("#glassPillFilter")) {
-  .main-card-glass {
-    -webkit-backdrop-filter: blur(6px) saturate(1.2);
-    backdrop-filter: blur(6px) saturate(1.2);
   }
 }

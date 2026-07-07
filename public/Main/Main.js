@@ -59,12 +59,16 @@
       this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
       this.camera.position.set(0, 0, 6);
 
-      this.renderer = new THREE.WebGLRenderer({ antialias: true });
+      // The liquid-glass pass samples this WebGL canvas via drawImage(). Keep
+      // the presented frame available so the card refraction can see the main
+      // cardstream starfield/hypercube background instead of a cleared buffer.
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.renderer.setClearColor(this.background, 1);
 
       this.container.insertBefore(this.renderer.domElement, this.container.firstChild);
+      window.MainCardVFX?.attachLiquidSource?.(this.renderer.domElement);
       this.pressTargetGuide = document.createElement("div");
       this.pressTargetGuide.className = "hypercube-press-target-guide";
       this.container.appendChild(this.pressTargetGuide);
@@ -326,6 +330,7 @@
 
       if (this.pressPointerId !== null && this.burstTarget === 0) {
         this.pressAmount = Math.min((performance.now() - this.pressStartTime) / this.longPressDuration, 1);
+        this.updateCursorPressState(true);
         if (this.pressAmount >= 1) {
           this.activateBurst();
         }
@@ -333,6 +338,7 @@
         this.pressAmount = 1;
       } else {
         this.pressAmount += (0 - this.pressAmount) * 0.12;
+        this.updateCursorPressState(false);
       }
 
       if (this.mat) {
@@ -420,6 +426,7 @@
 
       this.pressStartTime = performance.now();
       this.pressPointerId = event.pointerId;
+      this.updateCursorPressState(true);
       this.enterHover();
       this.container.setPointerCapture?.(event.pointerId);
     }
@@ -473,6 +480,7 @@
       this.renderer.clear();
       this.pressPointerId = null;
       this.pressAmount = 1;
+      this.updateCursorPressState(false);
       this.hoverTarget = 1;
       this.burstTarget = 1;
       this.container.classList.remove("is-hypercube-hovered");
@@ -485,6 +493,7 @@
     cancelLongPress() {
       this.pressStartTime = 0;
       this.pressPointerId = null;
+      this.updateCursorPressState(false);
     }
 
     isInPressCenter(event) {
@@ -505,6 +514,15 @@
       this.pressTargetGuide.style.top = `${center.y}px`;
       this.pressTargetGuide.style.width = `${diameter}px`;
       this.pressTargetGuide.style.height = `${diameter}px`;
+    }
+
+    updateCursorPressState(active) {
+      window.dispatchEvent(new CustomEvent("main:hypercube-long-press", {
+        detail: {
+          active,
+          progress: active ? this.pressAmount : 0,
+        },
+      }));
     }
 
     getPressRadius(rect) {

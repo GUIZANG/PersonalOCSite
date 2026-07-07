@@ -38,6 +38,7 @@
       this.referenceBackground = window.MainReferenceBackground
         ? new window.MainReferenceBackground(document.getElementById("hypercube-stage") || document.body)
         : null;
+      window.MainCardVFX?.addLiquidBackgroundSource?.(this.referenceBackground?.canvas);
 
       this.animate = this.animate.bind(this);
       this.populate();
@@ -47,6 +48,7 @@
       this.position = -this.singleCycleWidth;
       this.createDialog();
       this.bindVFX();
+      this.bindLiquidGlass();
       this.animate();
     }
 
@@ -79,37 +81,30 @@
       });
     }
 
+    bindLiquidGlass() {
+      if (!window.MainCardVFX?.setLiquidCardProvider) return;
+      window.MainCardVFX.setLiquidCardProvider(() => this.getLiquidGlassCards());
+    }
+
     populate() {
       const loops = 3;
       this.line.innerHTML = "";
-      this.ensureGlassLayer();
       for (let loop = 0; loop < loops; loop++) {
         this.cards.forEach((card, index) => {
-          this.line.appendChild(this.createCard(card, index));
+          this.line.appendChild(this.createCard(card, index, loop));
         });
       }
     }
 
-    // Body-level layer for the glass panes. It sits BELOW the card stream
-    // (z 2 vs z 3) so the backdrop-filter only samples the stage background —
-    // never the ascii text, scanner or HUD. The dissolve cells canvas (z 8)
-    // renders above. Panes are re-positioned every frame in updateScanning.
-    ensureGlassLayer() {
-      if (!this.glassLayer) {
-        this.glassLayer = document.createElement("div");
-        this.glassLayer.className = "main-card-glass-layer";
-        document.body.appendChild(this.glassLayer);
-      }
-      this.glassLayer.innerHTML = "";
-    }
-
-    createCard(card, index) {
+    createCard(card, index, loop) {
       const wrapper = document.createElement("article");
       wrapper.className = "main-card-wrapper hoverable";
       wrapper.dataset.cardIndex = index;
+      wrapper.dataset.loop = loop;
       wrapper._scanQ = -1;
       wrapper._previousScanQ = -1;
       wrapper._dissolveSeed = Math.random();
+      wrapper._liquidSeed = Math.random();
 
       // Card front carries no text: it is a glass pane from the start. The
       // normal layer stays as the (empty) anchor for the vfx dissolve passes
@@ -122,22 +117,6 @@
       const asciiContent = document.createElement("pre");
       asciiContent.className = "main-ascii-content";
       ascii.appendChild(asciiContent);
-
-      // Glass lens for the right half of this card. Lives in the body-level
-      // glass layer (above the vfx canvas) and is repositioned every frame in
-      // updateScanning, so it tracks the card's motion exactly while staying
-      // purely visual (pointer-events: none).
-      const glass = document.createElement("div");
-      glass.className = "main-card-glass";
-      // Bevel/edge child gives the glass slab a sense of thickness. It sits on
-      // the real card box (inset by the overscan) and is clipped by the glass
-      // clip-path, so it stays fixed to the card edges — it never sweeps with
-      // the scanner and only shows over the visible glass region.
-      const glassEdge = document.createElement("div");
-      glassEdge.className = "main-card-glass-edge";
-      glass.appendChild(glassEdge);
-      this.glassLayer.appendChild(glass);
-      wrapper._glassEl = glass;
 
       wrapper.appendChild(normal);
       wrapper.appendChild(ascii);
@@ -290,6 +269,39 @@
       this.singleCycleWidth = Math.max(fifth.offsetLeft - first.offsetLeft, 1);
     }
 
+    getMiddleLoopCard(wrapper) {
+      if (!wrapper) return null;
+      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
+      const wrappers = Array.from(this.line.querySelectorAll(".main-card-wrapper"));
+      const middleLoop = Math.floor(wrappers.length / this.cards.length / 2);
+
+      return wrappers.find((candidate) =>
+        Number(candidate.dataset.cardIndex) === cardIndex &&
+        Number(candidate.dataset.loop) === middleLoop
+      ) || wrapper;
+    }
+
+    normalizeFocusedCardLoop() {
+      if (!this.focusedCard || !this.singleCycleWidth) return;
+      const current = this.focusedCard;
+      const middle = this.getMiddleLoopCard(current);
+      if (!middle || middle === current) return;
+
+      const delta = current.offsetLeft - middle.offsetLeft;
+      const wasSettled = this.focusSettled;
+      current.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
+      middle.classList.add("is-main-card-focused");
+      if (wasSettled) {
+        middle.classList.add("is-main-card-focus-settled");
+      }
+
+      this.focusedCard = middle;
+      this.position += delta;
+      this.focusTargetPosition += delta;
+      this.line.style.transform = `translate3d(${this.position}px, 0, 0)`;
+      this.updateFocusTargets();
+    }
+
     fitAsciiContent() {
       const baseWidth = 380;
       const baseHeight = 240;
@@ -390,8 +402,6 @@
           !suppressScanEffects && wrapper._scanQ >= 0 && wrapper._scanQ <= 1
         );
 
-        this.updateGlass(wrapper, rect);
-
         // Refresh the dissolve seed when a card first crosses the scanner, so
         // the pixel dissolve varies per pass. The white "scan flash" sweep was
         // removed (it read as a repeating reflection on the glass cards).
@@ -405,10 +415,42 @@
       this.updateScannerHud(nearestCard, nearestDistance, scannerX);
     }
 
+    getLiquidGlassCards() {
+      const pixelRatio = window.devicePixelRatio || 1;
+      const cards = [];
+
+      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
+        const rect = wrapper.getBoundingClientRect();
+        const offscreen = rect.right < -40 || rect.left > window.innerWidth + 40;
+        if (offscreen || this.revealAmount < 0.02) return;
+        if (rect.width <= 0.5 || rect.height <= 0.5) return;
+
+        const scanQ = typeof wrapper._scanQ === "number" ? wrapper._scanQ : -1;
+        const clipLeft = Math.min(Math.max(scanQ, 0), 1) * rect.width;
+        if (clipLeft >= rect.width - 0.5) return;
+
+        // Full card rect plus a separate left clip. This preserves the material
+        // coordinates of the whole card while making glass the complement of
+        // the ASCII text block: text [0, scanX], glass [scanX, cardRight].
+        cards.push({
+          left: rect.left * pixelRatio,
+          bottom: (window.innerHeight - rect.bottom) * pixelRatio,
+          width: rect.width * pixelRatio,
+          height: rect.height * pixelRatio,
+          opacity: 1,
+          seed: wrapper._liquidSeed,
+          clipLeft: clipLeft * pixelRatio,
+        });
+      });
+
+      return cards;
+    }
+
     focusCard(wrapper) {
       if (!wrapper || !this.active) return;
 
       const wasFocused = Boolean(this.focusedCard) && this.focusMode !== "exit";
+      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
 
       this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
       this.focusedCard = wrapper;
@@ -422,6 +464,7 @@
       this.stream.classList.add("is-card-focusing");
       this.stream.classList.remove("is-card-focus-settled");
       wrapper._dissolveSeed = Math.random();
+      this.referenceBackground?.setPalette?.(cardIndex, { glitch: wasFocused });
       if (!wasFocused) {
         this.referenceBackground?.activate();
       }
@@ -504,6 +547,7 @@
         this.isSwitchingFocus = false;
         this.stream.classList.add("is-card-focus-settled");
         this.focusedCard?.classList.add("is-main-card-focus-settled");
+        this.normalizeFocusedCardLoop();
       }
     }
 
@@ -544,43 +588,6 @@
     updateScannerPosition() {
       if (!this.scanner) return;
       this.scanner.style.left = `${this.scannerX}px`;
-    }
-
-    // Mirror the card's on-screen rect onto its glass lens (fixed-positioned
-    // above the vfx canvas). Because the source rect already includes every
-    // wrapper transform (drift, scaleX stretch, focus scale), the lens motion
-    // matches the card exactly.
-    updateGlass(wrapper, rect) {
-      const glass = wrapper._glassEl;
-      if (!glass) return;
-
-      const offscreen = rect.right < -40 || rect.left > window.innerWidth + 40;
-      const hidden = offscreen || this.revealAmount < 0.02;
-      glass.style.display = hidden ? "none" : "block";
-      if (hidden) return;
-
-      // Overscan gives the SVG displacement room to pull in backdrop pixels
-      // from outside the card. Without it, RGB offsets can hit the filter
-      // boundary at the card edge and leave a visible contour.
-      const overscan = 90;
-      glass.style.transform = `translate3d(${rect.left - overscan}px, ${rect.top - overscan}px, 0)`;
-      glass.style.width = `${rect.width + overscan * 2}px`;
-      glass.style.height = `${rect.height + overscan * 2}px`;
-
-      // Complementary with the ascii layer, mirroring the normal layer's
-      // --clip-right: glass pane right of the scan front, ascii to the left.
-      // Unscanned cards are a full glass pane; fully scanned ones are all ascii.
-      // The shine child is clipped by this same path, so it can only appear on
-      // the visible glass region — never on the ascii.
-      const scanQ = typeof wrapper._scanQ === "number" ? wrapper._scanQ : -1;
-      const scanLeft = Math.min(Math.max(scanQ, 0), 1) * rect.width;
-      const clipLeft = overscan + scanLeft;
-      glass.style.clipPath = `inset(${overscan}px ${overscan}px ${overscan}px ${clipLeft}px round 5px)`;
-
-      const dimmed = this.focusMode &&
-        this.focusMode !== "exit" &&
-        wrapper !== this.focusedCard;
-      glass.style.opacity = String(this.revealAmount * (dimmed ? 0.62 : 1));
     }
 
     createDialog() {

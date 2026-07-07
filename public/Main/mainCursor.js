@@ -36,6 +36,8 @@
     let pressGlitchUntil = 0;
     let isScreenPressing = false;
     let screenGlitchUntil = 0;
+    let isHypercubePressing = false;
+    let hypercubePressProgress = 0;
     let hasPointerPosition = false;
     let animationFrame = null;
     let cursorOuterSize = desktopOuterSize;
@@ -47,6 +49,7 @@
     document.addEventListener("pointerup", endPressGlitch);
     document.addEventListener("pointercancel", endPressGlitch);
     document.addEventListener("contextmenu", (event) => event.preventDefault());
+    window.addEventListener("main:hypercube-long-press", updateHypercubePressCursor);
     window.addEventListener("resize", updateCursorSize);
     window.addEventListener("blur", endPressGlitch);
     updateCursorSize();
@@ -130,6 +133,18 @@
       cursor.style.setProperty("--cursor-outer-scaled-half-size", `${renderOuterSize / 2}px`);
     }
 
+    function updateHypercubePressCursor(event) {
+      const detail = event.detail || {};
+      isHypercubePressing = Boolean(detail.active);
+      hypercubePressProgress = isHypercubePressing ? clamp(Number(detail.progress) || 0, 0, 1) : 0;
+
+      cursor.classList.toggle("is-hypercube-pressing", isHypercubePressing);
+      cursor.style.setProperty("--cursor-outer-color", mixColor("#f7f8fa", "#ff1f2d", hypercubePressProgress));
+      if (!isHypercubePressing && !isPressing && !isPressGlitching) {
+        cursor.style.setProperty("--cursor-shadow", defaultShadow);
+      }
+    }
+
     function updateCursorSize() {
       const scale = window.innerHeight / desktopReferenceHeight;
       const outerSize = snapEvenPixel(desktopOuterSize * scale);
@@ -209,12 +224,14 @@
     }
 
     function applyPressGlitch(now) {
-      const x = Math.round(Math.sin(now * 0.095) * 5 + Math.sin(now * 0.033) * 2);
-      const y = Math.round(Math.cos(now * 0.081) * 4 + Math.sin(now * 0.047) * 2);
+      const pressBoost = isHypercubePressing ? 1 + hypercubePressProgress * 1.6 : 1;
+      const x = Math.round((Math.sin(now * 0.095) * 5 + Math.sin(now * 0.033) * 2) * pressBoost);
+      const y = Math.round((Math.cos(now * 0.081) * 4 + Math.sin(now * 0.047) * 2) * pressBoost);
+      const red = mixColor(glitchColorR, "#ff1010", hypercubePressProgress);
 
       cursor.style.setProperty("--cursor-shadow", `
         ${x}px ${y}px 0 ${glitchColorB},
-        ${-x}px ${-y}px 0 ${glitchColorR}
+        ${-x}px ${-y}px 0 ${red}
       `);
       isPressGlitching = true;
     }
@@ -250,6 +267,27 @@
 
     function snapEvenPixel(value) {
       return Math.max(2, Math.round(value / 2) * 2);
+    }
+
+    function mixColor(from, to, amount) {
+      const a = hexToRgb(from);
+      const b = hexToRgb(to);
+      const t = clamp(amount, 0, 1);
+      const r = Math.round(a.r + (b.r - a.r) * t);
+      const g = Math.round(a.g + (b.g - a.g) * t);
+      const blue = Math.round(a.b + (b.b - a.b) * t);
+
+      return `rgb(${r}, ${g}, ${blue})`;
+    }
+
+    function hexToRgb(hex) {
+      const value = Number.parseInt(hex.replace("#", ""), 16);
+
+      return {
+        r: (value >> 16) & 255,
+        g: (value >> 8) & 255,
+        b: value & 255,
+      };
     }
   }
 })();

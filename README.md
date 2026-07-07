@@ -48,10 +48,11 @@ npm run preview
 
 🔹 **Recent Update (Main Scene)**
 
-- Refined the Main archive cursor with responsive sizing, hover scaling, press glitch, and right-click screen glitch feedback
-- Tuned the hypercube hover state with dust rays, hover particles, and clearer pointer-target response
-- Stabilized the scanning archive card stream with drag support, loop measurement, clipped card reflections, and scanner-adjacent fade
-- Kept VFX dependencies local to the static multi-page Vite flow for predictable development and preview behavior
+- Added a liquid-glass card material with background refraction, spectral scattering, thickness absorption, Fresnel response, specular highlights, softened internal bubble motion, and card-edge thickness cues
+- Reworked the scanning archive cards so the scanned-left region reveals the Buddhist scripture ASCII text block while the unscanned-right region remains liquid glass
+- Expanded selected-card background states with per-card color palettes, glitch-assisted palette switching, and a darker red-toned focused scene
+- Refined hypercube and cursor feedback, including long-press cursor glitch behavior and press-progress color transition on the visible cursor ring
+- Stabilized the looping card focus flow so finite DOM clones continue to read as an infinite sequence during repeated card switching
 
 🔹 **Project Goal**
 
@@ -98,7 +99,7 @@ This project is a dynamically growing experimental space, both a technical and a
 This project is dual-licensed:
 
 - **Source code** (HTML / CSS / JavaScript / shaders / config) — [MIT License](LICENSE).
-- **Original creative content** (OC, text, visual designs, artwork, images, audio) — [CC BY-NC-ND 4.0](LICENSE-CONTENT.md): sharing with attribution is allowed, but commercial use and derivative works are not.
+- **Original creative content** (OC, text, visual designs, artwork, images, audio) — [CC BY-NC-ND 4.0](ContentLicense.md): sharing with attribution is allowed, but commercial use and derivative works are not.
 
 Third-party libraries under `public/libs/` and other dependencies remain under their own respective licenses.
 

@@ -3,19 +3,39 @@
   // implementation: a flat "mote" pool advanced by per-band parallax factors,
   // with an enter/exit reveal driven from CSS and a ragged edge mask so the
   // field dissolves toward the screen sides.
-  const INK = ["#050505", "#101010", "#1b1b1b"];
-  const ASH = ["#ffffff", "#d7d7d7", "#a8a8a8"];
+  const PALETTES = [
+    {
+      backdrop: "#010709",
+      ink: ["#01090b", "#031519", "#06252b", "#08363d"],
+      ash: ["#13515b", "#1f7d87", "#35a9ad", "#84ddd8"],
+    },
+    {
+      backdrop: "#070102",
+      ink: ["#090102", "#120304", "#1d0506", "#2a0809"],
+      ash: ["#5a1718", "#7d2423", "#a63a35", "#d06a5a"],
+    },
+    {
+      backdrop: "#090000",
+      ink: ["#120101", "#240202", "#3b0303", "#540606"],
+      ash: ["#7c1010", "#aa1616", "#e32222", "#ff5a48"],
+    },
+    {
+      backdrop: "#030303",
+      ink: ["#050505", "#101010", "#1b1b1b", "#252525"],
+      ash: ["#8a8a8a", "#b6b6b6", "#d8d8d8", "#ffffff"],
+    },
+  ];
 
   // Each band describes one parallax plane: how fast it slides, how many motes
   // it carries, its palette, and the min/max span/thickness of each mote.
   const BANDS = [
-    { factor: 1.0, motes: 4000, palette: INK, span: [50, 100], thick: [10, 20] },
-    { factor: 1.2, motes: 2000, palette: INK, span: [20, 100], thick: [10, 20] },
-    { factor: 1.4, motes: 300, palette: ASH, span: [5, 100], thick: [5, 20] },
-    { factor: 1.5, motes: 1000, palette: ASH, span: [1, 5], thick: [1, 5] },
-    { factor: 1.6, motes: 200, palette: ASH, span: [5, 100], thick: [5, 20] },
-    { factor: 1.8, motes: 100, palette: ASH, span: [5, 100], thick: [1, 20] },
-    { factor: 1.9, motes: 1000, palette: INK, span: [1, 1], thick: [1, 1] },
+    { factor: 1.0, motes: 4000, palette: "ink", span: [50, 100], thick: [10, 20] },
+    { factor: 1.2, motes: 2000, palette: "ink", span: [20, 100], thick: [10, 20] },
+    { factor: 1.4, motes: 300, palette: "ash", span: [5, 100], thick: [5, 20] },
+    { factor: 1.5, motes: 1000, palette: "ash", span: [1, 5], thick: [1, 5] },
+    { factor: 1.6, motes: 200, palette: "ash", span: [5, 100], thick: [5, 20] },
+    { factor: 1.8, motes: 100, palette: "ash", span: [5, 100], thick: [1, 20] },
+    { factor: 1.9, motes: 1000, palette: "ink", span: [1, 1], thick: [1, 1] },
   ];
 
   const BASE_SLIDE = 2;
@@ -40,6 +60,10 @@
       this.enterTimer = null;
       this.pendingAction = null;
       this.exitTimer = null;
+      this.paletteIndex = 0;
+      this.palette = PALETTES[this.paletteIndex];
+      this.glitchUntil = 0;
+      this.glitchSwitchTimer = null;
       this.enterStartTime = 0;
       this.exitStartTime = 0;
       this.enterEdgeDuration = 820;
@@ -55,6 +79,46 @@
       this.onResize();
       this.seedField();
       this.update();
+    }
+
+    setPalette(index, options = {}) {
+      const nextIndex = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
+      if (nextIndex === this.paletteIndex && !options.glitch) return;
+
+      if (!options.glitch) {
+        this.applyPalette(nextIndex);
+        return;
+      }
+
+      this.triggerPaletteGlitch(() => {
+        this.applyPalette(nextIndex);
+      });
+    }
+
+    triggerPaletteGlitch(onSwitch) {
+      this.glitchUntil = performance.now() + 360;
+      if (this.glitchSwitchTimer) {
+        window.clearTimeout(this.glitchSwitchTimer);
+      }
+
+      this.glitchSwitchTimer = window.setTimeout(() => {
+        this.glitchSwitchTimer = null;
+        onSwitch();
+      }, 130);
+    }
+
+    applyPalette(index) {
+      this.paletteIndex = index;
+      this.palette = PALETTES[index];
+      this.motes.forEach((mote) => {
+        mote.color = this.pickPaletteColor(mote.paletteName, mote.colorSeed);
+      });
+    }
+
+    pickPaletteColor(name, seed = Math.random()) {
+      const colors = this.palette[name] || this.palette.ink;
+      const index = Math.floor(seed * colors.length) % colors.length;
+      return colors[index];
     }
 
     activate() {
@@ -184,13 +248,16 @@
 
       for (const band of BANDS) {
         for (let i = 0; i < band.motes; i++) {
+          const colorSeed = Math.random();
           pool.push({
             factor: band.factor,
             x: intBetween(0, span * 2),
             y: intBetween(0, tall),
             w: intBetween(band.span[0], band.span[1]),
             h: intBetween(band.thick[0], band.thick[1]),
-            color: oneOf(band.palette),
+            paletteName: band.palette,
+            colorSeed,
+            color: this.pickPaletteColor(band.palette, colorSeed),
             seed: Math.random(),
           });
         }
@@ -215,6 +282,10 @@
       const live = this.isRunning || this.canvas.classList.contains("is-exiting");
 
       if (live) {
+        const glitchAmount = this.getGlitchAmount();
+        ctx.fillStyle = this.palette.backdrop;
+        ctx.fillRect(0, 0, width, height);
+
         for (let i = 0; i < this.motes.length; i++) {
           const mote = this.motes[i];
           mote.x -= this.slide * mote.factor;
@@ -227,7 +298,13 @@
 
           ctx.globalAlpha = alpha;
           ctx.fillStyle = mote.color;
-          ctx.fillRect(mote.x, mote.y, mote.w, mote.h);
+          const glitchOffset = glitchAmount > 0
+            ? (jitter(Math.floor(mote.y / 13) * 19.7 + mote.seed * 113.0 + Math.floor(performance.now() / 34)) - 0.5) * 90 * glitchAmount
+            : 0;
+          ctx.fillRect(mote.x + glitchOffset, mote.y, mote.w, mote.h);
+        }
+        if (glitchAmount > 0) {
+          this.drawGlitchOverlay(ctx, width, height, glitchAmount);
         }
         ctx.globalAlpha = 1;
       }
@@ -237,6 +314,32 @@
 
     getParticleAlpha(mote) {
       return this.getSpatialDensity(mote);
+    }
+
+    getGlitchAmount() {
+      if (!this.glitchUntil) return 0;
+      const remaining = this.glitchUntil - performance.now();
+      if (remaining <= 0) {
+        this.glitchUntil = 0;
+        return 0;
+      }
+
+      return Math.min(Math.max(remaining / 360, 0), 1);
+    }
+
+    drawGlitchOverlay(ctx, width, height, amount) {
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      for (let i = 0; i < 18; i++) {
+        const seed = i * 37.1 + Math.floor(performance.now() / 28);
+        const y = jitter(seed) * height;
+        const h = 1 + jitter(seed + 9.3) * 5;
+        const x = (jitter(seed + 4.7) - 0.5) * width * 0.12 * amount;
+        ctx.globalAlpha = (0.08 + jitter(seed + 2.1) * 0.16) * amount;
+        ctx.fillStyle = i % 2 === 0 ? "#ff2a2a" : "#3ffff0";
+        ctx.fillRect(x, y, width, h);
+      }
+      ctx.restore();
     }
 
     getSpatialDensity(mote) {
