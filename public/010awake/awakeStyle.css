@@ -43,41 +43,6 @@ canvas {
   z-index: 0;
 }
 
-/* Synthwave CRT scanlines over the Sunny (scrolled-to-bottom) horizon. */
-.awake-sunny-scanlines {
-  position: fixed;
-  inset: -2px 0;
-  z-index: 1;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(180, 240, 255, 0.10) 0,
-      rgba(180, 240, 255, 0.10) 1px,
-      transparent 1px,
-      transparent 3px
-    ),
-    repeating-linear-gradient(
-      to bottom,
-      rgba(0, 187, 255, 0.14) 0,
-      rgba(0, 187, 255, 0.14) 2px,
-      transparent 2px,
-      transparent 9px
-    );
-  opacity: var(--sunny-scanline-opacity, 0);
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: awakeSunnyScanlines 8s linear infinite;
-}
-
-@keyframes awakeSunnyScanlines {
-  0% {
-    background-position: 0 0, 0 0;
-  }
-  100% {
-    background-position: 0 3px, 0 9px;
-  }
-}
-
 /* Scroll Container */
 .scroll-container {
   position: relative;
@@ -814,16 +779,12 @@ body.locked {
   z-index: 2147483645;
   --awake-overlay-edge-y: 0.1%;
   --awake-overlay-pointer-events: none;
-  --sw-pink: #ff2a6d;
-  --sw-cyan: #05d9e8;
-  --sw-purple: #7700ff;
-  --sw-magenta: #d300c5;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  color: rgba(255, 210, 235, 0.94);
-  background: linear-gradient(180deg, #0a0020 0%, #12002e 46%, #050010 100%);
+  color: rgba(238, 247, 255, 0.92);
+  background: linear-gradient(180deg, #050710 0%, #02030a 48%, #000 100%);
   font-family: "supplyMono", monospace;
   -webkit-clip-path: url(#awakeOverlayClipPath);
   clip-path: url(#awakeOverlayClipPath);
@@ -841,39 +802,19 @@ body.locked {
 .awake-overlay-page::before {
   content: "";
   position: absolute;
-  inset: -2px 0;
-  z-index: 2;
+  inset: 0;
   background:
     repeating-linear-gradient(
       to bottom,
-      rgba(5, 217, 232, 0.12) 0,
-      rgba(5, 217, 232, 0.12) 1px,
+      rgba(255, 255, 255, 0.045) 0,
+      rgba(255, 255, 255, 0.045) 1px,
       transparent 1px,
-      transparent 3px
-    ),
-    repeating-linear-gradient(
-      to bottom,
-      rgba(255, 42, 109, 0.16) 0,
-      rgba(255, 42, 109, 0.16) 2px,
-      transparent 2px,
-      transparent 9px
+      transparent 11px
     );
-  opacity: 0.85;
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: awakeOverlayScanlines 8s linear infinite;
+  opacity: 0.52;
 }
 
-@keyframes awakeOverlayScanlines {
-  0% {
-    background-position: 0 0, 0 0;
-  }
-  100% {
-    background-position: 0 3px, 0 9px;
-  }
-}
-
-/* Synthwave horizon scene as the overlay background. */
+/* Twilight horizon scene as the overlay background (replaces the star field). */
 .awake-overlay-horizon {
   position: absolute;
   inset: 0;
@@ -896,14 +837,14 @@ body.locked {
   left: -8%;
   width: 116%;
   height: clamp(72px, 12vh, 150px);
-  border-top: 2px solid var(--sw-cyan);
+  border-top: 2px solid rgba(255, 255, 255, 0.96);
   background:
-    linear-gradient(180deg, rgba(5, 217, 232, 0.55), rgba(255, 42, 109, 0.28) 32%, transparent 78%),
-    radial-gradient(ellipse at 50% 0%, rgba(255, 42, 109, 0.5), transparent 64%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.2) 28%, transparent 78%),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.46), transparent 64%);
   box-shadow:
-    0 -1px 0 rgba(5, 217, 232, 0.9),
-    0 0 24px rgba(255, 42, 109, 0.55),
-    0 0 48px rgba(5, 217, 232, 0.3);
+    0 -1px 0 rgba(255, 255, 255, 0.82),
+    0 0 18px rgba(255, 255, 255, 0.38),
+    0 0 42px rgba(255, 255, 255, 0.22);
   filter: blur(0.2px);
   opacity: var(--awake-overlay-edge-shadow, 0);
   transform: translateY(-1px);
@@ -916,9 +857,8 @@ body.locked {
   left: 0;
   z-index: 5;
   width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, var(--sw-pink), var(--sw-cyan));
-  box-shadow: 0 0 8px var(--sw-cyan), 0 0 16px var(--sw-pink);
+  height: 1px;
+  background: #fff;
   opacity: var(--awake-overlay-scroll-opacity, 0);
   pointer-events: none;
   transform: scaleX(var(--awake-overlay-scroll-progress, 0));
@@ -930,13 +870,13 @@ body.locked {
   top: 10px;
   left: 12px;
   z-index: 5;
-  color: var(--sw-cyan);
+  color: rgba(255, 255, 255, 0.82);
   font-size: 10px;
   line-height: 1;
   letter-spacing: 0.18em;
-  text-shadow: 0 0 8px rgba(5, 217, 232, 0.8);
   opacity: var(--awake-overlay-readout-opacity, 0);
   pointer-events: none;
+  mix-blend-mode: difference;
 }
 
 .awake-overlay-scan-readout {
@@ -946,14 +886,14 @@ body.locked {
   z-index: 5;
   display: flex;
   gap: 18px;
-  color: rgba(255, 42, 109, 0.78);
+  color: rgba(255, 255, 255, 0.38);
   font-size: 10px;
   line-height: 1;
   letter-spacing: 0.16em;
-  text-shadow: 0 0 6px rgba(255, 42, 109, 0.55);
   opacity: var(--awake-overlay-readout-opacity, 0);
   pointer-events: none;
   text-transform: uppercase;
+  mix-blend-mode: difference;
 }
 
 #awakeOverlayCoordReadout {
@@ -970,6 +910,7 @@ body.locked {
   scrollbar-width: none;
   text-align: center;
   text-transform: uppercase;
+  mix-blend-mode: difference;
 }
 
 .awake-overlay-page__inner::-webkit-scrollbar {
@@ -981,8 +922,7 @@ body.locked {
   margin-bottom: clamp(12px, 2vh, 18px);
   font-size: clamp(9px, 0.9vw, 13px);
   letter-spacing: clamp(0.18em, 0.7vw, 0.34em);
-  color: rgba(5, 217, 232, 0.82);
-  text-shadow: 0 0 10px rgba(5, 217, 232, 0.45);
+  color: rgba(255, 255, 255, 0.74);
 }
 
 .awake-overlay-page__title {
@@ -990,13 +930,7 @@ body.locked {
   font-size: clamp(32px, 6.6vw, 92px);
   line-height: 0.92;
   letter-spacing: -0.055em;
-  background: linear-gradient(90deg, var(--sw-pink) 0%, var(--sw-magenta) 42%, var(--sw-cyan) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter:
-    drop-shadow(0 0 18px rgba(255, 42, 109, 0.65))
-    drop-shadow(0 0 32px rgba(5, 217, 232, 0.35));
+  color: rgba(248, 252, 255, 0.96);
 }
 
 .awake-overlay-page__copy {
@@ -1005,15 +939,14 @@ body.locked {
   font-size: clamp(11px, 1vw, 14px);
   line-height: 1.6;
   letter-spacing: clamp(0.04em, 0.2vw, 0.08em);
-  color: rgba(220, 180, 230, 0.78);
-  text-shadow: 0 0 12px rgba(119, 0, 255, 0.25);
+  color: rgba(220, 231, 242, 0.72);
 }
 
 .awake-overlay-credits {
   width: min(680px, 100%);
   margin: clamp(20px, 4vh, 34px) auto 0;
   padding: 0;
-  border-top: 1px solid rgba(5, 217, 232, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
   list-style: none;
   text-align: left;
 }
@@ -1025,29 +958,27 @@ body.locked {
   justify-content: space-between;
   gap: clamp(16px, 3vw, 28px);
   padding: clamp(9px, 1.6vh, 13px) 0;
-  border-bottom: 1px solid rgba(255, 42, 109, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
   font-size: clamp(10px, 0.9vw, 13px);
   line-height: 1.35;
   letter-spacing: clamp(0.06em, 0.24vw, 0.14em);
 }
 
 .awake-overlay-credits span {
-  color: rgba(200, 160, 220, 0.62);
+  color: rgba(226, 232, 240, 0.58);
 }
 
 .awake-overlay-credits a {
-  color: var(--sw-cyan);
+  color: rgba(255, 255, 255, 0.9);
   text-align: right;
   text-decoration: none;
-  text-shadow: 0 0 6px rgba(5, 217, 232, 0.35);
 }
 
 .awake-overlay-credits a:hover,
 .awake-overlay-credits a:focus-visible {
-  color: #ffd319;
+  color: #fff;
   text-decoration: underline;
   text-underline-offset: 4px;
-  text-shadow: 0 0 12px rgba(255, 211, 25, 0.85), 0 0 22px rgba(255, 107, 53, 0.5);
 }
 
 @media (max-width: 760px) {
