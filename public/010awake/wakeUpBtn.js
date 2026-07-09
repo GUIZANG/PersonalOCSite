@@ -4,7 +4,7 @@ const text = textEl.textContent.trim();
 textEl.textContent = "";
 
 wakeUpBtn.addEventListener("click", () => {
-  window.location.href = "/Main/Main.html";
+  window.location.href = "/020archive/archive.html";
 });
 
 const total = text.length;

@@ -38,6 +38,9 @@
     let screenGlitchUntil = 0;
     let isHypercubePressing = false;
     let hypercubePressProgress = 0;
+    let snapActive = false;
+    let snapX = 0;
+    let snapY = 0;
     let hasPointerPosition = false;
     let animationFrame = null;
     let cursorOuterSize = desktopOuterSize;
@@ -49,7 +52,9 @@
     document.addEventListener("pointerup", endPressGlitch);
     document.addEventListener("pointercancel", endPressGlitch);
     document.addEventListener("contextmenu", (event) => event.preventDefault());
-    window.addEventListener("main:hypercube-long-press", updateHypercubePressCursor);
+    window.addEventListener("archive:hypercube-long-press", updateHypercubePressCursor);
+    window.addEventListener("archive:cursor-snap", updateCursorSnap);
+    window.addEventListener("archive:hypercube-burst", resetCursorAfterBurst);
     window.addEventListener("resize", updateCursorSize);
     window.addEventListener("blur", endPressGlitch);
     updateCursorSize();
@@ -139,9 +144,33 @@
       hypercubePressProgress = isHypercubePressing ? clamp(Number(detail.progress) || 0, 0, 1) : 0;
 
       cursor.classList.toggle("is-hypercube-pressing", isHypercubePressing);
+      cursor.style.setProperty("--press-progress", hypercubePressProgress.toFixed(3));
       cursor.style.setProperty("--cursor-outer-color", mixColor("#f7f8fa", "#ff1f2d", hypercubePressProgress));
       if (!isHypercubePressing && !isPressing && !isPressGlitching) {
         cursor.style.setProperty("--cursor-shadow", defaultShadow);
+      }
+    }
+
+    function resetCursorAfterBurst() {
+      snapActive = false;
+      isPressing = false;
+      isClicking = false;
+      isPressGlitching = false;
+      isHypercubePressing = false;
+      hypercubePressProgress = 0;
+      pressGlitchUntil = 0;
+      cursor.classList.remove("is-hypercube-pressing");
+      cursor.style.setProperty("--press-progress", "0");
+      cursor.style.setProperty("--cursor-shadow", defaultShadow);
+    }
+
+    function updateCursorSnap(event) {
+      const detail = event.detail || {};
+      snapActive = Boolean(detail.active);
+
+      if (snapActive) {
+        snapX = Number(detail.x) || 0;
+        snapY = Number(detail.y) || 0;
       }
     }
 
@@ -159,10 +188,22 @@
     }
 
     function animateCursor() {
+      if (snapActive) {
+        targetX = snapX;
+        targetY = snapY;
+      }
+
       dotX += (targetX - dotX) * 0.34;
       dotY += (targetY - dotY) * 0.34;
-      outerX += (dotX - outerX) * 0.18;
-      outerY += (dotY - outerY) * 0.18;
+      if (snapActive) {
+        // Pin the outer ring (long-press range) onto the inner dot so the two
+        // cursor circles stay concentric with the snapped red center dot.
+        outerX = dotX;
+        outerY = dotY;
+      } else {
+        outerX += (dotX - outerX) * 0.18;
+        outerY += (dotY - outerY) * 0.18;
+      }
       renderHoverScale += (hoverScale - renderHoverScale) * 0.16;
 
       if (Math.abs(targetX - dotX) < 0.01) dotX = targetX;
@@ -224,9 +265,8 @@
     }
 
     function applyPressGlitch(now) {
-      const pressBoost = isHypercubePressing ? 1 + hypercubePressProgress * 1.6 : 1;
-      const x = Math.round((Math.sin(now * 0.095) * 5 + Math.sin(now * 0.033) * 2) * pressBoost);
-      const y = Math.round((Math.cos(now * 0.081) * 4 + Math.sin(now * 0.047) * 2) * pressBoost);
+      const x = Math.round(Math.sin(now * 0.095) * 5 + Math.sin(now * 0.033) * 2);
+      const y = Math.round(Math.cos(now * 0.081) * 4 + Math.sin(now * 0.047) * 2);
       const red = mixColor(glitchColorR, "#ff1010", hypercubePressProgress);
 
       cursor.style.setProperty("--cursor-shadow", `

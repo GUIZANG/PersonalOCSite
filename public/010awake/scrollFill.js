@@ -2,7 +2,7 @@ const scrollFill = document.getElementById('scrollFill');
 const scrollHint = document.getElementById('scrollHint');
 // 获取所有的标记位
 const markers = document.querySelectorAll('.scroll-marker');
-const storageKey = 'homepage.txt';
+const storageKey = 'awake.txt';
 let saveTimer = null;
 let scrollHintTimer = null;
 let scrollHintSettleTimer = null;

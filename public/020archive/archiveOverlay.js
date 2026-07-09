@@ -1,14 +1,14 @@
 (function () {
-  document.addEventListener("DOMContentLoaded", initMainOverlay);
+  document.addEventListener("DOMContentLoaded", initArchiveOverlay);
 
-  function initMainOverlay() {
-    const overlay = document.getElementById("mainOverlayPage");
-    const overlayContent = overlay?.querySelector(".main-overlay-page__inner");
-    const scrollLine = document.getElementById("mainOverlayScrollLine");
-    const scrollPercent = document.getElementById("mainOverlayScrollPercent");
-    const coordReadout = document.getElementById("mainOverlayCoordReadout");
-    const scanReadoutState = document.getElementById("mainOverlayScanReadoutState");
-    const maskPath = document.getElementById("mainOverlayMaskPath");
+  function initArchiveOverlay() {
+    const overlay = document.getElementById("archiveOverlayPage");
+    const overlayContent = overlay?.querySelector(".archive-overlay-page__inner");
+    const scrollLine = document.getElementById("archiveOverlayScrollLine");
+    const scrollPercent = document.getElementById("archiveOverlayScrollPercent");
+    const coordReadout = document.getElementById("archiveOverlayCoordReadout");
+    const scanReadoutState = document.getElementById("archiveOverlayScanReadoutState");
+    const maskPath = document.getElementById("archiveOverlayMaskPath");
     if (!overlay || !maskPath) return;
 
     const expandThreshold = 10;
@@ -106,13 +106,13 @@
       const shape = createOverlayShape(progress);
       const isOpen = !isDisabled && progress > 0.01;
       maskPath.setAttribute("d", shape.path);
-      overlay.style.setProperty("--main-overlay-edge-y", `${shape.edgeY * 100}%`);
-      overlay.style.setProperty("--main-overlay-edge-shadow", progress > 0.03 && progress < 0.98 ? "0.9" : "0");
-      overlay.style.setProperty("--main-overlay-opacity", isOpen ? "1" : "0");
-      overlay.style.setProperty("--main-overlay-pointer-events", isOpen ? "auto" : "none");
-      overlay.style.setProperty("--main-overlay-readout-opacity", isOpen ? "1" : "0");
+      overlay.style.setProperty("--archive-overlay-edge-y", `${shape.edgeY * 100}%`);
+      overlay.style.setProperty("--archive-overlay-edge-shadow", progress > 0.03 && progress < 0.98 ? "0.9" : "0");
+      overlay.style.setProperty("--archive-overlay-opacity", isOpen ? "1" : "0");
+      overlay.style.setProperty("--archive-overlay-pointer-events", isOpen ? "auto" : "none");
+      overlay.style.setProperty("--archive-overlay-readout-opacity", isOpen ? "1" : "0");
       overlay.hidden = isDisabled;
-      document.body.classList.toggle("is-main-overlay-open", isOpen);
+      document.body.classList.toggle("is-archive-overlay-open", isOpen);
       updateScrollLine();
     }
 
@@ -160,8 +160,8 @@
       const scrollProgress = hasScroll ? overlayContent.scrollTop / maxScroll : 1;
       const percent = Math.round(scrollProgress * 100);
 
-      overlay.style.setProperty("--main-overlay-scroll-progress", format(scrollProgress));
-      overlay.style.setProperty("--main-overlay-scroll-opacity", hasScroll && progress > 0.01 ? "1" : "0");
+      overlay.style.setProperty("--archive-overlay-scroll-progress", format(scrollProgress));
+      overlay.style.setProperty("--archive-overlay-scroll-opacity", hasScroll && progress > 0.01 ? "1" : "0");
       if (scrollPercent) {
         scrollPercent.textContent = String(percent).padStart(2, "0");
       }
@@ -202,7 +202,7 @@
         animationFrame = null;
       }
 
-      document.body.classList.remove("is-main-overlay-open");
+      document.body.classList.remove("is-archive-overlay-open");
       render();
     }
 
@@ -215,10 +215,10 @@
 
       layers.forEach((layer, index) => {
         const starLayer = document.createElement("div");
-        starLayer.className = `main-overlay-stars main-overlay-stars--${layer.name}`;
+        starLayer.className = `archive-overlay-stars archive-overlay-stars--${layer.name}`;
         overlay.insertBefore(starLayer, overlay.firstElementChild);
         overlay.style.setProperty(
-          `--main-overlay-stars-${layer.name}`,
+          `--archive-overlay-stars-${layer.name}`,
           createStarShadows(layer.count, 2048 + index * 997)
         );
       });

@@ -1,11 +1,11 @@
 (function () {
-  class MainCardStream {
+  class ArchiveCardStream {
     constructor() {
-      this.stream = document.getElementById("mainCardStream");
-      this.line = document.getElementById("mainCardLine");
-      this.scanner = this.stream?.querySelector(".main-scanner");
-      this.hudLeft = document.getElementById("mainScannerHudLeft");
-      this.hudRight = document.getElementById("mainScannerHudRight");
+      this.stream = document.getElementById("archiveCardStream");
+      this.line = document.getElementById("archiveCardLine");
+      this.scanner = this.stream?.querySelector(".archive-scanner");
+      this.hudLeft = document.getElementById("archiveScannerHudLeft");
+      this.hudRight = document.getElementById("archiveScannerHudRight");
       this.cards = [
         { kicker: "Archive 01", title: "Signal", meta: "Memory / A" },
         { kicker: "Archive 02", title: "Vector", meta: "Trace / B" },
@@ -35,10 +35,10 @@
       this.focusTargetPosition = 0;
       this.scannerX = window.innerWidth / 2;
       this.scannerTargetX = this.scannerX;
-      this.referenceBackground = window.MainReferenceBackground
-        ? new window.MainReferenceBackground(document.getElementById("hypercube-stage") || document.body)
+      this.referenceBackground = window.ArchiveReferenceBackground
+        ? new window.ArchiveReferenceBackground(document.getElementById("hypercube-stage") || document.body)
         : null;
-      window.MainCardVFX?.addLiquidBackgroundSource?.(this.referenceBackground?.canvas);
+      window.ArchiveCardVFX?.addLiquidBackgroundSource?.(this.referenceBackground?.canvas);
 
       this.animate = this.animate.bind(this);
       this.populate();
@@ -68,11 +68,11 @@
     }
 
     bindVFX() {
-      if (!window.MainCardVFX) return;
-      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
-        const normal = wrapper.querySelector(".main-card-normal");
+      if (!window.ArchiveCardVFX) return;
+      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
+        const normal = wrapper.querySelector(".archive-card-normal");
         if (!normal) return;
-        window.MainCardVFX.bind(
+        window.ArchiveCardVFX.bind(
           normal,
           () => (typeof wrapper._scanQ === "number" ? wrapper._scanQ : -1),
           () => this.revealAmount,
@@ -82,8 +82,8 @@
     }
 
     bindLiquidGlass() {
-      if (!window.MainCardVFX?.setLiquidCardProvider) return;
-      window.MainCardVFX.setLiquidCardProvider(() => this.getLiquidGlassCards());
+      if (!window.ArchiveCardVFX?.setLiquidCardProvider) return;
+      window.ArchiveCardVFX.setLiquidCardProvider(() => this.getLiquidGlassCards());
     }
 
     populate() {
@@ -98,7 +98,7 @@
 
     createCard(card, index, loop) {
       const wrapper = document.createElement("article");
-      wrapper.className = "main-card-wrapper hoverable";
+      wrapper.className = "archive-card-wrapper hoverable";
       wrapper.dataset.cardIndex = index;
       wrapper.dataset.loop = loop;
       wrapper._scanQ = -1;
@@ -110,12 +110,12 @@
       // normal layer stays as the (empty) anchor for the vfx dissolve passes
       // and the scan clip, so the glass -> ascii transition keeps working.
       const normal = document.createElement("div");
-      normal.className = "main-card main-card-normal";
+      normal.className = "archive-card archive-card-normal";
 
       const ascii = document.createElement("div");
-      ascii.className = "main-card main-card-ascii";
+      ascii.className = "archive-card archive-card-ascii";
       const asciiContent = document.createElement("pre");
-      asciiContent.className = "main-ascii-content";
+      asciiContent.className = "archive-ascii-content";
       ascii.appendChild(asciiContent);
 
       wrapper.appendChild(normal);
@@ -150,17 +150,12 @@
 
     startPointer(event) {
       if (!this.active || event.button === 2) return;
-      this.pointerDownCard = event.target.closest(".main-card-wrapper");
+      this.pointerDownCard = event.target.closest(".archive-card-wrapper");
       this.pointerDownX = event.clientX;
       this.pointerDownY = event.clientY;
       this.hasPointerMoved = false;
-
-      if (this.focusMode) return;
-
-      this.lastPointerX = event.clientX;
-      this.line.classList.add("dragging");
-      this.stream.setPointerCapture?.(event.pointerId);
-      this.isDragging = true;
+      // Dragging is disabled on the card page: the conveyor keeps auto-scrolling
+      // even while the pointer is held down. Only click-to-focus is supported.
     }
 
     onDrag(event) {
@@ -185,7 +180,7 @@
       }
 
       this.isDragging = false;
-      this.isHoveringCard = Boolean(this.line.querySelector(".main-card-wrapper:hover"));
+      this.isHoveringCard = Boolean(this.line.querySelector(".archive-card-wrapper:hover"));
       this.line.classList.remove("dragging");
       this.pointerDownCard = null;
       this.hasPointerMoved = false;
@@ -195,13 +190,13 @@
     }
 
     onCardHover(event) {
-      const card = event.target.closest(".main-card-wrapper");
+      const card = event.target.closest(".archive-card-wrapper");
       if (!card || card.contains(event.relatedTarget)) return;
       this.isHoveringCard = true;
     }
 
     onCardLeave(event) {
-      const card = event.target.closest(".main-card-wrapper");
+      const card = event.target.closest(".archive-card-wrapper");
       if (!card || card.contains(event.relatedTarget)) return;
       this.isHoveringCard = false;
     }
@@ -262,7 +257,7 @@
     }
 
     calculateCycleWidth() {
-      const wrappers = this.line.querySelectorAll(".main-card-wrapper");
+      const wrappers = this.line.querySelectorAll(".archive-card-wrapper");
       if (wrappers.length < this.cards.length) return;
       const first = wrappers[0];
       const fifth = wrappers[this.cards.length];
@@ -272,7 +267,7 @@
     getMiddleLoopCard(wrapper) {
       if (!wrapper) return null;
       const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
-      const wrappers = Array.from(this.line.querySelectorAll(".main-card-wrapper"));
+      const wrappers = Array.from(this.line.querySelectorAll(".archive-card-wrapper"));
       const middleLoop = Math.floor(wrappers.length / this.cards.length / 2);
 
       return wrappers.find((candidate) =>
@@ -289,10 +284,10 @@
 
       const delta = current.offsetLeft - middle.offsetLeft;
       const wasSettled = this.focusSettled;
-      current.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
-      middle.classList.add("is-main-card-focused");
+      current.classList.remove("is-archive-card-focused", "is-archive-card-focus-settled");
+      middle.classList.add("is-archive-card-focused");
       if (wasSettled) {
-        middle.classList.add("is-main-card-focus-settled");
+        middle.classList.add("is-archive-card-focus-settled");
       }
 
       this.focusedCard = middle;
@@ -309,7 +304,7 @@
       const baseLineHeight = 14.4;
       const minPadding = 2;
 
-      const firstWrapper = this.line.querySelector(".main-card-wrapper");
+      const firstWrapper = this.line.querySelector(".archive-card-wrapper");
       if (!firstWrapper) return;
 
       const cardWidth = firstWrapper.offsetWidth;
@@ -323,14 +318,14 @@
       const availableHeight = Math.max(cardHeight - verticalPadding * 2, lineHeight);
       const rows = Math.max(Math.floor(availableHeight / lineHeight), 1);
       const fittedPadding = Math.max((cardHeight - rows * lineHeight) / 2, 0);
-      const firstAsciiContent = firstWrapper.querySelector(".main-ascii-content");
+      const firstAsciiContent = firstWrapper.querySelector(".archive-ascii-content");
       if (!firstAsciiContent) return;
 
       const charWidth = this.measureAsciiCharWidth(firstAsciiContent, fontSize, lineHeight);
       const columns = Math.max(Math.floor(cardWidth / charWidth), 1);
 
-      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
-        const asciiContent = wrapper.querySelector(".main-ascii-content");
+      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
+        const asciiContent = wrapper.querySelector(".archive-ascii-content");
         if (!asciiContent) return;
 
         const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
@@ -366,9 +361,9 @@
       let nearestCard = null;
       let nearestDistance = Infinity;
 
-      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
+      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
         const rect = wrapper.getBoundingClientRect();
-        const ascii = wrapper.querySelector(".main-card-ascii");
+        const ascii = wrapper.querySelector(".archive-card-ascii");
         const centerDistance = Math.abs(rect.left + rect.width / 2 - scannerX);
         const edgeAmount = Math.min(centerDistance / (window.innerWidth / 2), 1);
         wrapper.style.transform = wrapper === this.focusedCard && this.focusMode
@@ -419,7 +414,7 @@
       const pixelRatio = window.devicePixelRatio || 1;
       const cards = [];
 
-      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
+      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
         const rect = wrapper.getBoundingClientRect();
         const offscreen = rect.right < -40 || rect.left > window.innerWidth + 40;
         if (offscreen || this.revealAmount < 0.02) return;
@@ -452,7 +447,7 @@
       const wasFocused = Boolean(this.focusedCard) && this.focusMode !== "exit";
       const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
 
-      this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
+      this.focusedCard?.classList.remove("is-archive-card-focused", "is-archive-card-focus-settled");
       this.focusedCard = wrapper;
       this.focusMode = "enter";
       this.focusSettled = false;
@@ -460,7 +455,7 @@
       this.isDragging = false;
       this.pointerDownCard = null;
       this.line.classList.remove("dragging");
-      wrapper.classList.add("is-main-card-focused");
+      wrapper.classList.add("is-archive-card-focused");
       this.stream.classList.add("is-card-focusing");
       this.stream.classList.remove("is-card-focus-settled");
       wrapper._dissolveSeed = Math.random();
@@ -472,7 +467,7 @@
     }
 
     handleFocusedClick(clickedCard, event) {
-      const dialog = event.target.closest(".main-card-dialog");
+      const dialog = event.target.closest(".archive-card-dialog");
       if (dialog) return;
 
       if (!clickedCard) {
@@ -495,7 +490,7 @@
       this.focusMode = "exit";
       this.focusSettled = false;
       this.stream.classList.remove("is-card-focus-settled");
-      this.focusedCard?.classList.remove("is-main-card-focus-settled");
+      this.focusedCard?.classList.remove("is-archive-card-focus-settled");
       this.clearScanEffects();
       // Keep scannerX where it is (off to the left); it glides back to center in
       // animate() while the card drifts. Position is left untouched so the card
@@ -524,7 +519,7 @@
         // The card is free-drifting; finish once the scanner is back at center.
         if (Math.abs(this.scannerX - this.scannerTargetX) >= 0.45) return;
         this.scannerX = this.scannerTargetX;
-        this.focusedCard?.classList.remove("is-main-card-focused", "is-main-card-focus-settled");
+        this.focusedCard?.classList.remove("is-archive-card-focused", "is-archive-card-focus-settled");
         this.focusedCard = null;
         this.focusMode = null;
         this.focusSettled = false;
@@ -546,7 +541,7 @@
         this.focusSettled = true;
         this.isSwitchingFocus = false;
         this.stream.classList.add("is-card-focus-settled");
-        this.focusedCard?.classList.add("is-main-card-focus-settled");
+        this.focusedCard?.classList.add("is-archive-card-focus-settled");
         this.normalizeFocusedCardLoop();
       }
     }
@@ -580,7 +575,7 @@
     }
 
     clearScanEffects() {
-      this.line.querySelectorAll(".main-card-wrapper").forEach((wrapper) => {
+      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
         wrapper.classList.remove("is-scan-fading");
       });
     }
@@ -592,18 +587,18 @@
 
     createDialog() {
       this.dialog = document.createElement("div");
-      this.dialog.className = "main-card-dialog";
+      this.dialog.className = "archive-card-dialog";
       this.dialog.hidden = true;
       this.dialog.innerHTML = `
-        <div class="main-card-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="mainCardDialogTitle">
-          <button class="main-card-dialog__close hoverable" type="button" aria-label="Close">&times;</button>
-          <span class="main-card-dialog__kicker" id="mainCardDialogKicker"></span>
-          <h2 class="main-card-dialog__title" id="mainCardDialogTitle"></h2>
-          <p class="main-card-dialog__copy" id="mainCardDialogCopy"></p>
+        <div class="archive-card-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="archiveCardDialogTitle">
+          <button class="archive-card-dialog__close hoverable" type="button" aria-label="Close">&times;</button>
+          <span class="archive-card-dialog__kicker" id="archiveCardDialogKicker"></span>
+          <h2 class="archive-card-dialog__title" id="archiveCardDialogTitle"></h2>
+          <p class="archive-card-dialog__copy" id="archiveCardDialogCopy"></p>
         </div>
       `;
       this.dialog.addEventListener("pointerdown", (event) => {
-        if (event.target === this.dialog || event.target.closest(".main-card-dialog__close")) {
+        if (event.target === this.dialog || event.target.closest(".archive-card-dialog__close")) {
           event.stopPropagation();
           this.closeDialog();
         }
@@ -616,17 +611,17 @@
       const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
       const card = this.cards[cardIndex % this.cards.length];
 
-      this.dialog.querySelector("#mainCardDialogKicker").textContent = card.kicker;
-      this.dialog.querySelector("#mainCardDialogTitle").textContent = card.title;
-      this.dialog.querySelector("#mainCardDialogCopy").textContent = `${card.meta} is locked at center.`;
+      this.dialog.querySelector("#archiveCardDialogKicker").textContent = card.kicker;
+      this.dialog.querySelector("#archiveCardDialogTitle").textContent = card.title;
+      this.dialog.querySelector("#archiveCardDialogCopy").textContent = `${card.meta} is locked at center.`;
       this.dialog.hidden = false;
-      document.body.classList.add("is-main-card-dialog-open");
+      document.body.classList.add("is-archive-card-dialog-open");
     }
 
     closeDialog() {
       if (!this.dialog) return;
       this.dialog.hidden = true;
-      document.body.classList.remove("is-main-card-dialog-open");
+      document.body.classList.remove("is-archive-card-dialog-open");
     }
 
     updateScannerHud(wrapper, distance, scannerX) {
@@ -683,5 +678,5 @@
     return x - Math.floor(x);
   }
 
-  window.MainCardStream = MainCardStream;
+  window.ArchiveCardStream = ArchiveCardStream;
 })();

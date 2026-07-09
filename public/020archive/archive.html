@@ -6,47 +6,51 @@
   <title>PRECOGNITIVE STRATA</title>
   <link rel="icon" href="/assets/images/logo/brain.svg" type="image/x-icon" />
   <link rel="stylesheet" href="/styles/fonts.css" />
-  <link rel="stylesheet" href="Main.css" />
+  <link rel="stylesheet" href="archive.css" />
 </head>
 <body>
-  <main id="hypercube-stage" class="hypercube-stage" aria-label="Main hypercube">
-    <section class="main-card-stream" id="mainCardStream" aria-label="Archive card stream">
-      <div class="main-scanner" aria-hidden="true"></div>
-      <div class="main-scanner-hud main-scanner-hud--left" aria-hidden="true">
+  <main id="hypercube-stage" class="hypercube-stage" aria-label="Archive hypercube">
+    <div class="archive-thought-scanner" id="archiveThoughtScanner" aria-hidden="true">
+      <svg class="archive-thought-scanner__lines" id="archiveThoughtScannerLines"></svg>
+      <div class="archive-thought-scanner__probes" id="archiveThoughtScannerProbes"></div>
+    </div>
+    <section class="archive-card-stream" id="archiveCardStream" aria-label="Archive card stream">
+      <div class="archive-scanner" aria-hidden="true"></div>
+      <div class="archive-scanner-hud archive-scanner-hud--left" aria-hidden="true">
         <span>SCAN FIELD</span>
-        <strong id="mainScannerHudLeft">IDLE</strong>
+        <strong id="archiveScannerHudLeft">IDLE</strong>
       </div>
-      <div class="main-scanner-hud main-scanner-hud--right" aria-hidden="true">
+      <div class="archive-scanner-hud archive-scanner-hud--right" aria-hidden="true">
         <span>EDGE SIGNAL</span>
-        <strong id="mainScannerHudRight">000</strong>
+        <strong id="archiveScannerHudRight">000</strong>
       </div>
-      <div class="main-card-line" id="mainCardLine"></div>
+      <div class="archive-card-line" id="archiveCardLine"></div>
     </section>
   </main>
 
-  <svg class="main-overlay-mask" width="0" height="0" aria-hidden="true" focusable="false">
+  <svg class="archive-overlay-mask" width="0" height="0" aria-hidden="true" focusable="false">
     <defs>
-      <clipPath id="mainOverlayClipPath" clipPathUnits="objectBoundingBox">
-        <path id="mainOverlayMaskPath" d="M0 0 H1 V1 H0 Z"></path>
+      <clipPath id="archiveOverlayClipPath" clipPathUnits="objectBoundingBox">
+        <path id="archiveOverlayMaskPath" d="M0 0 H1 V1 H0 Z"></path>
       </clipPath>
     </defs>
   </svg>
 
-  <aside class="main-overlay-page" id="mainOverlayPage" aria-hidden="true">
-    <div class="main-overlay-scroll-line" id="mainOverlayScrollLine" aria-hidden="true"></div>
-    <div class="main-overlay-scroll-percent" id="mainOverlayScrollPercent" aria-hidden="true">00</div>
-    <div class="main-overlay-scan-readout" id="mainOverlayScanReadout" aria-hidden="true">
-      <span id="mainOverlayCoordReadout">X0000 / Y0000</span>
-      <span id="mainOverlayScanReadoutState">SCAN 00</span>
+  <aside class="archive-overlay-page" id="archiveOverlayPage" aria-hidden="true">
+    <div class="archive-overlay-scroll-line" id="archiveOverlayScrollLine" aria-hidden="true"></div>
+    <div class="archive-overlay-scroll-percent" id="archiveOverlayScrollPercent" aria-hidden="true">00</div>
+    <div class="archive-overlay-scan-readout" id="archiveOverlayScanReadout" aria-hidden="true">
+      <span id="archiveOverlayCoordReadout">X0000 / Y0000</span>
+      <span id="archiveOverlayScanReadoutState">SCAN 00</span>
     </div>
-    <div class="main-overlay-page__inner">
-      <span class="main-overlay-page__kicker">References / Inspiration / Source Notes</span>
-      <h1 class="main-overlay-page__title">CREDITS</h1>
-      <p class="main-overlay-page__copy">
+    <div class="archive-overlay-page__inner">
+      <span class="archive-overlay-page__kicker">References / Inspiration / Source Notes</span>
+      <h1 class="archive-overlay-page__title">CREDITS</h1>
+      <p class="archive-overlay-page__copy">
         This visual experiment references the following public works and materials.
         Copyright and authorship belong to their original creators.
       </p>
-      <ul class="main-overlay-credits" aria-label="Reference sources">
+      <ul class="archive-overlay-credits" aria-label="Reference sources">
         <li>
           <span>Central rotating hypercube animation</span>
           <a href="https://codepen.io/jkantner/pen/YPGrodj" target="_blank" rel="noopener noreferrer">CodePen by Jon Kantner</a>
@@ -83,11 +87,12 @@
   <div class="screen-glitch" hidden aria-hidden="true"></div>
 
   <script src="/libs/three.min.js"></script>
-  <script type="module" src="/Main/mainCardVFX.js"></script>
-  <script src="/Main/mainReferenceBackground.js"></script>
-  <script src="/Main/mainCard.js"></script>
-  <script src="/Main/Main.js"></script>
-  <script src="/Main/mainOverlay.js"></script>
-  <script src="/Main/mainCursor.js"></script>
+  <script type="module" src="/020archive/archiveCardVFX.js"></script>
+  <script src="/020archive/archiveReferenceBackground.js"></script>
+  <script src="/020archive/archiveScanLexicon.js"></script>
+  <script src="/020archive/archiveCard.js"></script>
+  <script src="/020archive/archive.js"></script>
+  <script src="/020archive/archiveOverlay.js"></script>
+  <script src="/020archive/archiveCursor.js"></script>
 </body>
 </html>

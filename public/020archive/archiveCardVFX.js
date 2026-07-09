@@ -8,7 +8,7 @@ import { VFX } from "/libs/vfx-js.min.js";
 //
 // The card front is an empty glass pane (no text), so only the dissolving
 // pixel cells are rendered here, on a canvas above the glass layer (z 8 vs
-// z 2, see Main.css) to keep the dissolve crisp on top of the refraction.
+// z 2, see archive.css) to keep the dissolve crisp on top of the refraction.
 const shaderLib = `
 precision highp float;
 uniform sampler2D src;
@@ -743,8 +743,8 @@ function bindLiquidSource() {
   }
 }
 
-window.MainCardVFX = {
-  // Bind a `.main-card-normal` element to the pixel-scan dissolve.
+window.ArchiveCardVFX = {
+  // Bind a `.archive-card-normal` element to the pixel-scan dissolve.
   // getProgress(): scanner position across the card in UV space (can be <0 / >1).
   // getReveal():   stream activation fade amount [0,1].
   bind(element, getProgress, getReveal, getSeed) {

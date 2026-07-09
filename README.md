@@ -22,11 +22,11 @@ npm run dev
 
 This project does not use a root `index.html`. After the dev server starts, open a specific page directly, for example:
 
-- Main archive scene: `http://localhost:5173/Main/Main.html`
-- Homepage: `http://localhost:5173/homePage/homepage.html`
-- Black Moon terminal: `http://localhost:5173/blackMoon/blackMoonTerminal/blackMoonTerminal.html`
-- Black Moon text: `http://localhost:5173/blackMoon/blackMoonText/blackMoonText.html`
-- Black Moon main scene: `http://localhost:5173/blackMoon/blackMoonMain/blackMoon.html`
+- Awake homepage: `http://localhost:5173/010awake/awake.html`
+- Archive scene: `http://localhost:5173/020archive/archive.html`
+- Black Moon text: `http://localhost:5173/021blackMoon/010blackMoonText/blackMoonText.html`
+- Black Moon main scene: `http://localhost:5173/021blackMoon/020blackMoonMain/blackMoon.html`
+- Black Moon terminal: `http://localhost:5173/021blackMoon/030blackMoonTerminal/blackMoonTerminal.html`
 
 Build and preview:
 
@@ -38,9 +38,9 @@ npm run preview
 🔹 **Project Structure**
 
 - `public/` — main static multi-page site (HTML / CSS / JavaScript)
-- `public/Main/` — main archive scene with a Three.js particle hypercube, full-screen particle expansion, scanning card stream, and custom cursor
-- `public/homePage/` — homepage with scroll-driven narrative, shader scene, custom cursor, and music
-- `public/blackMoon/` — Black Moon narrative / terminal / text / main scene modules
+- `public/010awake/` — awake homepage (entry) with scroll-driven narrative, shader scene, custom cursor, and music
+- `public/020archive/` — archive scene with a Three.js particle hypercube, full-screen particle expansion, scanning card stream, and custom cursor
+- `public/021blackMoon/` — Black Moon narrative modules (`010blackMoonText` / `020blackMoonMain` / `030blackMoonTerminal`), a branch off the archive scene
 - `public/reference/` — reference experiments used for visual interaction prototypes
 - `public/libs/` — locally bundled third-party libraries loaded by static pages
 - `src/` — leftover Vue scaffold files (currently unused by the live site)

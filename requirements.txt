@@ -9,8 +9,8 @@
 #
 # Local development:
 #   npm run dev
-#   Open http://localhost:5173/Main/Main.html
-#   Open http://localhost:5173/homePage/homepage.html
+#   Open http://localhost:5173/010awake/awake.html
+#   Open http://localhost:5173/020archive/archive.html
 #
 # Production build:
 #   npm run build

@@ -1,7 +1,7 @@
 // Shared raymarched horizon renderer. A single WebGL scene whose final image is
 // quantized to an ordered-dither, single-tint frame. Reused by:
 //   - moonAnimation.js : full-page background, scroll-driven Night -> Sunny.
-//   - homepageOverlay.js : overlay background, static Twilight preset.
+//   - awakeOverlay.js : overlay background, static Twilight preset.
 // The shader source lives here once so it is not duplicated across features.
 
 export const HORIZON_PRESETS = {

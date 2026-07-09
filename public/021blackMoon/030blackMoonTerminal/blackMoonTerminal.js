@@ -101,7 +101,7 @@ function typeAuto(text, cb) {
 function next() {
   if (index >= script.length) {
     setTimeout(() => {
-      window.location.href = "../blackMoonText/blackMoonText.html";
+      window.location.href = "../010blackMoonText/blackMoonText.html";
     }, 1000);
     return;
   }

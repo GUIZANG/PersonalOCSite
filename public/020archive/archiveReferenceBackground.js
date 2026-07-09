@@ -45,11 +45,11 @@
   const wrap01 = (v) => v - Math.floor(v);
   const jitter = (seed) => wrap01(Math.sin(seed * 12.9898) * 43758.5453);
 
-  class MainReferenceBackground {
+  class ArchiveReferenceBackground {
     constructor(container = document.body) {
       this.container = container;
       this.canvas = document.createElement("canvas");
-      this.canvas.className = "main-reference-background";
+      this.canvas.className = "archive-reference-background";
       this.context = this.canvas.getContext("2d");
       this.motes = [];
       this.slide = BASE_SLIDE;
@@ -161,7 +161,7 @@
       this.enterStartTime = 0;
       this.exitStartTime = performance.now();
       const exitDuration = this.getExitDuration();
-      this.canvas.style.setProperty("--main-reference-exit-ms", `${exitDuration}ms`);
+      this.canvas.style.setProperty("--archive-reference-exit-ms", `${exitDuration}ms`);
       this.canvas.classList.remove("is-active");
       this.canvas.classList.add("is-exiting");
 
@@ -366,5 +366,5 @@
     }
   }
 
-  window.MainReferenceBackground = MainReferenceBackground;
+  window.ArchiveReferenceBackground = ArchiveReferenceBackground;
 })();

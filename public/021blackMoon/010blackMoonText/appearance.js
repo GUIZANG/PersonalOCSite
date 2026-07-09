@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.body.classList.add('crash-effect');
 
       setTimeout(() => {
-        window.location.href = "../blackMoonMain/blackMoon.html";
+        window.location.href = "../020blackMoonMain/blackMoon.html";
       }, 500);
     });
   }

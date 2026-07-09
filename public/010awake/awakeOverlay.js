@@ -1,18 +1,18 @@
 // Homepage top-edge overlay. Same interaction/mask/readout logic as the Main
-// scene overlay (mainOverlay.js): move the pointer to the top edge to pull the
+// scene overlay (awakeOverlay.js): move the pointer to the top edge to pull the
 // panel down, to the bottom edge to retract it. The only difference is the
 // background: instead of a CSS star field it renders the shared horizon scene
 // locked to the Twilight preset.
 import { createHorizonScene } from "./horizonScene.js";
 
 function initHomepageOverlay() {
-  const overlay = document.getElementById("mainOverlayPage");
-  const overlayContent = overlay?.querySelector(".main-overlay-page__inner");
-  const scrollLine = document.getElementById("mainOverlayScrollLine");
-  const scrollPercent = document.getElementById("mainOverlayScrollPercent");
-  const coordReadout = document.getElementById("mainOverlayCoordReadout");
-  const scanReadoutState = document.getElementById("mainOverlayScanReadoutState");
-  const maskPath = document.getElementById("mainOverlayMaskPath");
+  const overlay = document.getElementById("awakeOverlayPage");
+  const overlayContent = overlay?.querySelector(".awake-overlay-page__inner");
+  const scrollLine = document.getElementById("awakeOverlayScrollLine");
+  const scrollPercent = document.getElementById("awakeOverlayScrollPercent");
+  const coordReadout = document.getElementById("awakeOverlayCoordReadout");
+  const scanReadoutState = document.getElementById("awakeOverlayScanReadoutState");
+  const maskPath = document.getElementById("awakeOverlayMaskPath");
   if (!overlay || !maskPath) return;
 
   const expandThreshold = 10;
@@ -106,12 +106,12 @@ function initHomepageOverlay() {
     const shape = createOverlayShape(progress);
     const isOpen = progress > 0.01;
     maskPath.setAttribute("d", shape.path);
-    overlay.style.setProperty("--main-overlay-edge-y", `${shape.edgeY * 100}%`);
-    overlay.style.setProperty("--main-overlay-edge-shadow", progress > 0.03 && progress < 0.98 ? "0.9" : "0");
-    overlay.style.setProperty("--main-overlay-opacity", isOpen ? "1" : "0");
-    overlay.style.setProperty("--main-overlay-pointer-events", isOpen ? "auto" : "none");
-    overlay.style.setProperty("--main-overlay-readout-opacity", isOpen ? "1" : "0");
-    document.body.classList.toggle("is-main-overlay-open", isOpen);
+    overlay.style.setProperty("--awake-overlay-edge-y", `${shape.edgeY * 100}%`);
+    overlay.style.setProperty("--awake-overlay-edge-shadow", progress > 0.03 && progress < 0.98 ? "0.9" : "0");
+    overlay.style.setProperty("--awake-overlay-opacity", isOpen ? "1" : "0");
+    overlay.style.setProperty("--awake-overlay-pointer-events", isOpen ? "auto" : "none");
+    overlay.style.setProperty("--awake-overlay-readout-opacity", isOpen ? "1" : "0");
+    document.body.classList.toggle("is-awake-overlay-open", isOpen);
     // Only render the horizon background while the overlay is visible.
     if (isOpen) horizon?.start();
     else horizon?.stop();
@@ -162,8 +162,8 @@ function initHomepageOverlay() {
     const scrollProgress = hasScroll ? overlayContent.scrollTop / maxScroll : 1;
     const percent = Math.round(scrollProgress * 100);
 
-    overlay.style.setProperty("--main-overlay-scroll-progress", format(scrollProgress));
-    overlay.style.setProperty("--main-overlay-scroll-opacity", hasScroll && progress > 0.01 ? "1" : "0");
+    overlay.style.setProperty("--awake-overlay-scroll-progress", format(scrollProgress));
+    overlay.style.setProperty("--awake-overlay-scroll-opacity", hasScroll && progress > 0.01 ? "1" : "0");
     if (scrollPercent) {
       scrollPercent.textContent = String(percent).padStart(2, "0");
     }
@@ -182,7 +182,7 @@ function initHomepageOverlay() {
 
   function setupHorizonBackground() {
     const bg = document.createElement("div");
-    bg.className = "main-overlay-horizon";
+    bg.className = "awake-overlay-horizon";
     overlay.insertBefore(bg, overlay.firstElementChild);
     horizon = createHorizonScene({ container: bg });
     horizon.applyPreset("Twilight");

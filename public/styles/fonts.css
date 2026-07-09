@@ -35,6 +35,36 @@
   src: url("/assets/fonts/KeShiLuMingTi/I-Ming-5-10-2.ttf");
 }
 @font-face {
+  font-family: "KaloSans";
+  src: url("/assets/fonts/KaloSans/KaloSans EL.otf");
+  font-weight: 200;
+}
+@font-face {
+  font-family: "KaloSans";
+  src: url("/assets/fonts/KaloSans/KaloSans L.otf");
+  font-weight: 300;
+}
+@font-face {
+  font-family: "KaloSans";
+  src: url("/assets/fonts/KaloSans/KaloSans R.otf");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "KaloSans";
+  src: url("/assets/fonts/KaloSans/KaloSans M.otf");
+  font-weight: 500;
+}
+@font-face {
+  font-family: "KaloSans";
+  src: url("/assets/fonts/KaloSans/KaloSans B.otf");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "KaloSans";
+  src: url("/assets/fonts/KaloSans/KaloSans H.otf");
+  font-weight: 800;
+}
+@font-face {
   font-family: "MajorMonnoDisplay";
   src: url("/assets/fonts/MajorMonnoDisplay/MajorMonoDisplay.ttf");
 }
@@ -105,6 +135,10 @@
 @font-face {
   font-family: "WenYueGaoHei";
   src: url("/assets/fonts/WenYueGaoHei/WenYue-GaoHei-J-2.otf");
+}
+@font-face {
+  font-family: "WenYueGuTiFangSong";
+  src: url("/assets/fonts/WenYueGuTiFangSong/WenYue-GuTiFangSong-JRFC-2.otf");
 }
 @font-face {
   font-family: "WenYueHouXianDai";
