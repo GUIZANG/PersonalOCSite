@@ -1,7 +1,7 @@
 // Shared raymarched horizon renderer. A single WebGL scene whose final image is
 // quantized to an ordered-dither, single-tint frame. Reused by:
 //   - moonAnimation.js : full-page background, scroll-driven Night -> Sunny.
-//   - awakeOverlay.js : overlay background, static Twilight preset.
+//   - awakeOverlay.js : overlay background, static Synthwave preset.
 // The shader source lives here once so it is not duplicated across features.
 
 export const HORIZON_PRESETS = {
@@ -33,6 +33,16 @@ export const HORIZON_PRESETS = {
     reflectionStrength: 1.8, reflectionWidth: 0.08,
     haloStrength: 0.8, haloRadius: 0.4, haloSize: 0.025, vignetteStrength: 0.55,
     flareIntensity: 1.2, flareGhosting: 1.0, flareStreak: 1.5, flareAngle: 140,
+    enableGrid: 1.0,
+  },
+  Synthwave: {
+    sunPosX: 0.0, sunPosY: -0.04, sunSize: 0.6, sunIntensity: 3.5,
+    horizonColor: "#2b1055", cloudDensity: 0.12, cloudColor: "#5a1a8a",
+    waveHeight: 0.22, speed: 0.38,
+    sssBaseColor: "#08001a", sssTipColor: "#ff2a6d",
+    reflectionStrength: 3.2, reflectionWidth: 0.05,
+    haloStrength: 1.1, haloRadius: 0.38, haloSize: 0.018, vignetteStrength: 0.48,
+    flareIntensity: 1.4, flareGhosting: 1.3, flareStreak: 0.0, flareAngle: 140,
     enableGrid: 1.0,
   },
 };

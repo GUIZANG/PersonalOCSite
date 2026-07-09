@@ -2,7 +2,7 @@
 // scene overlay (awakeOverlay.js): move the pointer to the top edge to pull the
 // panel down, to the bottom edge to retract it. The only difference is the
 // background: instead of a CSS star field it renders the shared horizon scene
-// locked to the Twilight preset.
+// locked to the Synthwave preset.
 import { createHorizonScene } from "./horizonScene.js";
 
 function initHomepageOverlay() {
@@ -184,8 +184,10 @@ function initHomepageOverlay() {
     const bg = document.createElement("div");
     bg.className = "awake-overlay-horizon";
     overlay.insertBefore(bg, overlay.firstElementChild);
+
     horizon = createHorizonScene({ container: bg });
-    horizon.applyPreset("Twilight");
+    horizon.applyPreset("Synthwave");
+    horizon.setCamera(3.6, -0.14);
     horizon.stop();
   }
 }
