@@ -6,6 +6,7 @@
   <title>PRECOGNITIVE STRATA</title>
   <link rel="icon" href="/assets/images/logo/brain.svg" type="image/x-icon" />
   <link rel="stylesheet" href="/styles/fonts.css" />
+  <link rel="stylesheet" href="/styles/colors.css" />
   <link rel="stylesheet" href="archive.css" />
 </head>
 <body>
@@ -14,6 +15,83 @@
       <svg class="archive-thought-scanner__lines" id="archiveThoughtScannerLines"></svg>
       <div class="archive-thought-scanner__probes" id="archiveThoughtScannerProbes"></div>
     </div>
+    <section class="hypercube-interface" id="archiveAmbientHud" aria-label="Archive interface status">
+      <div class="hypercube-interface__field" aria-hidden="true"></div>
+      <div class="hypercube-interface__grain" aria-hidden="true"></div>
+      <div class="hypercube-interface__sweep" aria-hidden="true"></div>
+
+      <div class="hypercube-interface__frame" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+      </div>
+
+      <header class="hypercube-interface__identity">
+        <div class="hypercube-interface__edition">
+          <span>NOOSPHERE ARCHIVE</span>
+          <span>ED.020</span>
+        </div>
+        <strong class="hypercube-interface__number" aria-hidden="true">020</strong>
+        <div class="hypercube-interface__title">
+          <span>POST–HUMAN FIELD RECORD</span>
+          <h1>Precognitive<br />Strata</h1>
+          <p>Industrial memory extracted from a nonlocal cognitive layer.</p>
+        </div>
+        <div class="hypercube-interface__classification">
+          <span>CLASS IV</span>
+          <span>RESTRICTED</span>
+          <span>CRC ACTIVE</span>
+        </div>
+      </header>
+
+      <div class="hypercube-interface__core" aria-hidden="true">
+        <span class="hypercube-interface__core-index">N–020 / CORE</span>
+        <div class="hypercube-interface__reticle"><i></i></div>
+        <span class="hypercube-interface__core-axis">X / Y / Z / Ψ</span>
+      </div>
+
+      <aside class="hypercube-interface__telemetry" aria-label="Live extraction matrix">
+        <div class="hypercube-interface__panel-title">
+          <span>EXTRACTION</span>
+          <b>ONLINE</b>
+        </div>
+        <dl>
+          <div><dt>SIGNAL</dt><dd id="archiveHudSignal" aria-live="polite">DORMANT</dd></div>
+          <div><dt>COORD</dt><dd id="archiveHudCoord">X0000 / Y0000</dd></div>
+          <div><dt>SCAN</dt><dd id="archiveHudScan">00</dd></div>
+          <div><dt>DEPTH</dt><dd><span id="archiveHudDepth">07.43</span> NM</dd></div>
+          <div><dt>MATTER</dt><dd>NONLOCAL</dd></div>
+        </dl>
+        <p>
+          UTC+08 / STRATUM <span id="archiveHudStratum">7.02</span><br />
+          SIGNAL INTEGRITY <span id="archiveHudIntegrity">98.4</span>%
+        </p>
+      </aside>
+
+      <ol class="hypercube-interface__echoes" aria-label="Nearby archive records">
+        <li data-archive-node="01"><span>IDX–01</span><strong>MNEMONIC ECHO</strong></li>
+        <li data-archive-node="02"><span>IDX–02</span><strong>NULL INDEX</strong></li>
+        <li data-archive-node="03"><span>IDX–03</span><strong>ENTITY RECORD</strong></li>
+      </ol>
+
+      <footer class="hypercube-interface__status">
+        <div class="hypercube-interface__ticker" aria-hidden="true">
+          <span class="hypercube-interface__rec"><i></i>REC</span>
+          <span>UID <b id="archiveHudUid">0X0000</b></span>
+          <span id="archiveHudClock">--:--:--</span>
+          <span>FR <b id="archiveHudFrame">000000</b></span>
+        </div>
+        <div class="hypercube-interface__record">
+          <span>CURRENT TRACE / EXCAVATION</span>
+          <strong id="archiveHudRecord">SUBCONSCIOUS TRACE</strong>
+          <p id="archiveHudSummary">Residual cognition detected beyond the indexed field.</p>
+        </div>
+        <div class="hypercube-interface__instruction">
+          <span>CORE ACCESS / MANUAL</span>
+          <strong id="archiveHudInstruction">HOLD CORE / 03.00 SEC TO DECODE</strong>
+          <div class="hypercube-interface__progress" aria-hidden="true"><i id="archiveHudProgress"></i></div>
+        </div>
+      </footer>
+    </section>
+
     <section class="archive-card-stream" id="archiveCardStream" aria-label="Archive card stream">
       <div class="archive-scanner" aria-hidden="true"></div>
       <div class="archive-scanner-hud archive-scanner-hud--left" aria-hidden="true">

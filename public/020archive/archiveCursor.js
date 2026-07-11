@@ -145,7 +145,7 @@
 
       cursor.classList.toggle("is-hypercube-pressing", isHypercubePressing);
       cursor.style.setProperty("--press-progress", hypercubePressProgress.toFixed(3));
-      cursor.style.setProperty("--cursor-outer-color", mixColor("#f7f8fa", "#ff1f2d", hypercubePressProgress));
+      cursor.style.setProperty("--cursor-outer-color", mixColor("#f7f8fa", "#ff0d1a", hypercubePressProgress));
       if (!isHypercubePressing && !isPressing && !isPressGlitching) {
         cursor.style.setProperty("--cursor-shadow", defaultShadow);
       }
@@ -267,11 +267,9 @@
     function applyPressGlitch(now) {
       const x = Math.round(Math.sin(now * 0.095) * 5 + Math.sin(now * 0.033) * 2);
       const y = Math.round(Math.cos(now * 0.081) * 4 + Math.sin(now * 0.047) * 2);
-      const red = mixColor(glitchColorR, "#ff1010", hypercubePressProgress);
-
       cursor.style.setProperty("--cursor-shadow", `
-        ${x}px ${y}px 0 ${glitchColorB},
-        ${-x}px ${-y}px 0 ${red}
+        ${x}px ${y}px 0 #00F5FF,
+        ${-x}px ${-y}px 0 #FF2DA6
       `);
       isPressGlitching = true;
     }

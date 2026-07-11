@@ -166,6 +166,7 @@ const liquidRects = new Float32Array(MAX_LIQUID_CARDS * 4);
 const liquidOpacity = new Float32Array(MAX_LIQUID_CARDS);
 const liquidSeeds = new Float32Array(MAX_LIQUID_CARDS);
 const liquidClipLeft = new Float32Array(MAX_LIQUID_CARDS);
+const liquidHover = new Float32Array(MAX_LIQUID_CARDS);
 let liquidCardCount = 0;
 let liquidProvider = null;
 let liquidSource = null;
@@ -197,6 +198,7 @@ uniform vec4 liquidRects[${MAX_LIQUID_CARDS}];
 uniform float liquidOpacity[${MAX_LIQUID_CARDS}];
 uniform float liquidSeeds[${MAX_LIQUID_CARDS}];
 uniform float liquidClipLeft[${MAX_LIQUID_CARDS}];
+uniform float liquidHover[${MAX_LIQUID_CARDS}];
 uniform float bubbleData[${BUBBLE_PARAMS.count * 4}];
 
 const float DISP = 0.03;
@@ -316,7 +318,7 @@ float bubbleDensity(vec3 p) {
   return clamp(density, 0.0, 1.0);
 }
 
-bool resolveCard(vec2 frag, out vec4 rect, out vec2 local, out float opacity, out float seed, out float clipLeft) {
+bool resolveCard(vec2 frag, out vec4 rect, out vec2 local, out float opacity, out float seed, out float clipLeft, out float hover) {
   for (int i = 0; i < ${MAX_LIQUID_CARDS}; i++) {
     if (i >= cardCount) break;
     vec4 r = liquidRects[i];
@@ -327,6 +329,7 @@ bool resolveCard(vec2 frag, out vec4 rect, out vec2 local, out float opacity, ou
       opacity = liquidOpacity[i];
       seed = liquidSeeds[i];
       clipLeft = liquidClipLeft[i];
+      hover = liquidHover[i];
       return true;
     }
   }
@@ -341,8 +344,9 @@ void main() {
   float paneOpacity = 0.0;
   float cardSeed = 0.0;
   float glassClipLeft = 0.0;
+  float cardHover = 0.0;
 
-  if (!resolveCard(frag, rect, local, paneOpacity, cardSeed, glassClipLeft)) {
+  if (!resolveCard(frag, rect, local, paneOpacity, cardSeed, glassClipLeft, cardHover)) {
     gl_FragColor = vec4(0.0);
     return;
   }
@@ -530,17 +534,29 @@ void main() {
   col *= mix(vec3(1.0), exp(-absorbAmount * thickness), f2);
   col *= 1.0 + f2 * 0.3;
 
+  // Specular highlights are plain white by default. On hover the hovered card's
+  // highlights take on a neon palette: electric cyan, hot magenta, acid yellow,
+  // plus a hover-only signal orange lobe.
+  vec3 acidYellow = vec3(0.792, 1.0, 0.0);
+  vec3 electricCyan = vec3(0.0, 0.902, 1.0);
+  vec3 hotMagenta = vec3(1.0, 0.0, 0.6);
+  vec3 signalOrange = vec3(1.0, 0.349, 0.0);
+
   vec3 ld = normalize(vec3(0.5, 0.9, -0.3));
   float spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 200.0);
-  col += spec * mix(22.0, 38.0, rSpec);
+  col += spec * mix(22.0, 38.0, rSpec) * mix(vec3(1.0), electricCyan, cardHover);
 
   ld = normalize(vec3(-0.9, 0.4, -0.3));
   spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 300.0);
-  col += spec * mix(2.0, 4.5, hash11(cardSeed + 6.7));
+  col += spec * mix(2.0, 4.5, hash11(cardSeed + 6.7)) * mix(vec3(1.0), hotMagenta, cardHover);
 
   ld = normalize(vec3(-0.1, -0.9, -0.1));
   spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 30.0);
-  col += spec * mix(0.35, 0.8, hash11(cardSeed + 7.3));
+  col += spec * mix(0.35, 0.8, hash11(cardSeed + 7.3)) * mix(vec3(1.0), acidYellow, cardHover);
+
+  ld = normalize(vec3(0.85, -0.3, -0.4));
+  spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 120.0);
+  col += spec * mix(6.0, 10.0, hash11(cardSeed + 8.1)) * signalOrange * cardHover;
 
   col = min(col, 1.0);
   col = 1.0 - abs(col + fres * 0.12 - 1.0);
@@ -570,6 +586,7 @@ function updateLiquidCards() {
   liquidOpacity.fill(0);
   liquidSeeds.fill(0);
   liquidClipLeft.fill(0);
+  liquidHover.fill(0);
   liquidCardCount = 0;
 
   if (!liquidProvider) {
@@ -588,6 +605,7 @@ function updateLiquidCards() {
     liquidOpacity[i] = card.opacity;
     liquidSeeds[i] = typeof card.seed === "number" ? card.seed : 0;
     liquidClipLeft[i] = typeof card.clipLeft === "number" ? card.clipLeft : 0;
+    liquidHover[i] = typeof card.hover === "number" ? card.hover : 0;
   }
 
   return liquidRects;
@@ -733,6 +751,7 @@ function bindLiquidSource() {
       liquidOpacity: () => liquidOpacity,
       liquidSeeds: () => liquidSeeds,
       liquidClipLeft: () => liquidClipLeft,
+      liquidHover: () => liquidHover,
       cardCount: () => liquidCardCount,
       bubbleData: () => updateBubbleData(),
     },

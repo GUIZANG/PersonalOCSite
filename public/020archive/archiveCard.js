@@ -424,6 +424,12 @@
         const clipLeft = Math.min(Math.max(scanQ, 0), 1) * rect.width;
         if (clipLeft >= rect.width - 0.5) return;
 
+        // Smoothly ease the per-card hover amount so the specular tint fades in
+        // and out instead of snapping when the pointer enters/leaves a card.
+        const hoverTarget = wrapper.matches(":hover") ? 1 : 0;
+        const prevHover = typeof wrapper._hoverAmount === "number" ? wrapper._hoverAmount : 0;
+        wrapper._hoverAmount = prevHover + (hoverTarget - prevHover) * 0.18;
+
         // Full card rect plus a separate left clip. This preserves the material
         // coordinates of the whole card while making glass the complement of
         // the ASCII text block: text [0, scanX], glass [scanX, cardRight].
@@ -435,6 +441,7 @@
           opacity: 1,
           seed: wrapper._liquidSeed,
           clipLeft: clipLeft * pixelRatio,
+          hover: wrapper._hoverAmount,
         });
       });
 

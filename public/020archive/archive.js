@@ -9,8 +9,9 @@
     constructor(container = document.body, cardStream = null) {
       this.container = container;
       this.cardStream = cardStream;
-      this.background = 0x000000;
+      this.background = 0x0d0e15;
       this.foreground = 0xffffff;
+      this.baseRayColor = new THREE.Color(0xffffff);
       this.duration = 16000;
       this.hoverAmount = 0;
       this.hoverTarget = 0;
@@ -26,10 +27,15 @@
       this.hoverEnterRadiusRatio = 0.16;
       this.hoverExitRadiusRatio = 0.4;
       this.pressRadiusRatio = 0.06;
-      this.pressOffsetXRatio = -0.015;
-      this.pressOffsetYRatio = 0.015;
+      this.pressOffsetXRatio = 0;
+      this.pressOffsetYRatio = 0;
+      // Shift the eye shape, dust glow and rays up-right by this world ratio,
+      // while the center dot and long-press circle stay at the cube center.
+      this.eyeShiftXRatio = 0.015;
+      this.eyeShiftYRatio = 0.015;
       this.baseRotationX = Math.sin(45 * Math.PI / 180);
       this.cubeCloud = null;
+      this.cubeWorldCenter = new THREE.Vector3();
       this.mat = null;
       this.hoverDustGroup = null;
       this.hoverDust = null;
@@ -67,10 +73,10 @@
       this.scanAnchorDots = [];
       this.scanAnchorSignature = "";
       this.scanActiveAnchors = [];
-      this.scanAttractRadius = 430;
+      this.scanAttractRadius = 250;
       this.scanAvoidPointerRadius = 76;
       this.scanMaxOverlapRatio = 0.5;
-      this.scanAnchorDeadRadiusRatio = 0.22;
+      this.scanAnchorDeadRadiusRatio = 0.17;
       this.scanAnchorMinDistance = 12;
       this.scanWordBank = Array.isArray(window.ArchiveScanLexicon) && window.ArchiveScanLexicon.length
         ? window.ArchiveScanLexicon
@@ -82,6 +88,45 @@
             "THE LANTERN EATER",
             "EYELESS CURATOR",
           ];
+      this.ambientHud = document.getElementById("archiveAmbientHud");
+      this.hudSignal = document.getElementById("archiveHudSignal");
+      this.hudCoord = document.getElementById("archiveHudCoord");
+      this.hudScan = document.getElementById("archiveHudScan");
+      this.hudRecord = document.getElementById("archiveHudRecord");
+      this.hudSummary = document.getElementById("archiveHudSummary");
+      this.hudInstruction = document.getElementById("archiveHudInstruction");
+      this.hudUid = document.getElementById("archiveHudUid");
+      this.hudClock = document.getElementById("archiveHudClock");
+      this.hudFrame = document.getElementById("archiveHudFrame");
+      this.hudDepth = document.getElementById("archiveHudDepth");
+      this.hudIntegrity = document.getElementById("archiveHudIntegrity");
+      this.hudStratum = document.getElementById("archiveHudStratum");
+      this.hudFrameCount = 0;
+      this.hudMicroLast = 0;
+      this.hudGlitchTimer = null;
+      this.hudTelemetryLast = 0;
+      this.hudTelemetryTargetAt = 0;
+      this.hudTelemetry = {
+        depth: 7.43,
+        depthTarget: 7.43,
+        integrity: 98.4,
+        integrityTarget: 98.4,
+        stratum: 2,
+        stratumTarget: 2,
+      };
+      this.hudNodes = Array.from(document.querySelectorAll("[data-archive-node]"));
+      this.hudStaticCopy = {
+        archive: this.ambientHud?.querySelector(".hypercube-interface__edition span:first-child"),
+        eyebrow: this.ambientHud?.querySelector(".hypercube-interface__title > span"),
+        classes: Array.from(this.ambientHud?.querySelectorAll(".hypercube-interface__classification span") || []),
+        matrix: this.ambientHud?.querySelector(".hypercube-interface__panel-title span"),
+        matrixState: this.ambientHud?.querySelector(".hypercube-interface__panel-title b"),
+      };
+      this.hudCaptureCount = 0;
+      this.hudCapturedWords = [];
+      this.hudState = "DORMANT";
+      this.hudEyeRecordActive = false;
+      this.hudPressPhaseIndex = -1;
 
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color(this.background);
@@ -112,6 +157,16 @@
       this.pressTargetGuide = document.createElement("div");
       this.pressTargetGuide.className = "hypercube-press-target-guide";
       this.container.appendChild(this.pressTargetGuide);
+      this.rayInnerRingEl = document.createElement("div");
+      this.rayInnerRingEl.className = "hypercube-ray-inner-ring";
+      this.container.appendChild(this.rayInnerRingEl);
+      this.eyeFxEl = document.createElement("div");
+      this.eyeFxEl.className = "hypercube-eye-fx";
+      this.eyeFxEl.setAttribute("aria-hidden", "true");
+      this.eyeFxEl.innerHTML =
+        '<span class="hypercube-eye-fx__scan"></span>' +
+        '<span class="hypercube-eye-fx__ring"></span>';
+      this.container.appendChild(this.eyeFxEl);
       this.initThoughtScannerOverlay();
 
       this.animate = this.animate.bind(this);
@@ -230,6 +285,7 @@
           uColor: { value: new THREE.Color(this.foreground) },
           uResolution: { value: window.innerHeight * Math.min(window.devicePixelRatio, 2) },
           uHoverTilt: { value: new THREE.Matrix3() },
+          uEyeShift: { value: new THREE.Vector2(0, 0) },
         },
         vertexShader: `
           uniform float uTime;
@@ -238,6 +294,7 @@
           uniform float uPress;
           uniform float uResolution;
           uniform mat3 uHoverTilt;
+          uniform vec2 uEyeShift;
           attribute vec3 targetPos;
           attribute vec3 squarePos;
           attribute vec3 burstPos;
@@ -282,12 +339,16 @@
             float bulge = sin(easedProgress * 3.14159265) * 0.1;
             vec3 cubePos = mix(position, targetPos, easedProgress) + midDir * bulge;
             mat3 worldRotation = mat3(modelMatrix);
-            vec3 tiltedSquare = uHoverTilt * squarePos;
+            vec3 tiltedSquare = uHoverTilt * squarePos * (1.5 + uPress * 0.12);
+            // Apply the eye shift in the camera-facing frame (before the inverse
+            // model rotation) so it stays a constant screen-space offset and
+            // does not swing as the cube spins.
+            tiltedSquare.xy += uEyeShift;
             vec3 hoverTarget = vec3(
               dot(worldRotation[0], tiltedSquare),
               dot(worldRotation[1], tiltedSquare),
               dot(worldRotation[2], tiltedSquare)
-            ) * (1.5 + uPress * 0.12);
+            );
             float hoverEase = cubicBezierEase(uHover);
             float hoverMotion = smoothstep(0.72, 1.0, hoverEase) * (1.0 - uBurst);
             vec2 hoverDir = normalize(squarePos.xy + vec2(0.0001));
@@ -343,11 +404,13 @@
       this.cubeCloud = new THREE.Points(geo, this.mat);
       this.cubeCloud.rotation.x = this.baseRotationX;
       this.cubeCloud.renderOrder = 2;
+      this.updateEyeShift();
       this.createHoverDust();
       this.scene.add(this.cubeCloud);
 
       this.createTrails(burstPos, offsets, burstMask);
       this.createThoughtScannerTarget();
+      this.ensureThoughtScannerAnchors(this.renderer.domElement.getBoundingClientRect());
 
       window.addEventListener("resize", this.onResize);
       this.container.addEventListener("pointermove", this.onPointerMove);
@@ -356,6 +419,7 @@
       this.container.addEventListener("pointerup", this.onPointerUp);
       this.container.addEventListener("pointercancel", this.onPointerUp);
       this.updatePressTargetGuide();
+      this.updateAmbientHudState("DORMANT");
       this.animate(0);
     }
 
@@ -377,6 +441,7 @@
       if (this.pressPointerId !== null && this.burstTarget === 0) {
         this.pressAmount = Math.min((performance.now() - this.pressStartTime) / this.longPressDuration, 1);
         this.updateCursorPressState(true);
+        this.updateAmbientHudPress(this.pressAmount);
         if (this.pressAmount >= 1) {
           this.activateBurst();
         }
@@ -421,13 +486,72 @@
         this.renderer.render(this.scene, this.camera);
       }
 
+      this.updateHudMicroLabels(time);
+      this.updateLivingTelemetry(time);
       window.requestAnimationFrame(this.animate);
+    }
+
+    updateHudMicroLabels(time) {
+      this.hudFrameCount++;
+      if (time - this.hudMicroLast < 120) return;
+      this.hudMicroLast = time;
+
+      if (this.hudFrame) {
+        this.hudFrame.textContent = String(this.hudFrameCount % 1000000).padStart(6, "0");
+      }
+      if (this.hudClock) {
+        const now = new Date();
+        this.hudClock.textContent = [now.getHours(), now.getMinutes(), now.getSeconds()]
+          .map((unit) => String(unit).padStart(2, "0"))
+          .join(":");
+      }
+      if (this.hudUid) {
+        // Pseudo memory-address readout that drifts while the field is live.
+        const seed = (Math.floor(time / 480) * 2654435761) >>> 0;
+        this.hudUid.textContent = `0X${seed.toString(16).toUpperCase().padStart(8, "0").slice(0, 4)}`;
+      }
+    }
+
+    updateLivingTelemetry(time) {
+      const telemetry = this.hudTelemetry;
+      const active = this.hoverTarget > 0 || this.pressPointerId !== null;
+      const targetInterval = active ? 280 : 520;
+      const renderInterval = active ? 70 : 120;
+
+      if (time >= this.hudTelemetryTargetAt) {
+        const randomBetween = (min, max) => min + Math.random() * (max - min);
+        telemetry.depthTarget = randomBetween(active ? 7.3 : 7.4, active ? 7.6 : 7.46);
+        telemetry.integrityTarget = randomBetween(active ? 98.1 : 98.3, active ? 98.6 : 98.5);
+        telemetry.stratumTarget = Math.round(randomBetween(active ? 0 : 1, active ? 9 : 3));
+        this.hudTelemetryTargetAt = time + targetInterval;
+      }
+
+      if (time - this.hudTelemetryLast < renderInterval) return;
+      this.hudTelemetryLast = time;
+
+      const smoothing = active ? 0.34 : 0.2;
+      telemetry.depth += (telemetry.depthTarget - telemetry.depth) * smoothing;
+      telemetry.integrity += (telemetry.integrityTarget - telemetry.integrity) * smoothing;
+      telemetry.stratum += (telemetry.stratumTarget - telemetry.stratum) * smoothing;
+
+      if (this.hudDepth) {
+        this.hudDepth.textContent = telemetry.depth.toFixed(2).padStart(5, "0");
+      }
+      if (this.hudIntegrity) {
+        this.hudIntegrity.textContent = telemetry.integrity.toFixed(1).padStart(4, "0");
+      }
+      if (this.hudStratum) {
+        const suffix = String(Math.round(telemetry.stratum)).padStart(2, "0");
+        this.hudStratum.textContent = `7.${suffix}`;
+      }
     }
 
     onResize() {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.updateEyeShift();
+      this.ensureThoughtScannerAnchors(this.renderer.domElement.getBoundingClientRect());
 
       if (this.mat) {
         this.mat.uniforms.uResolution.value = window.innerHeight * Math.min(window.devicePixelRatio, 2);
@@ -449,6 +573,12 @@
         return;
       }
 
+      if (this.pressPointerId === event.pointerId) {
+        this.hideThoughtScanner(true);
+        this.updateCursorSnap(event);
+        return;
+      }
+
       const { distance, rect } = this.getCenterDistance(event);
       const base = Math.min(rect.width, rect.height);
       const isHovering = this.hoverTarget === 1 || this.hoverAmount > 0.18;
@@ -463,10 +593,8 @@
       this.updateHoverLookTarget(event, distance < hitRadius);
       this.updateCursorSnap(event);
       this.updateThoughtScanner(event, distance >= hitRadius);
+      this.updateAmbientHudPointer(event, distance >= hitRadius);
 
-      if (this.pressPointerId === event.pointerId && !this.isInPressCenter(event)) {
-        this.cancelLongPress();
-      }
     }
 
     updateCursorSnap(event) {
@@ -498,22 +626,34 @@
     onPointerLeave() {
       this.hideThoughtScanner(true);
       this.resetHoverLookTarget();
+      if (this.pressPointerId !== null) {
+        return;
+      }
+
       this.cursorSnapActive = false;
       window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
       if (this.burstTarget > 0) return;
 
       this.cancelLongPress();
       this.exitHover();
+      this.container.classList.remove("is-hud-scanning");
+      this.updateAmbientHudState("DORMANT");
     }
 
     onPointerDown(event) {
       if (event.button !== 0) return;
-      if (this.burstTarget > 0 || !this.isInPressCenter(event)) return;
+
+      // Long-press only starts when the cursor is actually aimed at (snapped to)
+      // the red center dot. We do NOT force-snap on press.
+      const { distance } = this.getPressDistance(event);
+      if (this.burstTarget > 0 || distance > this.getCursorSnapRadius()) return;
 
       this.pressStartTime = performance.now();
       this.pressPointerId = event.pointerId;
       this.updateCursorPressState(true);
+      this.updateAmbientHudPress(0);
       this.enterHover();
+      this.updateCursorSnap(event);
       this.container.setPointerCapture?.(event.pointerId);
     }
 
@@ -521,13 +661,29 @@
       if (this.pressPointerId !== event.pointerId) return;
 
       this.cancelLongPress();
+      this.cursorSnapActive = false;
+      window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
       this.container.releasePointerCapture?.(event.pointerId);
+    }
+
+    lockCursorToPressCenter() {
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      const center = this.getPressCenter(rect);
+      this.cursorSnapActive = true;
+      window.dispatchEvent(new CustomEvent("archive:cursor-snap", {
+        detail: {
+          active: true,
+          x: center.x,
+          y: center.y,
+        },
+      }));
     }
 
     enterHover() {
       this.isHoverDustExiting = false;
       this.hoverTarget = 1;
       this.container.classList.add("is-hypercube-hovered");
+      this.setAmbientHudEyeRecord(true);
     }
 
     exitHover() {
@@ -537,6 +693,7 @@
       if (!this.isHoverDustExiting) {
         this.hoverTarget = 0;
         this.container.classList.remove("is-hypercube-hovered");
+        this.setAmbientHudEyeRecord(false);
       }
     }
 
@@ -552,6 +709,7 @@
           this.isHoverDustExiting = false;
           this.hoverTarget = 0;
           this.container.classList.remove("is-hypercube-hovered");
+          this.setAmbientHudEyeRecord(false);
         }
         return;
       }
@@ -637,6 +795,8 @@
       this.burstTarget = 1;
       this.container.classList.remove("is-hypercube-hovered");
       this.container.classList.add("is-hypercube-bursting");
+      this.container.classList.remove("is-hud-scanning", "is-hud-pressing");
+      this.updateAmbientHudState("OPEN");
       this.hideThoughtScanner(true);
       this.cursorSnapActive = false;
       window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
@@ -650,6 +810,19 @@
       this.pressStartTime = 0;
       this.pressPointerId = null;
       this.updateCursorPressState(false);
+      this.container.classList.remove("is-hud-pressing");
+      this.ambientHud?.style.setProperty("--archive-hud-progress", "0");
+      if (this.burstTarget === 0) {
+        this.updateAmbientHudState(this.hoverTarget === 1 ? "ACQUIRING" : "DORMANT");
+        this.hudScan.textContent = String(this.hudCaptureCount % 100).padStart(2, "0");
+        if (this.hudEyeRecordActive) {
+          this.hudPressPhaseIndex = -1;
+          delete this.ambientHud.dataset.pressPhase;
+          this.updateAmbientHudStaticPressCopy(-1);
+          this.hudRecord.textContent = "THE EYE";
+          this.hudSummary.textContent = "It does not look at you. It remembers the version of you that has not happened yet.";
+        }
+      }
     }
 
     isInPressCenter(event) {
@@ -664,12 +837,52 @@
 
       const rect = this.renderer.domElement.getBoundingClientRect();
       const diameter = this.getPressRadius(rect) * 2;
-      const center = this.getPressCenter(rect);
 
-      this.pressTargetGuide.style.left = `${center.x}px`;
-      this.pressTargetGuide.style.top = `${center.y}px`;
+      // Left/top are governed purely by CSS (top:50%;left:50%) so the center
+      // dot is hard-pinned to the viewport/cube center and never drifts.
       this.pressTargetGuide.style.width = `${diameter}px`;
       this.pressTargetGuide.style.height = `${diameter}px`;
+      this.updateDebugCircles();
+    }
+
+    updateDebugCircles() {
+      if (!this.rayInnerRingEl) return;
+
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      const base = this.getHoverDustBaseSize();
+      const pxPerWorld = rect.height / base;
+      // Inner radius of the hover-dust ray field (see createHoverDust),
+      // pulled in by 10px per request.
+      const innerRadius = base * 0.32 * pxPerWorld - 10;
+      const dustCenter = this.getHoverDustCenter();
+      const cx = rect.left + rect.width / 2 + dustCenter.x * pxPerWorld;
+      const cy = rect.top + rect.height / 2 - dustCenter.y * pxPerWorld;
+
+      this.rayInnerRingEl.style.left = `${cx}px`;
+      this.rayInnerRingEl.style.top = `${cy}px`;
+      this.rayInnerRingEl.style.width = `${innerRadius * 2}px`;
+      this.rayInnerRingEl.style.height = `${innerRadius * 2}px`;
+
+      if (this.eyeFxEl) {
+        // Square center must coincide with the red center dot (press center),
+        // not the up-right-shifted eye pattern.
+        const dotCenter = this.getPressCenter(rect);
+        this.eyeFxEl.style.left = `${dotCenter.x}px`;
+        this.eyeFxEl.style.top = `${dotCenter.y}px`;
+      }
+    }
+
+    getHypercubeScreenCenter(rect) {
+      if (!this.cubeCloud) return this.getPressCenter(rect);
+
+      this.cubeCloud.updateWorldMatrix(true, false);
+      this.cubeCloud.getWorldPosition(this.cubeWorldCenter);
+      this.cubeWorldCenter.project(this.camera);
+
+      return {
+        x: rect.left + (this.cubeWorldCenter.x * 0.5 + 0.5) * rect.width,
+        y: rect.top + (-this.cubeWorldCenter.y * 0.5 + 0.5) * rect.height,
+      };
     }
 
     updateCursorPressState(active) {
@@ -679,6 +892,209 @@
           progress: active ? this.pressAmount : 0,
         },
       }));
+    }
+
+    updateAmbientHudPointer(event, isScanning) {
+      if (!this.ambientHud || this.burstTarget > 0) return;
+
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      const x = Math.round(THREE.MathUtils.clamp(event.clientX - rect.left, 0, rect.width));
+      const y = Math.round(THREE.MathUtils.clamp(event.clientY - rect.top, 0, rect.height));
+      this.hudCoord.textContent = `X${String(x).padStart(4, "0")} / Y${String(y).padStart(4, "0")}`;
+      this.container.classList.toggle("is-hud-scanning", isScanning);
+
+      if (this.pressPointerId === null) {
+        this.updateAmbientHudState("ACQUIRING");
+      }
+    }
+
+    updateAmbientHudPress(progress) {
+      if (!this.ambientHud || this.burstTarget > 0) return;
+
+      const clamped = THREE.MathUtils.clamp(progress, 0, 1);
+      const remaining = Math.max(0, (this.longPressDuration * (1 - clamped)) / 1000);
+      this.container.classList.add("is-hud-pressing");
+      this.ambientHud.style.setProperty("--archive-hud-progress", clamped.toFixed(3));
+      this.updateAmbientHudState("DECRYPTING");
+      this.applyAmbientHudPressCopy(clamped, remaining);
+    }
+
+    applyAmbientHudPressCopy(progress, remaining = this.longPressDuration / 1000) {
+      const phases = [
+        {
+          threshold: 0,
+          signal: "CORE LOCK",
+          title: "THE EYE",
+          summary: "It does not look at you. It remembers the version of you that has not happened yet.",
+          instruction: "CORE LOCK",
+        },
+        {
+          threshold: 0.28,
+          signal: "MEMORY LEAK",
+          title: "IT HEARS YOU",
+          summary: "Something behind the iris is repeating thoughts you have never spoken.",
+          instruction: "MEMORY LEAK",
+        },
+        {
+          threshold: 0.58,
+          signal: "IDENTITY LOSS",
+          title: "IT KNOWS YOU",
+          summary: "Your name has appeared in records written before your birth.",
+          instruction: "IDENTITY BREACH",
+        },
+        {
+          threshold: 0.82,
+          signal: "BREACH IMMINENT",
+          title: "DO NOT RELEASE",
+          summary: "The archive is opening from the other side.",
+          instruction: "CONTAINMENT FAILURE",
+        },
+      ];
+      const phaseIndex = phases.reduce(
+        (currentIndex, candidate, index) => progress >= candidate.threshold ? index : currentIndex,
+        0
+      );
+      const phase = phases[phaseIndex];
+
+      if (phaseIndex !== this.hudPressPhaseIndex) {
+        this.hudPressPhaseIndex = phaseIndex;
+        this.ambientHud.dataset.pressPhase = String(phaseIndex);
+        this.updateAmbientHudStaticPressCopy(phaseIndex);
+        this.hudSignal.textContent = phase.signal;
+        this.hudRecord.textContent = phase.title;
+        this.hudSummary.textContent = phase.summary;
+        this.triggerHudGlitch();
+      }
+      this.hudScan.textContent = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
+      this.hudInstruction.textContent = `${phase.instruction} / ${remaining.toFixed(2)} SEC`;
+    }
+
+    updateAmbientHudStaticPressCopy(phaseIndex) {
+      const variants = [
+        {
+          archive: "NOOSPHERE ARCHIVE",
+          eyebrow: "POST–HUMAN FIELD RECORD",
+          classes: ["CLASS IV", "RESTRICTED", "CRC ACTIVE"],
+          matrix: "EXTRACTION",
+          matrixState: "ONLINE",
+        },
+        {
+          archive: "MEMORY OVERRIDE",
+          eyebrow: "RECURSIVE SIGNAL",
+          classes: ["CLASS IV", "CORE LOCK", "CRC ERROR"],
+          matrix: "CONTAINMENT",
+          matrixState: "UNSTABLE",
+        },
+        {
+          archive: "IDENTITY BREACH",
+          eyebrow: "OBSERVER CORRUPTED",
+          classes: ["CLASS Ω", "BREACH", "CRC FAILED"],
+          matrix: "COGNITIVE",
+          matrixState: "CRITICAL",
+        },
+        {
+          archive: "ARCHIVE AWAKE",
+          eyebrow: "SUBJECT MERGED",
+          classes: ["CLASS NULL", "NO RELEASE", "CRC VOID"],
+          matrix: "MATRIX LOST",
+          matrixState: "OPEN",
+        },
+      ];
+      const copy = variants[Math.max(0, phaseIndex)];
+      const setText = (element, text) => {
+        if (element) element.textContent = text;
+      };
+
+      setText(this.hudStaticCopy.archive, copy.archive);
+      setText(this.hudStaticCopy.eyebrow, copy.eyebrow);
+      this.hudStaticCopy.classes.forEach((element, index) => setText(element, copy.classes[index] || ""));
+      setText(this.hudStaticCopy.matrix, copy.matrix);
+      setText(this.hudStaticCopy.matrixState, copy.matrixState);
+    }
+
+    triggerHudGlitch() {
+      if (!this.ambientHud) return;
+
+      this.ambientHud.classList.remove("is-hud-glitch");
+      // Force reflow so the short animation restarts even on rapid re-triggers.
+      void this.ambientHud.offsetWidth;
+      this.ambientHud.classList.add("is-hud-glitch");
+      clearTimeout(this.hudGlitchTimer);
+      this.hudGlitchTimer = setTimeout(() => {
+        this.ambientHud?.classList.remove("is-hud-glitch");
+      }, 400);
+    }
+
+    updateAmbientHudState(state) {
+      if (!this.ambientHud) return;
+
+      const changed = this.hudState !== state;
+      this.hudState = state;
+      this.ambientHud.dataset.state = state.toLowerCase();
+      this.hudSignal.textContent = state;
+
+      if (changed && this.burstTarget === 0) {
+        this.triggerHudGlitch();
+      }
+
+      if (state === "OPEN") {
+        this.hudInstruction.textContent = "ARCHIVE CHANNEL OPEN";
+      } else if (state !== "DECRYPTING") {
+        this.hudInstruction.textContent = "HOLD CORE / 03.00 SEC TO DECODE";
+      }
+    }
+
+    captureAmbientHudRecord(word) {
+      if (!this.ambientHud || !word || word === this.hudCapturedWords[0]) return;
+
+      this.hudCaptureCount++;
+      this.hudCapturedWords = [word, ...this.hudCapturedWords.filter((entry) => entry !== word)].slice(0, 3);
+      this.hudScan.textContent = String(this.hudCaptureCount % 100).padStart(2, "0");
+      if (!this.hudEyeRecordActive) {
+        this.hudRecord.textContent = word;
+        this.hudSummary.textContent = this.getAmbientHudSummary(word);
+      }
+
+      this.hudNodes.forEach((node, index) => {
+        const capturedWord = this.hudCapturedWords[index];
+        if (!capturedWord) return;
+        const label = node.querySelector("span");
+        const title = node.querySelector("strong");
+        if (label) label.textContent = `IDX–${String(this.hudCaptureCount - index).padStart(2, "0")}`;
+        if (title) title.textContent = capturedWord;
+      });
+    }
+
+    setAmbientHudEyeRecord(active) {
+      if (!this.hudRecord || !this.hudSummary || this.hudEyeRecordActive === active) return;
+
+      this.hudEyeRecordActive = active;
+      if (active) {
+        this.hudPressPhaseIndex = -1;
+        this.hudRecord.textContent = "THE EYE";
+        this.hudSummary.textContent = "It does not look at you. It remembers the version of you that has not happened yet.";
+        return;
+      }
+
+      const latestRecord = this.hudCapturedWords[0] || "SUBCONSCIOUS TRACE";
+      this.hudPressPhaseIndex = -1;
+      delete this.ambientHud.dataset.pressPhase;
+      this.hudRecord.textContent = latestRecord;
+      this.hudSummary.textContent = this.getAmbientHudSummary(latestRecord);
+    }
+
+    getAmbientHudSummary(word) {
+      if (/ENTITY|SPECIMEN|BIOFORM|EATER|MANTIS|WORM|LARVA|SERAPH|THING|STAG/.test(word)) {
+        return "Unclassified entity signature retained at the edge of the field.";
+      }
+      if (/HAZARD|NULL|STATIC|PARALYSIS|BLEED/.test(word)) {
+        return "Cognitive interference exceeds the stable archive threshold.";
+      }
+      if (/MEMORY|MNEMONIC|DREAM|THOUGHT|EGO|SUBCONSCIOUS/.test(word)) {
+        return "Residual cognition detected beyond the indexed field.";
+      }
+
+      return "Recovered signal fragment awaiting noospheric classification.";
     }
 
     getPressRadius(rect) {
@@ -843,6 +1259,9 @@
         if (anchorChanged || !probe.label.textContent) {
           probe.label.textContent = this.pickThoughtScannerWord(index, now);
           probe.lastWordAt = now;
+          if (index === 0) {
+            this.captureAmbientHudRecord(probe.label.textContent);
+          }
         }
 
         probe.readout.textContent = `LOCK ${Math.round(anchor.pointerDistance).toString().padStart(3, "0")} / D${Math.round(anchor.distance).toString().padStart(3, "0")}`;
@@ -877,18 +1296,23 @@
       const centerY = rect.top + rect.height / 2;
       const base = Math.min(rect.width, rect.height);
       const deadRadius = base * this.scanAnchorDeadRadiusRatio;
-      const margin = 32;
-      const clusterCount = 14;
+      const frameInset = THREE.MathUtils.clamp(rect.width * 0.035, 22, 52);
+      const margin = frameInset + 12;
+      const outerRadius = Math.max(
+        deadRadius * 1.2,
+        Math.min(base * 0.35, base / 2 - margin)
+      );
+      const clusterCount = 12;
       const clusters = [];
 
       for (let i = 0; i < clusterCount; i++) {
         const angle = i * 2.399963 + Utils.hash(i * 19.17) * 1.2;
         const radialBias = Math.pow(Utils.hash(i * 31.91 + 2.7), 0.55);
-        const radius = THREE.MathUtils.lerp(deadRadius * 1.08, Math.hypot(rect.width, rect.height) * 0.46, radialBias);
-        const x = THREE.MathUtils.clamp(centerX + Math.cos(angle) * radius * (0.72 + Utils.hash(i * 7.3) * 0.7), rect.left + margin, rect.right - margin);
-        const y = THREE.MathUtils.clamp(centerY + Math.sin(angle) * radius * (0.62 + Utils.hash(i * 9.1) * 0.76), rect.top + margin, rect.bottom - margin);
-        const density = 5 + Math.floor(Utils.hash(i * 13.73) * 8);
-        const spread = THREE.MathUtils.lerp(base * 0.055, base * 0.15, Utils.hash(i * 23.9));
+        const radius = THREE.MathUtils.lerp(deadRadius * 1.2, outerRadius, radialBias);
+        const x = THREE.MathUtils.clamp(centerX + Math.cos(angle) * radius * 1.2, rect.left + margin, rect.right - margin);
+        const y = THREE.MathUtils.clamp(centerY + Math.sin(angle) * radius * 1.12, rect.top + margin, rect.bottom - margin);
+        const density = 7 + Math.floor(Utils.hash(i * 13.73) * 8);
+        const spread = THREE.MathUtils.lerp(base * 0.025, base * 0.05, Utils.hash(i * 23.9));
 
         if (Math.hypot(x - centerX, y - centerY) <= deadRadius) continue;
         clusters.push({ x, y, density, spread });
@@ -898,7 +1322,7 @@
         for (let i = 0; i < cluster.density * 3 && this.getClusterAnchorCount(clusterIndex) < cluster.density; i++) {
           const angle = Utils.hash(clusterIndex * 101 + i * 17.31) * Math.PI * 2;
           const radius = Math.pow(Utils.hash(clusterIndex * 131 + i * 29.7), 1.25) * cluster.spread;
-          const x = THREE.MathUtils.clamp(cluster.x + Math.cos(angle) * radius, rect.left + margin, rect.right - margin);
+          const x = THREE.MathUtils.clamp(cluster.x + Math.cos(angle) * radius * 1.16, rect.left + margin, rect.right - margin);
           const y = THREE.MathUtils.clamp(cluster.y + Math.sin(angle) * radius, rect.top + margin, rect.bottom - margin);
 
           if (Math.hypot(x - centerX, y - centerY) <= deadRadius) continue;
@@ -906,10 +1330,18 @@
         }
       });
 
-      const sparseTotal = 72;
+      // Keep the fallback pool in the same annulus as the hypercube. The HUD
+      // frame is a hard boundary: no scanner target is generated outside it.
+      const sparseTotal = 48;
       for (let i = 0; i < sparseTotal * 2 && this.getClusterAnchorCount(-1) < sparseTotal; i++) {
-        const x = THREE.MathUtils.lerp(rect.left + margin, rect.right - margin, Utils.hash(i * 43.11 + 1.7));
-        const y = THREE.MathUtils.lerp(rect.top + margin, rect.bottom - margin, Utils.hash(i * 61.87 + 5.3));
+        const angle = i * 2.399963 + Utils.hash(i * 17.31) * 0.45;
+        const radius = THREE.MathUtils.lerp(
+          deadRadius * 1.2,
+          outerRadius,
+          Math.pow(Utils.hash(i * 43.11 + 1.7), 0.72)
+        );
+        const x = THREE.MathUtils.clamp(centerX + Math.cos(angle) * radius * 1.2, rect.left + margin, rect.right - margin);
+        const y = THREE.MathUtils.clamp(centerY + Math.sin(angle) * radius * 1.12, rect.top + margin, rect.bottom - margin);
 
         if (Math.hypot(x - centerX, y - centerY) <= deadRadius) continue;
         this.addThoughtScannerAnchor(x, y, -1);
@@ -925,12 +1357,7 @@
 
       if (tooClose) return false;
       const distanceSeed = Utils.hash(x * 0.073 + y * 0.119 + (cluster + 17) * 5.31);
-      const centered = (distanceSeed - 0.5) * 2;
-      const distance = Math.round(THREE.MathUtils.clamp(
-        120 + centered * centered * Math.sign(centered || 1) * 52,
-        60,
-        150
-      ));
+      const distance = Math.round(THREE.MathUtils.lerp(64, 120, distanceSeed) / 2) * 2;
       this.scanAnchorPoints.push({ x, y, distance, cluster });
 
       return true;
@@ -977,7 +1404,10 @@
         const overlaps = selected.some((anchor) => {
           const anchorSize = this.getThoughtAnchorSize(anchor);
 
-          return this.getThoughtProbeOverlapRatio(candidate, probeSize, anchor, anchorSize) > this.scanMaxOverlapRatio;
+          return (
+            this.getThoughtProbeOverlapRatio(candidate, probeSize, anchor, anchorSize) > this.scanMaxOverlapRatio ||
+            this.doThoughtProbeTextsOverlap(candidate, probeSize, anchor, anchorSize)
+          );
         });
 
         if (overlaps) continue;
@@ -991,7 +1421,7 @@
     }
 
     getThoughtAnchorSize(anchor) {
-      const raw = THREE.MathUtils.clamp(anchor.distance || 120, 60, 150);
+      const raw = THREE.MathUtils.clamp(anchor.distance || 120, 64, 120);
 
       return Math.round(raw / 2) * 2;
     }
@@ -1013,6 +1443,28 @@
       const smallerArea = Math.min(aSize * aSize, bSize * bSize);
 
       return smallerArea > 0 ? overlapArea / smallerArea : 0;
+    }
+
+    doThoughtProbeTextsOverlap(a, aSize, b, bSize) {
+      const getTextRects = (anchor, size) => {
+        const left = anchor.x - size / 2;
+        const boxTop = anchor.y - size / 2;
+        const boxBottom = anchor.y + size / 2;
+
+        return [
+          { left, right: left + 180, top: boxTop - 25, bottom: boxTop - 5 },
+          { left, right: left + 180, top: boxBottom + 5, bottom: boxBottom + 20 },
+        ];
+      };
+      const aRects = getTextRects(a, aSize);
+      const bRects = getTextRects(b, bSize);
+
+      return aRects.some((aRect) => bRects.some((bRect) => (
+        aRect.left < bRect.right &&
+        aRect.right > bRect.left &&
+        aRect.top < bRect.bottom &&
+        aRect.bottom > bRect.top
+      )));
     }
 
     updateThoughtScannerFade(now) {
@@ -1238,7 +1690,7 @@
         uniforms: {
           uHover: { value: 0 },
           uBurst: { value: 0 },
-          uColor: { value: new THREE.Color(0xffff00) },
+          uColor: { value: this.baseRayColor.clone() },
         },
         vertexShader: `
           void main() {
@@ -1277,9 +1729,19 @@
       const base = this.getHoverDustBaseSize();
 
       return {
-        x: base * this.pressOffsetXRatio,
-        y: -base * this.pressOffsetYRatio,
+        x: base * this.pressOffsetXRatio + base * this.eyeShiftXRatio,
+        y: -base * this.pressOffsetYRatio + base * this.eyeShiftYRatio,
       };
+    }
+
+    updateEyeShift() {
+      if (!this.mat) return;
+
+      const base = this.getHoverDustBaseSize();
+      this.mat.uniforms.uEyeShift.value.set(
+        base * this.eyeShiftXRatio,
+        base * this.eyeShiftYRatio
+      );
     }
 
     createTrails(burstPos, offsets, burstMask) {

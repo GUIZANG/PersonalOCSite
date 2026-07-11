@@ -43,41 +43,6 @@ canvas {
   z-index: 0;
 }
 
-/* Synthwave CRT scanlines over the Sunny (scrolled-to-bottom) horizon. */
-.awake-sunny-scanlines {
-  position: fixed;
-  inset: -2px 0;
-  z-index: 1;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(180, 240, 255, 0.10) 0,
-      rgba(180, 240, 255, 0.10) 1px,
-      transparent 1px,
-      transparent 3px
-    ),
-    repeating-linear-gradient(
-      to bottom,
-      rgba(0, 187, 255, 0.14) 0,
-      rgba(0, 187, 255, 0.14) 2px,
-      transparent 2px,
-      transparent 9px
-    );
-  opacity: var(--sunny-scanline-opacity, 0);
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: awakeSunnyScanlines 8s linear infinite;
-}
-
-@keyframes awakeSunnyScanlines {
-  0% {
-    background-position: 0 0, 0 0;
-  }
-  100% {
-    background-position: 0 3px, 0 9px;
-  }
-}
-
 /* Scroll Container */
 .scroll-container {
   position: relative;
