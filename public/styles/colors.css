@@ -19,4 +19,15 @@
   --c-05: #0a0a0a;
   --c-06: #f8f8f8;
   --c-07: #7a7a7a;
+
+  /* Duotone screenprint / risograph tokens (Hypercube archive) */
+  --c-paper: #ece5d6;
+  --c-paper-deep: #ddd3bf;
+  --c-paper-shade: #cabfa6;
+  --c-ink-cyan: #00b6d6;
+  --c-ink-cyan-bright: #00d9ff;
+  --c-ink-magenta: #ff2d8d;
+  --c-ink-magenta-deep: #d8176e;
+  --c-ink-overprint: #2a2340;
+  --c-ink-black: #16141d;
 }

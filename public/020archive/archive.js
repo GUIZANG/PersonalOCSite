@@ -9,9 +9,23 @@
     constructor(container = document.body, cardStream = null) {
       this.container = container;
       this.cardStream = cardStream;
-      this.background = 0x0d0e15;
-      this.foreground = 0xffffff;
-      this.baseRayColor = new THREE.Color(0xffffff);
+      this.themePalette = {
+        background: 0x050203,
+        particle: 0xffddd8,
+        hoverParticle: 0xff2338,
+        pressParticle: 0xffffff,
+        burstParticle: 0xff2338,
+        dust: 0xff2338,
+        ray: 0x9b0018,
+        trail: 0xff2338,
+      };
+      const initialPalette = this.themePalette;
+      this.background = initialPalette.background;
+      this.foreground = initialPalette.particle;
+      this.baseRayColor = new THREE.Color(initialPalette.ray);
+      this.themeRenderColor = new THREE.Color(initialPalette.particle);
+      this.themeTargetColor = new THREE.Color(initialPalette.particle);
+      this.themeDustRenderColor = new THREE.Color(initialPalette.dust);
       this.duration = 16000;
       this.hoverAmount = 0;
       this.hoverTarget = 0;
@@ -73,8 +87,8 @@
       this.scanAnchorDots = [];
       this.scanAnchorSignature = "";
       this.scanActiveAnchors = [];
-      this.scanAttractRadius = 250;
-      this.scanAvoidPointerRadius = 76;
+      this.scanAttractRadius = 120;
+      this.scanAvoidPointerRadius = 36;
       this.scanMaxOverlapRatio = 0.5;
       this.scanAnchorDeadRadiusRatio = 0.17;
       this.scanAnchorMinDistance = 12;
@@ -127,7 +141,6 @@
       this.hudState = "DORMANT";
       this.hudEyeRecordActive = false;
       this.hudPressPhaseIndex = -1;
-
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color(this.background);
       this.fadeScene = new THREE.Scene();
@@ -175,6 +188,37 @@
       this.onPointerLeave = this.onPointerLeave.bind(this);
       this.onPointerDown = this.onPointerDown.bind(this);
       this.onPointerUp = this.onPointerUp.bind(this);
+    }
+
+    applyArchiveThemeColors() {
+      const palette = this.themePalette;
+
+      this.background = palette.background;
+      this.foreground = palette.particle;
+      this.baseRayColor.setHex(palette.ray);
+      this.scene?.background?.setHex(palette.background);
+      this.renderer?.setClearColor(palette.background, 1);
+      this.fadeMaterial?.color?.setHex(palette.background);
+      this.mat?.uniforms.uColor.value.setHex(palette.particle);
+      this.hoverDustMat?.uniforms.uColor.value.setHex(palette.dust);
+      this.hoverDustRayMat?.uniforms.uColor.value.setHex(palette.ray);
+      this.trailMat?.uniforms.uColor.value.setHex(palette.trail);
+    }
+
+    updateArchiveThemeRenderColors() {
+      const palette = this.themePalette;
+
+      this.themeRenderColor
+        .setHex(palette.particle)
+        .lerp(this.themeTargetColor.setHex(palette.hoverParticle), this.hoverAmount)
+        .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount)
+        .lerp(this.themeTargetColor.setHex(palette.burstParticle), this.burstAmount);
+      this.themeDustRenderColor
+        .setHex(palette.dust)
+        .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount * 0.72);
+
+      this.mat?.uniforms.uColor.value.copy(this.themeRenderColor);
+      this.hoverDustMat?.uniforms.uColor.value.copy(this.themeDustRenderColor);
     }
 
     async init() {
@@ -286,6 +330,7 @@
           uResolution: { value: window.innerHeight * Math.min(window.devicePixelRatio, 2) },
           uHoverTilt: { value: new THREE.Matrix3() },
           uEyeShift: { value: new THREE.Vector2(0, 0) },
+          uSignalLoss: { value: 0 },
         },
         vertexShader: `
           uniform float uTime;
@@ -295,6 +340,7 @@
           uniform float uResolution;
           uniform mat3 uHoverTilt;
           uniform vec2 uEyeShift;
+          uniform float uSignalLoss;
           attribute vec3 targetPos;
           attribute vec3 squarePos;
           attribute vec3 burstPos;
@@ -340,6 +386,15 @@
             vec3 cubePos = mix(position, targetPos, easedProgress) + midDir * bulge;
             mat3 worldRotation = mat3(modelMatrix);
             vec3 tiltedSquare = uHoverTilt * squarePos * (1.5 + uPress * 0.12);
+            // Pupil constriction: an accelerating (press^2) implosion that pulls
+            // the inner eye pattern toward the core, with a fast tremor near the
+            // end so the iris feels like it is clamping shut on the viewer.
+            float pressSq = uPress * uPress;
+            float eyeR = length(tiltedSquare.xy);
+            float constrict = 1.0 - pressSq * 0.34 * (1.0 - smoothstep(0.0, 2.2, eyeR));
+            tiltedSquare.xy *= constrict;
+            float tremor = sin(uTime * 42.0 + offset * 30.0) * 0.02 * pressSq;
+            tiltedSquare.xy += normalize(tiltedSquare.xy + vec2(0.0001)) * tremor;
             // Apply the eye shift in the camera-facing frame (before the inverse
             // model rotation) so it stays a constant screen-space offset and
             // does not swing as the cube spins.
@@ -380,6 +435,17 @@
             float stageAlpha = mix(cubeMask, hoverAlpha, hoverEase);
             vAlpha = mix(stageAlpha, burstMask, burstEase);
 
+            // Signal-loss glitch: horizontal slice tearing + point dropout, only
+            // meaningful before the burst so the cube reads like a failing feed.
+            if (uSignalLoss > 0.001) {
+              float slice = floor((currentPos.y + 6.0) * 5.0);
+              float sliceRnd = fract(sin(slice * 12.9898 + floor(uTime * 24.0)) * 43758.5453);
+              float tear = (sliceRnd - 0.5) * uSignalLoss * 1.6 * step(0.55, sliceRnd);
+              currentPos.x += tear * (1.0 - burstEase);
+              float dropRnd = fract(sin(offset * 91.17 + floor(uTime * 30.0)) * 24634.6345);
+              vAlpha *= 1.0 - uSignalLoss * step(0.82, dropRnd) * (1.0 - burstEase);
+            }
+
             vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
             float dustScale = mix(1.0, 0.72, burstEase);
             gl_PointSize = (uResolution / 160.0) * dustScale * (1.0 / -mvPosition.z);
@@ -409,6 +475,7 @@
       this.scene.add(this.cubeCloud);
 
       this.createTrails(burstPos, offsets, burstMask);
+      this.applyArchiveThemeColors();
       this.createThoughtScannerTarget();
       this.ensureThoughtScannerAnchors(this.renderer.domElement.getBoundingClientRect());
 
@@ -452,11 +519,15 @@
         this.updateCursorPressState(false);
       }
 
+      this.updateSignalLoss(time);
+      this.updateArchiveThemeRenderColors();
+
       if (this.mat) {
         this.mat.uniforms.uTime.value = time / 1000;
         this.mat.uniforms.uHover.value = this.hoverAmount;
         this.mat.uniforms.uBurst.value = this.burstAmount;
         this.mat.uniforms.uPress.value = this.pressAmount;
+        this.mat.uniforms.uSignalLoss.value = this.signalLoss || 0;
       }
 
       if (this.hoverDustMat) {
@@ -489,6 +560,35 @@
       this.updateHudMicroLabels(time);
       this.updateLivingTelemetry(time);
       window.requestAnimationFrame(this.animate);
+    }
+
+    updateSignalLoss(time) {
+      if (this.signalLoss === undefined) {
+        this.signalLoss = 0;
+        this.signalLossPeak = 0;
+        this.signalLossStart = 0;
+        this.signalLossDuration = 0;
+        this.nextSignalLossAt = time + 1800 + Math.random() * 2600;
+      }
+
+      // Randomly schedule short dropout bursts while the cube is idle/hovered.
+      if (time >= this.nextSignalLossAt && this.burstTarget === 0) {
+        this.signalLossStart = time;
+        this.signalLossDuration = 90 + Math.random() * 160;
+        this.signalLossPeak = 0.5 + Math.random() * 0.5;
+        this.nextSignalLossAt = time + 2200 + Math.random() * 4200;
+        this.triggerHudGlitch?.();
+      }
+
+      const elapsed = time - this.signalLossStart;
+      if (elapsed >= 0 && elapsed < this.signalLossDuration) {
+        // Fast stutter envelope rather than a smooth fade.
+        const phase = elapsed / this.signalLossDuration;
+        const flicker = Math.sin(elapsed * 0.9) * 0.5 + 0.5;
+        this.signalLoss = this.signalLossPeak * (1 - phase) * (0.4 + 0.6 * flicker);
+      } else {
+        this.signalLoss = 0;
+      }
     }
 
     updateHudMicroLabels(time) {
@@ -612,13 +712,26 @@
       }));
     }
 
-    getCursorSnapRadius() {
+    getCursorMetrics() {
+      // Mirror the responsive sizing in archiveCursor.js (updateCursorSize) so
+      // the red center dot tracks the real cursor's outer ring / inner dot on
+      // any viewport height.
       const desktopReferenceHeight = 1080;
       const desktopOuterSize = 25;
+      const desktopDotSize = 8;
+      const scale = window.innerHeight / desktopReferenceHeight;
+      const snapEven = (value) => Math.max(2, Math.round(value / 2) * 2);
+
+      return {
+        outer: snapEven(desktopOuterSize * scale),
+        dot: snapEven(desktopDotSize * scale),
+      };
+    }
+
+    getCursorSnapRadius() {
       const hoverScale = 1.8;
       const dotRadius = 2.5;
-      const scaled = desktopOuterSize * (window.innerHeight / desktopReferenceHeight);
-      const outerSize = Math.max(2, Math.round(scaled / 2) * 2);
+      const outerSize = this.getCursorMetrics().outer;
 
       return (outerSize / 2) * hoverScale + dotRadius;
     }
@@ -759,7 +872,7 @@
       if (this.hoverCenterDotEl) {
         const rect = this.renderer.domElement.getBoundingClientRect();
         const center = this.getPressCenter(rect);
-        const pressRadius = this.getPressRadius(rect);
+        const cursorMetrics = this.getCursorMetrics();
         let ox = this.hoverLookCurrent.x;
         let oy = this.hoverLookCurrent.y;
         const len = Math.hypot(ox, oy);
@@ -771,12 +884,17 @@
 
         // While the cursor is magnetically snapped to the press center, keep the
         // red dot exactly on that center so it stays concentric with the
-        // cursor's inner circle and long-press range ring.
-        const dotOffset = this.cursorSnapActive ? 0 : pressRadius;
+        // cursor's inner circle and long-press range ring. Otherwise it roams
+        // within the cursor's (hover-scaled) outer-ring radius so the travel
+        // range matches the visible outer circle. Its diameter matches the
+        // cursor's inner dot. Both track the responsive cursor sizing.
+        const outerHoverRadius = (cursorMetrics.outer / 2) * 1.8;
+        const dotOffset = this.cursorSnapActive ? 0 : outerHoverRadius;
         const dotX = center.x + ox * dotOffset;
         const dotY = center.y + oy * dotOffset;
         const opacity = Math.max(this.hoverDustAmount, this.pressAmount) * (1 - this.burstAmount);
 
+        this.hoverCenterDotEl.style.setProperty("--dot-size", `${cursorMetrics.dot}px`);
         this.hoverCenterDotEl.style.setProperty("--dot-x", `${dotX}px`);
         this.hoverCenterDotEl.style.setProperty("--dot-y", `${dotY}px`);
         this.hoverCenterDotEl.style.setProperty("--dot-opacity", opacity.toFixed(3));
@@ -796,6 +914,8 @@
       this.container.classList.remove("is-hypercube-hovered");
       this.container.classList.add("is-hypercube-bursting");
       this.container.classList.remove("is-hud-scanning", "is-hud-pressing");
+      this.container.style.setProperty("--archive-hud-progress", "0");
+      this.container.style.setProperty("--archive-hud-tension", "0");
       this.updateAmbientHudState("OPEN");
       this.hideThoughtScanner(true);
       this.cursorSnapActive = false;
@@ -812,6 +932,8 @@
       this.updateCursorPressState(false);
       this.container.classList.remove("is-hud-pressing");
       this.ambientHud?.style.setProperty("--archive-hud-progress", "0");
+      this.container.style.setProperty("--archive-hud-progress", "0");
+      this.container.style.setProperty("--archive-hud-tension", "0");
       if (this.burstTarget === 0) {
         this.updateAmbientHudState(this.hoverTarget === 1 ? "ACQUIRING" : "DORMANT");
         this.hudScan.textContent = String(this.hudCaptureCount % 100).padStart(2, "0");
@@ -912,9 +1034,12 @@
       if (!this.ambientHud || this.burstTarget > 0) return;
 
       const clamped = THREE.MathUtils.clamp(progress, 0, 1);
+      const tension = clamped * clamped;
       const remaining = Math.max(0, (this.longPressDuration * (1 - clamped)) / 1000);
       this.container.classList.add("is-hud-pressing");
       this.ambientHud.style.setProperty("--archive-hud-progress", clamped.toFixed(3));
+      this.container.style.setProperty("--archive-hud-progress", clamped.toFixed(3));
+      this.container.style.setProperty("--archive-hud-tension", tension.toFixed(3));
       this.updateAmbientHudState("DECRYPTING");
       this.applyAmbientHudPressCopy(clamped, remaining);
     }
@@ -960,9 +1085,9 @@
         this.hudPressPhaseIndex = phaseIndex;
         this.ambientHud.dataset.pressPhase = String(phaseIndex);
         this.updateAmbientHudStaticPressCopy(phaseIndex);
-        this.hudSignal.textContent = phase.signal;
-        this.hudRecord.textContent = phase.title;
         this.hudSummary.textContent = phase.summary;
+        this.scrambleElement(this.hudSignal, phase.signal, 300);
+        this.scrambleElement(this.hudRecord, phase.title, 420);
         this.triggerHudGlitch();
       }
       this.hudScan.textContent = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
@@ -1012,6 +1137,27 @@
       setText(this.hudStaticCopy.matrixState, copy.matrixState);
     }
 
+    scrambleElement(el, finalText, duration = 360) {
+      if (!el) return;
+      const glyphs = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789/#%*+<>";
+      const start = performance.now();
+      clearInterval(el._scrambleTimer);
+      el._scrambleTimer = setInterval(() => {
+        const progress = Math.min((performance.now() - start) / duration, 1);
+        const revealed = Math.floor(progress * finalText.length);
+        let out = "";
+        for (let i = 0; i < finalText.length; i++) {
+          const ch = finalText[i];
+          out += i < revealed || ch === " " ? ch : glyphs[Math.floor(Math.random() * glyphs.length)];
+        }
+        el.textContent = out;
+        if (progress >= 1) {
+          clearInterval(el._scrambleTimer);
+          el.textContent = finalText;
+        }
+      }, 28);
+    }
+
     triggerHudGlitch() {
       if (!this.ambientHud) return;
 
@@ -1031,10 +1177,12 @@
       const changed = this.hudState !== state;
       this.hudState = state;
       this.ambientHud.dataset.state = state.toLowerCase();
-      this.hudSignal.textContent = state;
 
       if (changed && this.burstTarget === 0) {
         this.triggerHudGlitch();
+        this.scrambleElement(this.hudSignal, state, 300);
+      } else {
+        this.hudSignal.textContent = state;
       }
 
       if (state === "OPEN") {
@@ -1618,17 +1766,21 @@
             float drift = sin(uTime * 2.4 + offset * 18.8496) * 0.012;
             float shimmer = cos(uTime * 3.1 + offset * 11.73) * 0.006;
             float pressMotion = smoothstep(0.0, 1.0, uPress) * (1.0 - uBurst);
+            float pressSq = uPress * uPress * (1.0 - uBurst);
+            // Rays stretch outward while an accelerating suck drags dust back
+            // toward the iris, and the tremble amplitude climbs near completion.
             float rayLength = (0.05 + offset * 0.09) * pressMotion;
-            float rayNoise = sin(uTime * 1.35 + offset * 37.6991) * 0.012 * pressMotion;
+            float suck = pressSq * (0.14 + offset * 0.12);
+            float rayNoise = sin(uTime * 1.35 + offset * 37.6991) * (0.012 + 0.03 * pressSq) * pressMotion;
 
             currentPos.xy = uDustCenter + fromCenter * dustReveal * dustScale;
             currentPos.xy += (dustTangent * drift + dustDir * shimmer) * hoverMotion;
-            currentPos.xy += dustDir * (rayLength + rayNoise) + dustTangent * rayNoise * 0.45;
+            currentPos.xy += dustDir * (rayLength - suck + rayNoise) + dustTangent * rayNoise * 0.45;
 
             vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
             gl_PointSize = (uResolution / 185.0) * (1.0 / -mvPosition.z);
             gl_Position = projectionMatrix * mvPosition;
-            float pressGlow = 1.0 + uPress * 0.55;
+            float pressGlow = 1.0 + uPress * 0.55 + pressSq * 0.6;
             vAlpha = alpha * pressGlow * mix(0.42, 1.0, clamp(rayStrength, 0.0, 1.0)) * fade;
           }
         `,
