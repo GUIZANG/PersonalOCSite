@@ -47,6 +47,12 @@
       // while the center dot and long-press circle stay at the cube center.
       this.eyeShiftXRatio = 0.015;
       this.eyeShiftYRatio = 0.015;
+      // Single source of truth for the WHOLE hypercube assembly: cube points,
+      // eye pattern, square scan, dust/rays and every detection zone + guide are
+      // all derived from this offset, so changing it moves everything together.
+      // World +y is up. Units are a ratio of the visible field.
+      this.hypercubeOffsetXRatio = 0;
+      this.hypercubeOffsetYRatio = 0;
       this.baseRotationX = Math.sin(45 * Math.PI / 180);
       this.cubeCloud = null;
       this.cubeWorldCenter = new THREE.Vector3();
@@ -72,36 +78,6 @@
       this.burstSourceIndices = [];
       this.trailSourceIndices = [];
       this.hoverTargetPoints = [];
-      this.scanRaycaster = new THREE.Raycaster();
-      this.scanPointer = new THREE.Vector2();
-      this.scanJitterPointer = new THREE.Vector2();
-      this.scanHitTarget = null;
-      this.scanProbes = [];
-      this.scanProbeCount = 6;
-      this.scanMinProbeCount = 2;
-      this.scanFadeDelay = 140;
-      this.scanLastMoveTime = -Infinity;
-      this.scanLastRefreshTime = -Infinity;
-      this.scanLastPointer = null;
-      this.scanAnchorPoints = [];
-      this.scanAnchorDots = [];
-      this.scanAnchorSignature = "";
-      this.scanActiveAnchors = [];
-      this.scanAttractRadius = 120;
-      this.scanAvoidPointerRadius = 36;
-      this.scanMaxOverlapRatio = 0.5;
-      this.scanAnchorDeadRadiusRatio = 0.17;
-      this.scanAnchorMinDistance = 12;
-      this.scanWordBank = Array.isArray(window.ArchiveScanLexicon) && window.ArchiveScanLexicon.length
-        ? window.ArchiveScanLexicon
-        : [
-            "SUBCONSCIOUS TRACE",
-            "MNEMONIC ECHO",
-            "ENTITY RECORD",
-            "COGNITIVE HAZARD",
-            "THE LANTERN EATER",
-            "EYELESS CURATOR",
-          ];
       this.ambientHud = document.getElementById("archiveAmbientHud");
       this.hudSignal = document.getElementById("archiveHudSignal");
       this.hudCoord = document.getElementById("archiveHudCoord");
@@ -128,16 +104,13 @@
         stratum: 2,
         stratumTarget: 2,
       };
-      this.hudNodes = Array.from(document.querySelectorAll("[data-archive-node]"));
       this.hudStaticCopy = {
-        archive: this.ambientHud?.querySelector(".hypercube-interface__edition span:first-child"),
-        eyebrow: this.ambientHud?.querySelector(".hypercube-interface__title > span"),
-        classes: Array.from(this.ambientHud?.querySelectorAll(".hypercube-interface__classification span") || []),
-        matrix: this.ambientHud?.querySelector(".hypercube-interface__panel-title span"),
-        matrixState: this.ambientHud?.querySelector(".hypercube-interface__panel-title b"),
+        archive: null,
+        eyebrow: null,
+        classes: [],
+        matrix: null,
+        matrixState: null,
       };
-      this.hudCaptureCount = 0;
-      this.hudCapturedWords = [];
       this.hudState = "DORMANT";
       this.hudEyeRecordActive = false;
       this.hudPressPhaseIndex = -1;
@@ -170,6 +143,10 @@
       this.pressTargetGuide = document.createElement("div");
       this.pressTargetGuide.className = "hypercube-press-target-guide";
       this.container.appendChild(this.pressTargetGuide);
+      this.hoverExitGuide = document.createElement("div");
+      this.hoverExitGuide.className = "hypercube-hover-exit-guide";
+      this.hoverExitGuide.setAttribute("aria-hidden", "true");
+      this.container.appendChild(this.hoverExitGuide);
       this.rayInnerRingEl = document.createElement("div");
       this.rayInnerRingEl.className = "hypercube-ray-inner-ring";
       this.container.appendChild(this.rayInnerRingEl);
@@ -180,7 +157,6 @@
         '<span class="hypercube-eye-fx__scan"></span>' +
         '<span class="hypercube-eye-fx__ring"></span>';
       this.container.appendChild(this.eyeFxEl);
-      this.initThoughtScannerOverlay();
 
       this.animate = this.animate.bind(this);
       this.onResize = this.onResize.bind(this);
@@ -473,11 +449,10 @@
       this.updateEyeShift();
       this.createHoverDust();
       this.scene.add(this.cubeCloud);
+      this.applyHypercubeOffset();
 
       this.createTrails(burstPos, offsets, burstMask);
       this.applyArchiveThemeColors();
-      this.createThoughtScannerTarget();
-      this.ensureThoughtScannerAnchors(this.renderer.domElement.getBoundingClientRect());
 
       window.addEventListener("resize", this.onResize);
       this.container.addEventListener("pointermove", this.onPointerMove);
@@ -651,7 +626,7 @@
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.updateEyeShift();
-      this.ensureThoughtScannerAnchors(this.renderer.domElement.getBoundingClientRect());
+      this.applyHypercubeOffset();
 
       if (this.mat) {
         this.mat.uniforms.uResolution.value = window.innerHeight * Math.min(window.devicePixelRatio, 2);
@@ -669,12 +644,10 @@
 
     onPointerMove(event) {
       if (this.burstTarget > 0) {
-        this.hideThoughtScanner(true);
         return;
       }
 
       if (this.pressPointerId === event.pointerId) {
-        this.hideThoughtScanner(true);
         this.updateCursorSnap(event);
         return;
       }
@@ -692,7 +665,6 @@
 
       this.updateHoverLookTarget(event, distance < hitRadius);
       this.updateCursorSnap(event);
-      this.updateThoughtScanner(event, distance >= hitRadius);
       this.updateAmbientHudPointer(event, distance >= hitRadius);
 
     }
@@ -737,7 +709,6 @@
     }
 
     onPointerLeave() {
-      this.hideThoughtScanner(true);
       this.resetHoverLookTarget();
       if (this.pressPointerId !== null) {
         return;
@@ -855,7 +826,7 @@
     updateHoverLookTransform() {
       this.hoverLookCurrent.lerp(this.hoverLookTarget, 0.12);
       const active = smoothstep(0.18, 0.92, this.hoverAmount) * (1 - this.burstAmount);
-      const tiltX = -this.hoverLookCurrent.y * this.hoverLookMaxTilt * active;
+      const tiltX = this.hoverLookCurrent.y * this.hoverLookMaxTilt * active;
       const tiltY = this.hoverLookCurrent.x * this.hoverLookMaxTilt * active;
 
       if (this.hoverDustGroup) {
@@ -888,7 +859,7 @@
         // within the cursor's (hover-scaled) outer-ring radius so the travel
         // range matches the visible outer circle. Its diameter matches the
         // cursor's inner dot. Both track the responsive cursor sizing.
-        const outerHoverRadius = (cursorMetrics.outer / 2) * 1.8;
+        const outerHoverRadius = (cursorMetrics.outer / 2) * 1.8 + 5;
         const dotOffset = this.cursorSnapActive ? 0 : outerHoverRadius;
         const dotX = center.x + ox * dotOffset;
         const dotY = center.y + oy * dotOffset;
@@ -917,7 +888,6 @@
       this.container.style.setProperty("--archive-hud-progress", "0");
       this.container.style.setProperty("--archive-hud-tension", "0");
       this.updateAmbientHudState("OPEN");
-      this.hideThoughtScanner(true);
       this.cursorSnapActive = false;
       window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
       window.dispatchEvent(new CustomEvent("archive:hypercube-burst"));
@@ -936,7 +906,9 @@
       this.container.style.setProperty("--archive-hud-tension", "0");
       if (this.burstTarget === 0) {
         this.updateAmbientHudState(this.hoverTarget === 1 ? "ACQUIRING" : "DORMANT");
-        this.hudScan.textContent = String(this.hudCaptureCount % 100).padStart(2, "0");
+        if (this.hudScan) {
+          this.hudScan.textContent = "000%";
+        }
         if (this.hudEyeRecordActive) {
           this.hudPressPhaseIndex = -1;
           delete this.ambientHud.dataset.pressPhase;
@@ -959,12 +931,27 @@
 
       const rect = this.renderer.domElement.getBoundingClientRect();
       const diameter = this.getPressRadius(rect) * 2;
+      const center = this.getPressCenter(rect);
 
-      // Left/top are governed purely by CSS (top:50%;left:50%) so the center
-      // dot is hard-pinned to the viewport/cube center and never drifts.
+      // Pin the guide to the press center (cube center + hypercube offset) so it
+      // follows the assembly; transform: translate(-50%, -50%) keeps it centered.
+      this.pressTargetGuide.style.left = `${center.x}px`;
+      this.pressTargetGuide.style.top = `${center.y}px`;
       this.pressTargetGuide.style.width = `${diameter}px`;
       this.pressTargetGuide.style.height = `${diameter}px`;
+      this.updateHoverExitGuide(rect);
       this.updateDebugCircles();
+    }
+
+    updateHoverExitGuide(rect) {
+      if (!this.hoverExitGuide) return;
+
+      const radius = Math.min(rect.width, rect.height) * this.hoverExitRadiusRatio;
+      const offset = this.getHypercubeScreenOffset(rect);
+      this.hoverExitGuide.style.left = `${rect.left + rect.width / 2 + offset.x}px`;
+      this.hoverExitGuide.style.top = `${rect.top + rect.height / 2 + offset.y}px`;
+      this.hoverExitGuide.style.width = `${radius * 2}px`;
+      this.hoverExitGuide.style.height = `${radius * 2}px`;
     }
 
     updateDebugCircles() {
@@ -1022,7 +1009,9 @@
       const rect = this.renderer.domElement.getBoundingClientRect();
       const x = Math.round(THREE.MathUtils.clamp(event.clientX - rect.left, 0, rect.width));
       const y = Math.round(THREE.MathUtils.clamp(event.clientY - rect.top, 0, rect.height));
-      this.hudCoord.textContent = `X${String(x).padStart(4, "0")} / Y${String(y).padStart(4, "0")}`;
+      if (this.hudCoord) {
+        this.hudCoord.textContent = `X${String(x).padStart(4, "0")} / Y${String(y).padStart(4, "0")}`;
+      }
       this.container.classList.toggle("is-hud-scanning", isScanning);
 
       if (this.pressPointerId === null) {
@@ -1090,8 +1079,12 @@
         this.scrambleElement(this.hudRecord, phase.title, 420);
         this.triggerHudGlitch();
       }
-      this.hudScan.textContent = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
-      this.hudInstruction.textContent = `${phase.instruction} / ${remaining.toFixed(2)} SEC`;
+      if (this.hudScan) {
+        this.hudScan.textContent = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
+      }
+      if (this.hudInstruction) {
+        this.hudInstruction.textContent = `${phase.instruction} / ${remaining.toFixed(2)} SEC`;
+      }
     }
 
     updateAmbientHudStaticPressCopy(phaseIndex) {
@@ -1181,36 +1174,15 @@
       if (changed && this.burstTarget === 0) {
         this.triggerHudGlitch();
         this.scrambleElement(this.hudSignal, state, 300);
-      } else {
+      } else if (this.hudSignal) {
         this.hudSignal.textContent = state;
       }
 
-      if (state === "OPEN") {
+      if (state === "OPEN" && this.hudInstruction) {
         this.hudInstruction.textContent = "ARCHIVE CHANNEL OPEN";
-      } else if (state !== "DECRYPTING") {
+      } else if (state !== "DECRYPTING" && this.hudInstruction) {
         this.hudInstruction.textContent = "HOLD CORE / 03.00 SEC TO DECODE";
       }
-    }
-
-    captureAmbientHudRecord(word) {
-      if (!this.ambientHud || !word || word === this.hudCapturedWords[0]) return;
-
-      this.hudCaptureCount++;
-      this.hudCapturedWords = [word, ...this.hudCapturedWords.filter((entry) => entry !== word)].slice(0, 3);
-      this.hudScan.textContent = String(this.hudCaptureCount % 100).padStart(2, "0");
-      if (!this.hudEyeRecordActive) {
-        this.hudRecord.textContent = word;
-        this.hudSummary.textContent = this.getAmbientHudSummary(word);
-      }
-
-      this.hudNodes.forEach((node, index) => {
-        const capturedWord = this.hudCapturedWords[index];
-        if (!capturedWord) return;
-        const label = node.querySelector("span");
-        const title = node.querySelector("strong");
-        if (label) label.textContent = `IDX–${String(this.hudCaptureCount - index).padStart(2, "0")}`;
-        if (title) title.textContent = capturedWord;
-      });
     }
 
     setAmbientHudEyeRecord(active) {
@@ -1224,11 +1196,10 @@
         return;
       }
 
-      const latestRecord = this.hudCapturedWords[0] || "SUBCONSCIOUS TRACE";
       this.hudPressPhaseIndex = -1;
       delete this.ambientHud.dataset.pressPhase;
-      this.hudRecord.textContent = latestRecord;
-      this.hudSummary.textContent = this.getAmbientHudSummary(latestRecord);
+      this.hudRecord.textContent = "THE EYE";
+      this.hudSummary.textContent = "It does not look at you. It remembers the version of you that has not happened yet.";
     }
 
     getAmbientHudSummary(word) {
@@ -1249,12 +1220,40 @@
       return Math.min(rect.width, rect.height) * this.pressRadiusRatio;
     }
 
-    getPressCenter(rect) {
-      const base = Math.min(rect.width, rect.height);
+    getHypercubeWorldOffset() {
+      const base = this.getHoverDustBaseSize();
 
       return {
-        x: rect.left + rect.width / 2 + base * this.pressOffsetXRatio,
-        y: rect.top + rect.height / 2 + base * this.pressOffsetYRatio,
+        x: base * this.hypercubeOffsetXRatio,
+        y: base * this.hypercubeOffsetYRatio,
+      };
+    }
+
+    getHypercubeScreenOffset(rect) {
+      // World-to-screen scale is rect.height / visibleHeight on both axes, so a
+      // world-ratio offset maps to ratio * rect.height px. World +y is up, which
+      // is screen -y.
+      return {
+        x: this.hypercubeOffsetXRatio * rect.height,
+        y: -this.hypercubeOffsetYRatio * rect.height,
+      };
+    }
+
+    applyHypercubeOffset() {
+      if (!this.cubeCloud) return;
+
+      const offset = this.getHypercubeWorldOffset();
+      this.cubeCloud.position.x = offset.x;
+      this.cubeCloud.position.y = offset.y;
+    }
+
+    getPressCenter(rect) {
+      const base = Math.min(rect.width, rect.height);
+      const offset = this.getHypercubeScreenOffset(rect);
+
+      return {
+        x: rect.left + rect.width / 2 + base * this.pressOffsetXRatio + offset.x,
+        y: rect.top + rect.height / 2 + base * this.pressOffsetYRatio + offset.y,
       };
     }
 
@@ -1270,404 +1269,14 @@
 
     getCenterDistance(event) {
       const rect = this.renderer.domElement.getBoundingClientRect();
-      const x = event.clientX - rect.left - rect.width / 2;
-      const y = event.clientY - rect.top - rect.height / 2;
+      const offset = this.getHypercubeScreenOffset(rect);
+      const x = event.clientX - rect.left - rect.width / 2 - offset.x;
+      const y = event.clientY - rect.top - rect.height / 2 - offset.y;
 
       return {
         distance: Math.hypot(x, y),
         rect,
       };
-    }
-
-    initThoughtScannerOverlay() {
-      this.scanOverlay = document.getElementById("archiveThoughtScanner");
-      if (!this.scanOverlay) {
-        this.scanOverlay = document.createElement("div");
-        this.scanOverlay.id = "archiveThoughtScanner";
-        this.scanOverlay.className = "archive-thought-scanner";
-        this.container.appendChild(this.scanOverlay);
-      }
-
-      this.scanLineSvg = document.getElementById("archiveThoughtScannerLines");
-      if (!this.scanLineSvg) {
-        this.scanLineSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        this.scanLineSvg.id = "archiveThoughtScannerLines";
-        this.scanLineSvg.classList.add("archive-thought-scanner__lines");
-        this.scanOverlay.appendChild(this.scanLineSvg);
-      }
-
-      this.scanAnchorContainer = document.createElement("div");
-      this.scanAnchorContainer.className = "archive-thought-scanner__anchors";
-      this.scanOverlay.appendChild(this.scanAnchorContainer);
-
-      this.scanProbeContainer = document.getElementById("archiveThoughtScannerProbes");
-      if (!this.scanProbeContainer) {
-        this.scanProbeContainer = document.createElement("div");
-        this.scanProbeContainer.id = "archiveThoughtScannerProbes";
-        this.scanProbeContainer.className = "archive-thought-scanner__probes";
-        this.scanOverlay.appendChild(this.scanProbeContainer);
-      }
-
-      for (let i = 0; i < this.scanProbeCount; i++) {
-        const probe = document.createElement("div");
-        probe.className = "archive-thought-probe";
-        probe.style.setProperty("--scan-opacity", "0");
-
-        const label = document.createElement("div");
-        label.className = "archive-thought-probe__label";
-        const readout = document.createElement("div");
-        readout.className = "archive-thought-probe__readout";
-
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.classList.add("archive-thought-scanner__line");
-        line.style.setProperty("--scan-opacity", "0");
-
-        probe.append(label, readout);
-        this.scanProbeContainer.appendChild(probe);
-        this.scanLineSvg.appendChild(line);
-        this.scanProbes.push({
-          element: probe,
-          label,
-          readout,
-          line,
-          anchorId: null,
-          lastWordAt: -Infinity,
-          renderX: null,
-          renderY: null,
-        });
-      }
-    }
-
-    createThoughtScannerTarget() {
-      const geometry = new THREE.SphereGeometry(2.45, 32, 18);
-      const material = new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        depthTest: false,
-      });
-
-      this.scanHitTarget = new THREE.Mesh(geometry, material);
-      this.scanHitTarget.name = "thought-scanner-proxy";
-      this.scanHitTarget.renderOrder = -10;
-      this.scene.add(this.scanHitTarget);
-    }
-
-    updateThoughtScanner(event, enabled) {
-      if (!enabled || this.pressPointerId !== null || !this.scanProbes.length) {
-        this.hideThoughtScanner();
-        return;
-      }
-
-      const rect = this.renderer.domElement.getBoundingClientRect();
-      const now = performance.now();
-      const pointer = {
-        x: event.clientX,
-        y: event.clientY,
-      };
-      const pointerSpeed = this.scanLastPointer
-        ? Math.hypot(pointer.x - this.scanLastPointer.x, pointer.y - this.scanLastPointer.y)
-        : 0;
-
-      this.scanLastPointer = pointer;
-      this.scanLastMoveTime = now;
-      this.ensureThoughtScannerAnchors(rect);
-      this.scanPointer.set(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -(((event.clientY - rect.top) / rect.height) * 2 - 1)
-      );
-
-      const nearbyAnchorCount = this.countNearbyThoughtScannerAnchors(pointer);
-      const count = THREE.MathUtils.clamp(
-        Math.min(nearbyAnchorCount, pointerSpeed > 2 ? 4 : 3),
-        2,
-        4
-      );
-      const shouldRefreshWords = now - this.scanLastRefreshTime > 420;
-
-      if (shouldRefreshWords) {
-        this.scanLastRefreshTime = now;
-      }
-
-      const selectedAnchors = this.pickThoughtScannerAnchors(pointer, count);
-
-      this.scanProbes.forEach((probe, index) => {
-        const anchor = selectedAnchors[index];
-        if (!anchor) {
-          this.setThoughtProbeOpacity(probe, 0);
-          return;
-        }
-
-        const size = this.getThoughtAnchorSize(anchor);
-        const scale = 1;
-        const anchorId = `${Math.round(anchor.x)}:${Math.round(anchor.y)}`;
-        const anchorChanged = probe.anchorId !== anchorId;
-
-        if (anchorChanged || !probe.label.textContent) {
-          probe.label.textContent = this.pickThoughtScannerWord(index, now);
-          probe.lastWordAt = now;
-          if (index === 0) {
-            this.captureAmbientHudRecord(probe.label.textContent);
-          }
-        }
-
-        probe.readout.textContent = `LOCK ${Math.round(anchor.pointerDistance).toString().padStart(3, "0")} / D${Math.round(anchor.distance).toString().padStart(3, "0")}`;
-        probe.renderX = Math.round(anchor.x);
-        probe.renderY = Math.round(anchor.y);
-        probe.element.style.setProperty("--scan-x", `${probe.renderX}px`);
-        probe.element.style.setProperty("--scan-y", `${probe.renderY}px`);
-        probe.element.style.setProperty("--scan-size", `${size}px`);
-        probe.element.style.setProperty("--scan-scale", scale.toFixed(3));
-        this.setThoughtProbeOpacity(probe, 1);
-        if (anchorChanged) {
-          probe.anchorId = anchorId;
-          this.flashThoughtProbe(probe);
-        }
-
-        probe.line.setAttribute("x1", Math.round(pointer.x));
-        probe.line.setAttribute("y1", Math.round(pointer.y));
-        probe.line.setAttribute("x2", probe.renderX);
-        probe.line.setAttribute("y2", probe.renderY);
-      });
-    }
-
-    ensureThoughtScannerAnchors(rect) {
-      const signature = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
-      if (signature === this.scanAnchorSignature && this.scanAnchorPoints.length) return;
-
-      this.scanAnchorSignature = signature;
-      this.scanAnchorPoints = [];
-      this.scanActiveAnchors = [];
-
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const base = Math.min(rect.width, rect.height);
-      const deadRadius = base * this.scanAnchorDeadRadiusRatio;
-      const frameInset = THREE.MathUtils.clamp(rect.width * 0.035, 22, 52);
-      const margin = frameInset + 12;
-      const outerRadius = Math.max(
-        deadRadius * 1.2,
-        Math.min(base * 0.35, base / 2 - margin)
-      );
-      const clusterCount = 12;
-      const clusters = [];
-
-      for (let i = 0; i < clusterCount; i++) {
-        const angle = i * 2.399963 + Utils.hash(i * 19.17) * 1.2;
-        const radialBias = Math.pow(Utils.hash(i * 31.91 + 2.7), 0.55);
-        const radius = THREE.MathUtils.lerp(deadRadius * 1.2, outerRadius, radialBias);
-        const x = THREE.MathUtils.clamp(centerX + Math.cos(angle) * radius * 1.2, rect.left + margin, rect.right - margin);
-        const y = THREE.MathUtils.clamp(centerY + Math.sin(angle) * radius * 1.12, rect.top + margin, rect.bottom - margin);
-        const density = 7 + Math.floor(Utils.hash(i * 13.73) * 8);
-        const spread = THREE.MathUtils.lerp(base * 0.025, base * 0.05, Utils.hash(i * 23.9));
-
-        if (Math.hypot(x - centerX, y - centerY) <= deadRadius) continue;
-        clusters.push({ x, y, density, spread });
-      }
-
-      clusters.forEach((cluster, clusterIndex) => {
-        for (let i = 0; i < cluster.density * 3 && this.getClusterAnchorCount(clusterIndex) < cluster.density; i++) {
-          const angle = Utils.hash(clusterIndex * 101 + i * 17.31) * Math.PI * 2;
-          const radius = Math.pow(Utils.hash(clusterIndex * 131 + i * 29.7), 1.25) * cluster.spread;
-          const x = THREE.MathUtils.clamp(cluster.x + Math.cos(angle) * radius * 1.16, rect.left + margin, rect.right - margin);
-          const y = THREE.MathUtils.clamp(cluster.y + Math.sin(angle) * radius, rect.top + margin, rect.bottom - margin);
-
-          if (Math.hypot(x - centerX, y - centerY) <= deadRadius) continue;
-          this.addThoughtScannerAnchor(x, y, clusterIndex);
-        }
-      });
-
-      // Keep the fallback pool in the same annulus as the hypercube. The HUD
-      // frame is a hard boundary: no scanner target is generated outside it.
-      const sparseTotal = 48;
-      for (let i = 0; i < sparseTotal * 2 && this.getClusterAnchorCount(-1) < sparseTotal; i++) {
-        const angle = i * 2.399963 + Utils.hash(i * 17.31) * 0.45;
-        const radius = THREE.MathUtils.lerp(
-          deadRadius * 1.2,
-          outerRadius,
-          Math.pow(Utils.hash(i * 43.11 + 1.7), 0.72)
-        );
-        const x = THREE.MathUtils.clamp(centerX + Math.cos(angle) * radius * 1.2, rect.left + margin, rect.right - margin);
-        const y = THREE.MathUtils.clamp(centerY + Math.sin(angle) * radius * 1.12, rect.top + margin, rect.bottom - margin);
-
-        if (Math.hypot(x - centerX, y - centerY) <= deadRadius) continue;
-        this.addThoughtScannerAnchor(x, y, -1);
-      }
-
-      this.renderThoughtScannerAnchors();
-    }
-
-    addThoughtScannerAnchor(x, y, cluster) {
-      const tooClose = this.scanAnchorPoints.some((anchor) => (
-        Math.hypot(anchor.x - x, anchor.y - y) < this.scanAnchorMinDistance
-      ));
-
-      if (tooClose) return false;
-      const distanceSeed = Utils.hash(x * 0.073 + y * 0.119 + (cluster + 17) * 5.31);
-      const distance = Math.round(THREE.MathUtils.lerp(64, 120, distanceSeed) / 2) * 2;
-      this.scanAnchorPoints.push({ x, y, distance, cluster });
-
-      return true;
-    }
-
-    getClusterAnchorCount(cluster) {
-      return this.scanAnchorPoints.filter((anchor) => anchor.cluster === cluster).length;
-    }
-
-    renderThoughtScannerAnchors() {
-      if (!this.scanAnchorContainer) return;
-
-      this.scanAnchorContainer.replaceChildren();
-      this.scanAnchorDots = this.scanAnchorPoints.map((anchor) => {
-        const dot = document.createElement("span");
-
-        dot.className = "archive-thought-anchor-dot";
-        dot.style.setProperty("--anchor-x", `${anchor.x}px`);
-        dot.style.setProperty("--anchor-y", `${anchor.y}px`);
-        dot.style.setProperty("--anchor-size", "2px");
-        dot.style.setProperty("--anchor-opacity", "0.55");
-        this.scanAnchorContainer.appendChild(dot);
-
-        return dot;
-      });
-    }
-
-    pickThoughtScannerAnchors(pointer, count) {
-      const candidates = this.scanAnchorPoints
-        .map((anchor) => {
-          const pointerDistance = Math.hypot(anchor.x - pointer.x, anchor.y - pointer.y);
-
-          return {
-            ...anchor,
-            pointerDistance,
-          };
-        })
-        .filter((anchor) => anchor.pointerDistance <= this.scanAttractRadius)
-        .sort((a, b) => a.pointerDistance - b.pointerDistance);
-
-      const selected = [];
-      for (const candidate of candidates) {
-        const probeSize = this.getThoughtAnchorSize(candidate);
-        const overlaps = selected.some((anchor) => {
-          const anchorSize = this.getThoughtAnchorSize(anchor);
-
-          return (
-            this.getThoughtProbeOverlapRatio(candidate, probeSize, anchor, anchorSize) > this.scanMaxOverlapRatio ||
-            this.doThoughtProbeTextsOverlap(candidate, probeSize, anchor, anchorSize)
-          );
-        });
-
-        if (overlaps) continue;
-        selected.push(candidate);
-        if (selected.length >= count) break;
-      }
-
-      this.scanActiveAnchors = selected;
-
-      return selected;
-    }
-
-    getThoughtAnchorSize(anchor) {
-      const raw = THREE.MathUtils.clamp(anchor.distance || 120, 64, 120);
-
-      return Math.round(raw / 2) * 2;
-    }
-
-    countNearbyThoughtScannerAnchors(pointer) {
-      return this.scanAnchorPoints.reduce((total, anchor) => {
-        const distance = Math.hypot(anchor.x - pointer.x, anchor.y - pointer.y);
-
-        return total + (distance <= this.scanAttractRadius ? 1 : 0);
-      }, 0);
-    }
-
-    getThoughtProbeOverlapRatio(a, aSize, b, bSize) {
-      const aHalf = aSize / 2;
-      const bHalf = bSize / 2;
-      const overlapWidth = Math.max(0, Math.min(a.x + aHalf, b.x + bHalf) - Math.max(a.x - aHalf, b.x - bHalf));
-      const overlapHeight = Math.max(0, Math.min(a.y + aHalf, b.y + bHalf) - Math.max(a.y - aHalf, b.y - bHalf));
-      const overlapArea = overlapWidth * overlapHeight;
-      const smallerArea = Math.min(aSize * aSize, bSize * bSize);
-
-      return smallerArea > 0 ? overlapArea / smallerArea : 0;
-    }
-
-    doThoughtProbeTextsOverlap(a, aSize, b, bSize) {
-      const getTextRects = (anchor, size) => {
-        const left = anchor.x - size / 2;
-        const boxTop = anchor.y - size / 2;
-        const boxBottom = anchor.y + size / 2;
-
-        return [
-          { left, right: left + 180, top: boxTop - 25, bottom: boxTop - 5 },
-          { left, right: left + 180, top: boxBottom + 5, bottom: boxBottom + 20 },
-        ];
-      };
-      const aRects = getTextRects(a, aSize);
-      const bRects = getTextRects(b, bSize);
-
-      return aRects.some((aRect) => bRects.some((bRect) => (
-        aRect.left < bRect.right &&
-        aRect.right > bRect.left &&
-        aRect.top < bRect.bottom &&
-        aRect.bottom > bRect.top
-      )));
-    }
-
-    updateThoughtScannerFade(now) {
-      return now;
-    }
-
-    hideThoughtScanner(resetPointer = false) {
-      this.scanProbes.forEach((probe) => this.setThoughtProbeOpacity(probe, 0));
-      if (resetPointer) {
-        this.scanLastPointer = null;
-        this.scanLastMoveTime = -Infinity;
-        this.scanActiveAnchors = [];
-        this.scanProbes.forEach((probe) => {
-          probe.anchorId = null;
-          probe.renderX = null;
-          probe.renderY = null;
-        });
-      }
-    }
-
-    setThoughtProbeOpacity(probe, opacity) {
-      probe.element.style.setProperty("--scan-opacity", opacity);
-      probe.line.style.setProperty("--scan-opacity", opacity);
-    }
-
-    flashThoughtProbe(probe) {
-      probe.element.classList.remove("is-capturing");
-      probe.line.classList.remove("is-capturing");
-      void probe.element.offsetWidth;
-      probe.element.classList.add("is-capturing");
-      probe.line.classList.add("is-capturing");
-    }
-
-    pickThoughtScannerWord(index, now) {
-      const wordIndex = Math.floor(Utils.hash(index * 31.17 + now * 0.0027) * this.scanWordBank.length);
-
-      return this.scanWordBank[wordIndex];
-    }
-
-    projectWorldToScreen(point, rect) {
-      const projected = point.clone().project(this.camera);
-
-      return {
-        x: rect.left + (projected.x * 0.5 + 0.5) * rect.width,
-        y: rect.top + (-projected.y * 0.5 + 0.5) * rect.height,
-      };
-    }
-
-    isScreenPointVisible(point) {
-      const margin = 160;
-
-      return point.x > -margin &&
-        point.x < window.innerWidth + margin &&
-        point.y > -margin &&
-        point.y < window.innerHeight + margin;
     }
 
     setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, offsets, burst) {
@@ -1881,8 +1490,8 @@
       const base = this.getHoverDustBaseSize();
 
       return {
-        x: base * this.pressOffsetXRatio + base * this.eyeShiftXRatio,
-        y: -base * this.pressOffsetYRatio + base * this.eyeShiftYRatio,
+        x: base * this.pressOffsetXRatio + base * this.eyeShiftXRatio + base * this.hypercubeOffsetXRatio,
+        y: -base * this.pressOffsetYRatio + base * this.eyeShiftYRatio + base * this.hypercubeOffsetYRatio,
       };
     }
 

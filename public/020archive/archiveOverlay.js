@@ -1,6 +1,9 @@
+// Archive top-edge CREDITS overlay. Move the pointer to the top edge and
+// dwell for a beat to pull the panel down; move to the bottom edge to retract
+// it. The background is a multi-layer CSS starfield (box-shadow points seeded
+// once into CSS custom properties). The overlay auto-disables for good once
+// the hypercube bursts into the card stream.
 (function () {
-  document.addEventListener("DOMContentLoaded", initArchiveOverlay);
-
   function initArchiveOverlay() {
     const overlay = document.getElementById("archiveOverlayPage");
     const overlayContent = overlay?.querySelector(".archive-overlay-page__inner");
@@ -9,6 +12,7 @@
     const coordReadout = document.getElementById("archiveOverlayCoordReadout");
     const scanReadoutState = document.getElementById("archiveOverlayScanReadoutState");
     const maskPath = document.getElementById("archiveOverlayMaskPath");
+    const stage = document.getElementById("hypercube-stage");
     if (!overlay || !maskPath) return;
 
     const expandThreshold = 10;
@@ -17,14 +21,13 @@
     const expandDuration = 820;
     const retractDuration = 980;
     let dwellTimer = null;
-    const stage = document.getElementById("hypercube-stage");
     let progress = 0;
     let startProgress = 0;
     let targetProgress = 0;
     let animationStart = 0;
     let animationDuration = expandDuration;
     let animationFrame = null;
-    let isDisabled = stage?.classList.contains("is-hypercube-bursting") || false;
+    let disabled = false;
 
     setupStarField();
     render();
@@ -34,10 +37,10 @@
       render();
       updateScrollLine();
     });
-    observeCardEntry();
+    watchForBurst();
 
     function onPointerMove(event) {
-      if (isDisabled) return;
+      if (disabled) return;
       const height = window.innerHeight || document.documentElement.clientHeight;
       updatePointerReadout(event.clientX, event.clientY);
 
@@ -68,7 +71,6 @@
     }
 
     function animateTo(nextTarget) {
-      if (isDisabled && nextTarget > 0) return;
       if (targetProgress === nextTarget && animationFrame) return;
       if (targetProgress === nextTarget && progress === nextTarget) return;
 
@@ -104,14 +106,13 @@
 
     function render() {
       const shape = createOverlayShape(progress);
-      const isOpen = !isDisabled && progress > 0.01;
+      const isOpen = progress > 0.01;
       maskPath.setAttribute("d", shape.path);
       overlay.style.setProperty("--archive-overlay-edge-y", `${shape.edgeY * 100}%`);
       overlay.style.setProperty("--archive-overlay-edge-shadow", progress > 0.03 && progress < 0.98 ? "0.9" : "0");
       overlay.style.setProperty("--archive-overlay-opacity", isOpen ? "1" : "0");
       overlay.style.setProperty("--archive-overlay-pointer-events", isOpen ? "auto" : "none");
       overlay.style.setProperty("--archive-overlay-readout-opacity", isOpen ? "1" : "0");
-      overlay.hidden = isDisabled;
       document.body.classList.toggle("is-archive-overlay-open", isOpen);
       updateScrollLine();
     }
@@ -125,12 +126,12 @@
       return {
         edgeY,
         path: [
-        "M0 0",
-        "H1",
-        `V${format(edgeY)}`,
-        `C0.88 ${format(shoulderY)} 0.68 ${format(centerY)} 0.5 ${format(centerY)}`,
-        `C0.32 ${format(centerY)} 0.12 ${format(shoulderY)} 0 ${format(edgeY)}`,
-        "Z",
+          "M0 0",
+          "H1",
+          `V${format(edgeY)}`,
+          `C0.88 ${format(shoulderY)} 0.68 ${format(centerY)} 0.5 ${format(centerY)}`,
+          `C0.32 ${format(centerY)} 0.12 ${format(shoulderY)} 0 ${format(edgeY)}`,
+          "Z",
         ].join(" "),
       };
     }
@@ -171,78 +172,63 @@
       if (coordReadout) {
         coordReadout.textContent = `X${String(Math.round(x)).padStart(4, "0")} / Y${String(Math.round(y)).padStart(4, "0")}`;
       }
-
       if (scanReadoutState) {
         const scanValue = Math.round(((x / Math.max(window.innerWidth, 1)) * 73 + (y / Math.max(window.innerHeight, 1)) * 27) % 100);
         scanReadoutState.textContent = `SCAN ${String(scanValue).padStart(2, "0")}`;
       }
     }
 
-    function observeCardEntry() {
+    // Seed three parallax layers of stars as box-shadow lists in CSS vars.
+    function setupStarField() {
+      const spread = 2000;
+      overlay.style.setProperty("--archive-overlay-stars-small", buildStars(700, spread));
+      overlay.style.setProperty("--archive-overlay-stars-medium", buildStars(200, spread));
+      overlay.style.setProperty("--archive-overlay-stars-big", buildStars(90, spread));
+
+      ["small", "medium", "big"].forEach((size) => {
+        const layer = document.createElement("div");
+        layer.className = `archive-overlay-stars archive-overlay-stars--${size}`;
+        overlay.insertBefore(layer, overlay.firstChild);
+      });
+    }
+
+    function buildStars(count, spread) {
+      const parts = [];
+      for (let i = 0; i < count; i++) {
+        const x = Math.floor(Math.random() * spread);
+        const y = Math.floor(Math.random() * spread);
+        parts.push(`${x}px ${y}px #FFF`);
+      }
+      return parts.join(", ");
+    }
+
+    // Once the hypercube bursts, the overlay is no longer reachable.
+    function watchForBurst() {
       if (!stage) return;
+      if (stage.classList.contains("is-hypercube-bursting")) {
+        disableOverlay();
+        return;
+      }
       const observer = new MutationObserver(() => {
         if (stage.classList.contains("is-hypercube-bursting")) {
           disableOverlay();
           observer.disconnect();
         }
       });
-
       observer.observe(stage, { attributes: true, attributeFilter: ["class"] });
     }
 
     function disableOverlay() {
-      isDisabled = true;
+      disabled = true;
       cancelDwell();
-      progress = 0;
-      targetProgress = 0;
-      startProgress = 0;
-
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-        animationFrame = null;
-      }
-
-      document.body.classList.remove("is-archive-overlay-open");
-      render();
+      animateTo(0);
+      document.removeEventListener("pointermove", onPointerMove);
     }
+  }
 
-    function setupStarField() {
-      const layers = [
-        { name: "small", count: 700 },
-        { name: "medium", count: 200 },
-        { name: "big", count: 100 },
-      ];
-
-      layers.forEach((layer, index) => {
-        const starLayer = document.createElement("div");
-        starLayer.className = `archive-overlay-stars archive-overlay-stars--${layer.name}`;
-        overlay.insertBefore(starLayer, overlay.firstElementChild);
-        overlay.style.setProperty(
-          `--archive-overlay-stars-${layer.name}`,
-          createStarShadows(layer.count, 2048 + index * 997)
-        );
-      });
-    }
-
-    function createStarShadows(count, seed) {
-      const shadows = [];
-      let value = seed;
-
-      for (let i = 0; i < count; i++) {
-        value = seededRandom(value);
-        const x = Math.ceil(value * 2000);
-        value = seededRandom(value);
-        const y = Math.ceil(value * 2000);
-        shadows.push(`${x}px ${y}px #fff`);
-      }
-
-      return shadows.join(", ");
-    }
-
-    function seededRandom(value) {
-      const next = Math.sin(value * 12.9898) * 43758.5453;
-
-      return next - Math.floor(next);
-    }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initArchiveOverlay);
+  } else {
+    initArchiveOverlay();
   }
 })();
