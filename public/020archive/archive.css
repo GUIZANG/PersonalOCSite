@@ -1117,8 +1117,7 @@ body.is-screen-glitching .hypercube-stage {
   font-family: "Formula", "supplyMono", sans-serif;
   font-size: clamp(80px, 15vw, 250px);
   font-weight: 900;
-  color: transparent;
-  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.15); /* Solid fill but readable opacity */
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   pointer-events: none;
