@@ -1117,13 +1117,13 @@ body.is-screen-glitching .hypercube-stage {
   font-family: "Formula", "supplyMono", sans-serif;
   font-size: clamp(80px, 15vw, 250px);
   font-weight: 900;
-  color: var(--st-ink);
-  opacity: 0.08; /* Slightly more visible */
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.15);
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   pointer-events: none;
   user-select: none;
-  mix-blend-mode: overlay;
+  mix-blend-mode: difference;
 }
 
 .strata-grid {
