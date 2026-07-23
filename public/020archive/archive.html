@@ -20,26 +20,26 @@
       <div class="strata-grid strata-grid--y"></div>
       
       <div class="strata-corner strata-corner--tl"></div>
-      <div class="strata-corner strata-corner--tr"></div>
-      <div class="strata-corner strata-corner--bl"></div>
       <div class="strata-corner strata-corner--br"></div>
+
+      <div class="strata-watermark" aria-hidden="true">STRATA_</div>
 
       <header class="strata-header">
         <div class="strata-header__id">
-          <span class="strata-header__val">ARCHIVE // 020.X</span>
+          <span class="strata-header__val">ARCHIVE // FIELD_LOG</span>
           <span class="strata-header__stat">STABLE_</span>
         </div>
         <div class="strata-header__alert">
-          <div class="strata-alert-box">WARNING: AVOID DIRECT OBSERVATION</div>
+          <div class="strata-alert-box" data-text-default="WARNING: AVOID DIRECT OBSERVATION" data-text-press="CRITICAL_OVERLOAD"></div>
         </div>
       </header>
 
       <aside class="strata-sidebar">
         <div class="strata-sidebar__ruler"></div>
         <div class="strata-sidebar__data">
-          <span>LAT: 47.3769</span>
-          <span>LNG: 8.5417</span>
-          <span>ELEV: -999M</span>
+          <span id="sb-lat">LAT: 47.3769</span>
+          <span id="sb-lng">LNG: 8.5417</span>
+          <span id="sb-elev">ELEV: -999M</span>
         </div>
       </aside>
 
@@ -52,7 +52,7 @@
         <div class="strata-footer__barcode"></div>
         <div class="strata-footer__text">
           <span>SUBJECT: ANOMALY-00</span>
-          <span class="strata-redacted">CLASS: UNKNOWN</span>
+          <span class="strata-redacted">SEVERITY: HIGH</span>
         </div>
       </footer>
     </section>

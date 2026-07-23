@@ -236,6 +236,33 @@
 
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerleave", onPointerLeave, { passive: true });
+    
+    // HUD Data Scramble Logic for long press
+    const latEl = document.getElementById("sb-lat");
+    const lngEl = document.getElementById("sb-lng");
+    const elevEl = document.getElementById("sb-elev");
+    let lastScrambleTime = 0;
+
+    gsap.ticker.add((time, deltaTime) => {
+      if (!latEl || !lngEl || !elevEl) return;
+      
+      const isPressing = document.getElementById("hypercube-stage").classList.contains("is-hud-pressing");
+      
+      if (isPressing) {
+        // Scramble every ~50ms
+        if (time - lastScrambleTime > 0.05) {
+          latEl.textContent = `LAT: ${(Math.random() * 90).toFixed(4)}`;
+          lngEl.textContent = `LNG: ${(Math.random() * 180).toFixed(4)}`;
+          elevEl.textContent = `ELEV: -${Math.floor(Math.random() * 9999)}M`;
+          lastScrambleTime = time;
+        }
+      } else {
+        // Reset to original values when not pressing
+        latEl.textContent = "LAT: 47.3769";
+        lngEl.textContent = "LNG: 8.5417";
+        elevEl.textContent = "ELEV: -999M";
+      }
+    });
   }
 
   if (document.readyState === "loading") {

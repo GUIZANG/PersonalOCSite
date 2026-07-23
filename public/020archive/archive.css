@@ -1110,10 +1110,28 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 /* ---- Strata Peripheral Elements (Tech Noir / Brutalism) ---- */
+.strata-watermark {
+  position: absolute;
+  top: 15%;
+  right: 5%;
+  font-family: "Formula", "supplyMono", sans-serif;
+  font-size: clamp(80px, 15vw, 250px);
+  font-weight: 900;
+  color: var(--st-ink);
+  opacity: 0.03; /* Extremely faint */
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  pointer-events: none;
+  user-select: none;
+  mix-blend-mode: overlay;
+}
+
 .strata-grid {
   position: absolute;
   background: var(--st-line);
   pointer-events: none;
+  -webkit-mask-image: radial-gradient(circle at center, transparent 18vw, black 18.5vw);
+  mask-image: radial-gradient(circle at center, transparent 18vw, black 18.5vw);
 }
 .strata-grid--x {
   top: 50%; left: 0; right: 0; height: 1px;
@@ -1130,10 +1148,9 @@ body.is-screen-glitching .hypercube-stage {
   height: clamp(16px, 2vw, 32px);
   border: 1px solid var(--st-line-strong);
   pointer-events: none;
+  mix-blend-mode: difference;
 }
 .strata-corner--tl { top: var(--st-pad); left: var(--st-pad); border-right: none; border-bottom: none; }
-.strata-corner--tr { top: var(--st-pad); right: var(--st-pad); border-left: none; border-bottom: none; }
-.strata-corner--bl { bottom: var(--st-pad); left: var(--st-pad); border-right: none; border-top: none; }
 .strata-corner--br { bottom: var(--st-pad); right: var(--st-pad); border-left: none; border-top: none; }
 
 .strata-header {
@@ -1148,6 +1165,7 @@ body.is-screen-glitching .hypercube-stage {
   letter-spacing: 0.15em;
   font-weight: 500;
   pointer-events: none;
+  mix-blend-mode: difference;
 }
 
 .strata-header__id {
@@ -1165,22 +1183,17 @@ body.is-screen-glitching .hypercube-stage {
   color: var(--st-dim);
 }
 
-.strata-header__alert {
-  /* hidden by default, can flash on specific states if desired, keeping static for now */
-}
-
 .strata-alert-box {
-  background: var(--st-alert);
-  color: #fff;
+  background: transparent;
+  color: var(--st-dim);
+  border: 1px solid var(--st-line);
   padding: 4px 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  animation: strataAlertBlink 4s infinite step-end;
+  transition: all 0.2s;
 }
-
-@keyframes strataAlertBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.85; background: var(--st-faint); color: var(--st-ink); }
+.strata-alert-box::before {
+  content: attr(data-text-default);
 }
 
 .strata-sidebar {
@@ -1191,6 +1204,7 @@ body.is-screen-glitching .hypercube-stage {
   display: flex;
   align-items: center;
   gap: 16px;
+  mix-blend-mode: difference;
 }
 
 .strata-sidebar__ruler {
@@ -1229,6 +1243,7 @@ body.is-screen-glitching .hypercube-stage {
   font-size: clamp(9px, 0.8vw, 11px);
   text-align: right;
   pointer-events: none;
+  mix-blend-mode: difference;
 }
 
 .strata-footer__barcode {
@@ -1270,6 +1285,65 @@ body.is-screen-glitching .hypercube-stage {
 .hypercube-stage.is-hud-scanning .strata,
 .hypercube-stage.is-hypercube-hovered .strata {
   --st-accent: var(--st-signal);
+}
+
+/* Reactive HUD during long press */
+.hypercube-stage.is-hud-pressing .strata-alert-box {
+  background: var(--st-alert);
+  color: #fff;
+  border-color: var(--st-alert);
+  animation: strataAlertBlink 0.15s infinite step-end;
+}
+.hypercube-stage.is-hud-pressing .strata-alert-box::before {
+  content: attr(data-text-press);
+}
+.hypercube-stage.is-hud-pressing .strata-header__stat {
+  color: var(--st-alert);
+  animation: strataAlertBlink 0.15s infinite step-end;
+}
+.hypercube-stage.is-hud-pressing .strata-sidebar__data {
+  color: var(--st-alert);
+  filter: blur(0.5px);
+  animation: strataJitter 0.1s infinite;
+}
+.hypercube-stage.is-hud-pressing .strata-footer__barcode {
+  animation: strataBarcodeGlitch 0.2s infinite;
+  background: repeating-linear-gradient(
+    to right,
+    var(--st-alert),
+    var(--st-alert) 2px,
+    transparent 2px,
+    transparent 6px,
+    var(--st-alert) 6px,
+    var(--st-alert) 10px,
+    transparent 10px,
+    transparent 12px
+  );
+  mix-blend-mode: normal;
+}
+.hypercube-stage.is-hud-pressing .strata-redacted {
+  background: var(--st-alert);
+  color: #fff;
+}
+
+@keyframes strataAlertBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; background: transparent; color: var(--st-alert); }
+}
+@keyframes strataBarcodeGlitch {
+  0% { transform: translateX(0) scaleX(1); }
+  20% { transform: translateX(-4px) scaleX(1.05); }
+  40% { transform: translateX(4px) scaleX(0.95); }
+  60% { transform: translateX(-2px) scaleX(1); }
+  80% { transform: translateX(2px) scaleX(1.1); }
+  100% { transform: translateX(0) scaleX(1); }
+}
+@keyframes strataJitter {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(1px, -1px); }
+  50% { transform: translate(-1px, 2px); }
+  75% { transform: translate(-2px, -1px); }
+  100% { transform: translate(1px, 1px); }
 }
 
 .hypercube-stage.is-hud-pressing .strata__record-title {
