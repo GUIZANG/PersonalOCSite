@@ -1021,11 +1021,11 @@ body.is-screen-glitching .hypercube-stage {
    lives in the margins and never intercepts pointer events.
    ============================================================ */
 .strata {
-  --st-ink: #f0f4f8; /* Colder white for mechanical feel */
-  --st-dim: #6b7280; /* Colder gray */
-  --st-faint: rgba(240, 244, 248, 0.2);
-  --st-line: rgba(240, 244, 248, 0.1);
-  --st-line-strong: rgba(240, 244, 248, 0.35);
+  --st-ink: #ffffff; /* Pure white for max contrast */
+  --st-dim: #9ca3af; /* Brighter gray */
+  --st-faint: rgba(255, 255, 255, 0.25);
+  --st-line: rgba(255, 255, 255, 0.25);
+  --st-line-strong: rgba(255, 255, 255, 0.6);
   --st-signal: #00e5ff; /* Cyan accent instead of orange */
   --st-alert: #d32f2f; /* Deep cold red */
   --st-accent: var(--st-signal);
@@ -1096,7 +1096,7 @@ body.is-screen-glitching .hypercube-stage {
 
 .strata__record-body {
   max-width: 44ch;
-  font-size: clamp(10px, 0.95vw, 12.5px);
+  font-size: clamp(11px, 1vw, 13.5px);
   line-height: 1.55;
   letter-spacing: 0.05em;
   text-transform: none;
@@ -1118,7 +1118,7 @@ body.is-screen-glitching .hypercube-stage {
   font-size: clamp(80px, 15vw, 250px);
   font-weight: 900;
   color: var(--st-ink);
-  opacity: 0.03; /* Extremely faint */
+  opacity: 0.08; /* Slightly more visible */
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   pointer-events: none;
@@ -1161,9 +1161,9 @@ body.is-screen-glitching .hypercube-stage {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  font-size: clamp(9px, 0.8vw, 11px);
+  font-size: clamp(10px, 0.85vw, 12px);
   letter-spacing: 0.15em;
-  font-weight: 500;
+  font-weight: 600;
   pointer-events: none;
   mix-blend-mode: difference;
 }
@@ -1226,10 +1226,11 @@ body.is-screen-glitching .hypercube-stage {
   transform: rotate(180deg);
   display: flex;
   gap: 24px;
-  font-size: clamp(8px, 0.75vw, 10px);
+  font-size: clamp(9px, 0.8vw, 11px);
   color: var(--st-dim);
   letter-spacing: 0.25em;
-  opacity: 0.8;
+  opacity: 1;
+  font-weight: 500;
 }
 
 .strata-footer {
@@ -1240,7 +1241,7 @@ body.is-screen-glitching .hypercube-stage {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
-  font-size: clamp(9px, 0.8vw, 11px);
+  font-size: clamp(10px, 0.85vw, 12px);
   text-align: right;
   pointer-events: none;
   mix-blend-mode: difference;
@@ -1268,9 +1269,9 @@ body.is-screen-glitching .hypercube-stage {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: var(--st-dim);
+  color: var(--st-ink);
   letter-spacing: 0.1em;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .strata-redacted {
