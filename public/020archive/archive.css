@@ -1021,15 +1021,15 @@ body.is-screen-glitching .hypercube-stage {
    lives in the margins and never intercepts pointer events.
    ============================================================ */
 .strata {
-  --st-ink: #ece4d3;
-  --st-dim: #7f8494;
-  --st-faint: rgba(236, 228, 211, 0.34);
-  --st-line: rgba(236, 228, 211, 0.14);
-  --st-line-strong: rgba(236, 228, 211, 0.4);
-  --st-signal: #ff6a00;
-  --st-alert: #ff2a14;
+  --st-ink: #f0f4f8; /* Colder white for mechanical feel */
+  --st-dim: #6b7280; /* Colder gray */
+  --st-faint: rgba(240, 244, 248, 0.2);
+  --st-line: rgba(240, 244, 248, 0.1);
+  --st-line-strong: rgba(240, 244, 248, 0.35);
+  --st-signal: #00e5ff; /* Cyan accent instead of orange */
+  --st-alert: #d32f2f; /* Deep cold red */
   --st-accent: var(--st-signal);
-  --st-pad: clamp(14px, 2.2vw, 38px);
+  --st-pad: clamp(20px, 3vw, 40px);
 
   position: fixed;
   inset: 0;
@@ -1107,6 +1107,163 @@ body.is-screen-glitching .hypercube-stage {
      above it slides down. A fixed reserve keeps the head (title) locked in place
      while the copy changes underneath it. */
   min-height: calc(1.55em * 3);
+}
+
+/* ---- Strata Peripheral Elements (Tech Noir / Brutalism) ---- */
+.strata-grid {
+  position: absolute;
+  background: var(--st-line);
+  pointer-events: none;
+}
+.strata-grid--x {
+  top: 50%; left: 0; right: 0; height: 1px;
+  background: linear-gradient(to right, transparent, var(--st-line) 15%, var(--st-line) 85%, transparent);
+}
+.strata-grid--y {
+  left: 50%; top: 0; bottom: 0; width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--st-line) 15%, var(--st-line) 85%, transparent);
+}
+
+.strata-corner {
+  position: absolute;
+  width: clamp(16px, 2vw, 32px);
+  height: clamp(16px, 2vw, 32px);
+  border: 1px solid var(--st-line-strong);
+  pointer-events: none;
+}
+.strata-corner--tl { top: var(--st-pad); left: var(--st-pad); border-right: none; border-bottom: none; }
+.strata-corner--tr { top: var(--st-pad); right: var(--st-pad); border-left: none; border-bottom: none; }
+.strata-corner--bl { bottom: var(--st-pad); left: var(--st-pad); border-right: none; border-top: none; }
+.strata-corner--br { bottom: var(--st-pad); right: var(--st-pad); border-left: none; border-top: none; }
+
+.strata-header {
+  position: absolute;
+  top: calc(var(--st-pad) + 4px);
+  left: calc(var(--st-pad) + clamp(20px, 3vw, 40px));
+  right: calc(var(--st-pad) + clamp(20px, 3vw, 40px));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: clamp(9px, 0.8vw, 11px);
+  letter-spacing: 0.15em;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.strata-header__id {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.strata-header__val {
+  color: var(--st-ink);
+  font-weight: 600;
+}
+
+.strata-header__stat {
+  color: var(--st-dim);
+}
+
+.strata-header__alert {
+  /* hidden by default, can flash on specific states if desired, keeping static for now */
+}
+
+.strata-alert-box {
+  background: var(--st-alert);
+  color: #fff;
+  padding: 4px 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  animation: strataAlertBlink 4s infinite step-end;
+}
+
+@keyframes strataAlertBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; background: var(--st-faint); color: var(--st-ink); }
+}
+
+.strata-sidebar {
+  position: absolute;
+  right: calc(var(--st-pad) + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.strata-sidebar__ruler {
+  width: 1px;
+  height: clamp(150px, 25vh, 300px);
+  border-left: 1px solid var(--st-line-strong);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 6px,
+    var(--st-ink) 6px,
+    var(--st-ink) 7px
+  );
+  opacity: 0.5;
+}
+
+.strata-sidebar__data {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  display: flex;
+  gap: 24px;
+  font-size: clamp(8px, 0.75vw, 10px);
+  color: var(--st-dim);
+  letter-spacing: 0.25em;
+  opacity: 0.8;
+}
+
+.strata-footer {
+  position: absolute;
+  bottom: calc(var(--st-pad) + 4px);
+  right: calc(var(--st-pad) + clamp(20px, 3vw, 40px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  font-size: clamp(9px, 0.8vw, 11px);
+  text-align: right;
+  pointer-events: none;
+}
+
+.strata-footer__barcode {
+  width: 140px;
+  height: 28px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--st-ink),
+    var(--st-ink) 2px,
+    transparent 2px,
+    transparent 6px,
+    var(--st-ink) 6px,
+    var(--st-ink) 10px,
+    transparent 10px,
+    transparent 12px
+  );
+  opacity: 0.6;
+  mix-blend-mode: difference;
+}
+
+.strata-footer__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--st-dim);
+  letter-spacing: 0.1em;
+  font-weight: 500;
+}
+
+.strata-redacted {
+  background: var(--st-ink);
+  color: var(--st-ink);
+  padding: 1px 6px;
+  display: inline-block;
+  user-select: none;
 }
 
 /* ---- interaction states ------------------------------------- */
