@@ -30,7 +30,7 @@ button,
   width: 100vw;
   height: 100dvh;
   overflow: hidden;
-  background: #0d0e15;
+  background: #000;
 }
 
 .hypercube-stage.is-hypercube-hovered {
@@ -47,6 +47,42 @@ button,
   position: absolute;
   inset: 0;
   z-index: 0;
+}
+
+/* On hover the white cube is hidden and only the (white) eye + rays render, so
+   difference-blending the canvas against the black/white frames behind it turns
+   the eye + rays into a live inverse of the background. Off in every other
+   state so the dormant cube stays pure white and the burst stream is unchanged. */
+.hypercube-stage.is-hypercube-hovered > canvas:not(.archive-reference-background) {
+  mix-blend-mode: difference;
+}
+
+/* ---- nested-frame background (true bottom layer) -------------- */
+.strata-frames {
+  position: fixed;
+  inset: 0;
+  z-index: -1; /* below the transparent WebGL canvas (z-index 0) */
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 1;
+}
+
+.strata-frames__band {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  background: transparent;
+  will-change: transform;
+}
+
+.strata-frames__noise {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background-repeat: repeat;
+  background-size: 150px 150px;
+  opacity: 0.55;
+  mix-blend-mode: overlay;
 }
 
 
@@ -998,11 +1034,8 @@ body.is-screen-glitching .hypercube-stage {
   z-index: 4;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    "top"
-    "record"
-    "deck";
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "record";
   gap: clamp(12px, 2vw, 30px);
   padding: var(--st-pad);
   pointer-events: none;
@@ -1024,60 +1057,6 @@ body.is-screen-glitching .hypercube-stage {
   list-style: none;
 }
 
-/* ---- top rail ------------------------------------------------ */
-.strata__rail--top {
-  grid-area: top;
-  display: flex;
-  align-items: center;
-  gap: clamp(10px, 2vw, 28px);
-  padding-bottom: 9px;
-  border-bottom: 1px solid var(--st-line);
-  font-size: clamp(9px, 0.82vw, 11px);
-  letter-spacing: 0.34em;
-}
-
-.strata__callno {
-  color: var(--st-ink);
-  white-space: nowrap;
-}
-
-.strata__callno::before {
-  content: "";
-  display: inline-block;
-  width: 26px;
-  height: 7px;
-  margin-right: 12px;
-  vertical-align: middle;
-  background: var(--st-accent);
-  transition: background 300ms ease;
-}
-
-.strata__rail-ticks {
-  flex: 1;
-  height: 8px;
-  min-width: 40px;
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--st-line-strong) 0 1px,
-    transparent 1px 13px
-  );
-  opacity: 0.6;
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-}
-
-.strata__status {
-  color: var(--st-dim);
-  letter-spacing: 0.28em;
-  white-space: nowrap;
-}
-
-.strata__status b {
-  color: var(--st-accent);
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-  transition: color 260ms ease;
-}
-
 /* ---- protected record : brutalist wordmark ------------------ */
 .strata__record {
   grid-area: record;
@@ -1088,27 +1067,29 @@ body.is-screen-glitching .hypercube-stage {
   max-width: min(72vw, 720px);
 }
 
-.strata__record-tag {
-  font-size: 9.5px;
-  letter-spacing: 0.36em;
-  color: var(--st-dim);
-}
-
-.strata__record-tag::before {
-  content: "▮ ";
-  color: var(--st-alert);
-}
-
 .strata__record-title {
   font-family: "Formula", "supplyMono", sans-serif;
   font-weight: 900;
-  font-size: clamp(58px, 12.5vw, 176px);
-  line-height: 0.8;
+  font-size: clamp(28px, 5vw, 64px);
+  line-height: 0.9;
   letter-spacing: -0.02em;
   color: var(--st-ink);
-  margin-left: -0.04em;
   white-space: nowrap;
   transition: color 260ms ease;
+  /* Fixed-WIDTH capture box so every press phase (THE EYE / IT HEARS YOU / ... /
+     DO NOT RELEASE) renders at the SAME size and position. VFX builds its texture
+     from the element's bounding box; when the box grew with the text, the longer
+     phrases got scaled down and shifted. The height stays auto (always one line,
+     so it never varies) — pinning it clipped the tops of the glyphs. */
+  box-sizing: border-box;
+  width: min(78vw, 760px);
+  text-align: left;
+  /* Transparent gutter around the glyphs so the VFX capture never clips the
+     letters flush against the box edges (white cut-lines on the left / bottom).
+     Negative margins cancel the padding so the layout position is unchanged. */
+  padding: 0.18em 0.2em;
+  margin: -0.18em -0.2em;
+  margin-left: -0.24em;
 }
 
 .strata__record-body {
@@ -1118,56 +1099,12 @@ body.is-screen-glitching .hypercube-stage {
   letter-spacing: 0.05em;
   text-transform: none;
   color: var(--st-dim);
-}
-
-/* ---- bottom deck : decode ----------------------------------- */
-.strata__rail--bottom {
-  grid-area: deck;
-  display: flex;
-  align-items: center;
-  gap: clamp(12px, 2vw, 26px);
-  padding-top: 10px;
-  border-top: 1px solid var(--st-line);
-  font-size: clamp(9px, 0.82vw, 11px);
-  letter-spacing: 0.28em;
-}
-
-.strata__decode-label {
-  color: var(--st-dim);
-  white-space: nowrap;
-}
-
-.strata__decode-track {
-  position: relative;
-  flex: 1;
-  height: 6px;
-  min-width: 60px;
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--st-line) 0 1px,
-    transparent 1px 9px
-  );
-}
-
-.strata__decode-track i {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  transform: scaleX(var(--archive-hud-progress, 0));
-  background: var(--st-accent);
-  transition: background 260ms ease;
-}
-
-.strata__decode-pct {
-  color: var(--st-ink);
-  white-space: nowrap;
-}
-
-.strata__decode-pct b {
-  color: var(--st-accent);
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-  transition: color 260ms ease;
+  /* Reserve a constant block of space (3 lines — the most any summary wraps to)
+     so the record keeps a fixed height. Otherwise, when a shorter press-phase
+     summary drops to one line, the bottom-anchored block shrinks and the wordmark
+     above it slides down. A fixed reserve keeps the head (title) locked in place
+     while the copy changes underneath it. */
+  min-height: calc(1.55em * 3);
 }
 
 /* ---- interaction states ------------------------------------- */
@@ -1177,9 +1114,10 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 .hypercube-stage.is-hud-pressing .strata__record-title {
+  /* Wordmark stays put during the press: no jitter animation and no offset
+     text-shadow, so its size / position never shifts (the VFX box glitch on the
+     text supplies the only glitch motion). */
   color: var(--st-ink);
-  text-shadow: 0.05em 0 var(--st-alert), -0.05em 0 var(--st-ink-cyan, #00b6d6);
-  animation: strataRecordJitter 340ms steps(2) infinite;
 }
 
 .strata[data-press-phase="2"],
@@ -1187,9 +1125,8 @@ body.is-screen-glitching .hypercube-stage {
   --st-accent: var(--st-alert);
 }
 
-.strata[data-press-phase="3"] .strata__record-title {
-  color: var(--st-alert);
-}
+/* The final press phase keeps the same ink title colour as the earlier phases
+   (no pure-red switch). */
 
 .strata.is-hud-glitch {
   animation: strataGlitch 260ms steps(3) 1;
@@ -1209,12 +1146,6 @@ body.is-screen-glitching .hypercube-stage {
   filter: contrast(1.12) saturate(1.08);
 }
 
-@keyframes strataRecordJitter {
-  0% { transform: translate(0, 0); }
-  50% { transform: translate(-2px, 1px); }
-  100% { transform: translate(1px, -1px); }
-}
-
 @keyframes strataGlitch {
   0% { transform: translate(0, 0); clip-path: inset(0 0 0 0); }
   33% { transform: translate(-3px, 0); clip-path: inset(12% 0 44% 0); }
@@ -1222,65 +1153,65 @@ body.is-screen-glitching .hypercube-stage {
   100% { transform: translate(0, 0); clip-path: inset(0 0 0 0); }
 }
 
+/* Full-screen "damaged terminal" flash: on signal-loss / state-transition
+   glitches, large horizontal slices of the screen black out and jump for a
+   couple of frames, like the old interface's field/grain glitch. */
+.strata-glitch {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+
+/* Black eyelid shutter (the blink itself). */
+.strata-glitch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  clip-path: inset(0 0 100% 0);
+}
+
+.hypercube-stage.is-hud-glitch .strata-glitch::after {
+  animation: strataBlinkShutter 260ms ease-in-out 1;
+}
+
+@keyframes strataBlinkShutter {
+  0% { opacity: 1; clip-path: inset(0 0 100% 0); }
+  18% { opacity: 1; clip-path: inset(0 0 0 0); }
+  30% { opacity: 1; clip-path: inset(0 0 0 0); }
+  44% { opacity: 1; clip-path: inset(0 0 100% 0); }
+  64% { opacity: 1; clip-path: inset(0 0 100% 0); }
+  76% { opacity: 1; clip-path: inset(0 0 0 0); }
+  86% { opacity: 1; clip-path: inset(0 0 0 0); }
+  100% { opacity: 1; clip-path: inset(0 0 100% 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hypercube-stage.is-hud-glitch .strata-glitch::after {
+    animation: none;
+  }
+}
+
 /* ---- responsive --------------------------------------------- */
 @media (max-width: 900px) {
   .strata__record-title {
-    font-size: clamp(52px, 16vw, 120px);
+    font-size: clamp(26px, 6vw, 52px);
   }
 }
 
 @media (max-width: 600px) {
   .strata {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "top"
-      "record"
-      "deck";
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "record";
     gap: 14px;
   }
 
-  .strata__rail--top {
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    font-size: 8.5px;
-    letter-spacing: 0.18em;
-  }
-
-  .strata__callno,
-  .strata__status {
-    white-space: nowrap;
-  }
-
-  .strata__callno::before {
-    width: 18px;
-    margin-right: 8px;
-  }
-
-  .strata__rail-ticks {
-    display: none;
-  }
-
   .strata__record-title {
-    font-size: clamp(46px, 19vw, 92px);
+    font-size: clamp(24px, 8vw, 44px);
     white-space: normal;
-  }
-
-  .strata__rail--bottom {
-    flex-wrap: wrap;
-    gap: 6px 12px;
-    font-size: 8.5px;
-    letter-spacing: 0.16em;
-  }
-
-  .strata__decode-label {
-    white-space: normal;
-    line-height: 1.4;
-  }
-
-  .strata__decode-track {
-    order: 3;
-    flex-basis: 100%;
   }
 }
 

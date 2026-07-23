@@ -11,24 +11,14 @@
 </head>
 <body>
   <main id="hypercube-stage" class="hypercube-stage" data-archive-theme="03" data-dossier-mood="mono" aria-label="Archive hypercube">
-    <section class="strata" id="archiveAmbientHud" data-state="dormant" aria-label="Archive interface">
-      <header class="strata__rail strata__rail--top" aria-hidden="true">
-        <span class="strata__callno">020 / PRECOGNITIVE STRATA</span>
-        <span class="strata__rail-ticks"></span>
-        <span class="strata__status">SIGNAL &lt; <b id="archiveHudSignal">DORMANT</b> &gt;</span>
-      </header>
+    <div class="strata-frames" id="strataFrames" aria-hidden="true"></div>
+    <div class="strata-glitch" aria-hidden="true"></div>
 
+    <section class="strata" id="archiveAmbientHud" data-state="dormant" aria-label="Archive interface">
       <div class="strata__record">
-        <span class="strata__record-tag">PROTECTED RECORD / OBSERVER HAZARD</span>
         <strong class="strata__record-title" id="archiveHudRecord">THE EYE</strong>
         <p class="strata__record-body" id="archiveHudSummary">It does not look at you. It remembers the version of you that has not happened yet.</p>
       </div>
-
-      <footer class="strata__rail strata__rail--bottom">
-        <span class="strata__decode-label" id="archiveHudInstruction">HOLD CORE / 03.00 SEC TO DECODE</span>
-        <span class="strata__decode-track" aria-hidden="true"><i></i></span>
-        <span class="strata__decode-pct">DECODE <b id="archiveHudScan">000%</b></span>
-      </footer>
     </section>
 
     <section class="archive-card-stream" id="archiveCardStream" aria-label="Archive card stream">
@@ -104,11 +94,14 @@
   <div class="screen-glitch" hidden aria-hidden="true"></div>
 
   <script src="/libs/three.min.js"></script>
+  <script src="/libs/gsap.min.js"></script>
   <script type="module" src="/020archive/archiveCardVFX.js"></script>
   <script src="/020archive/archiveReferenceBackground.js"></script>
   <script src="/020archive/archiveCard.js"></script>
   <script src="/020archive/archive.js"></script>
+  <script src="/020archive/archiveFrames.js"></script>
   <script src="/020archive/archiveOverlay.js"></script>
   <script src="/020archive/archiveCursor.js"></script>
+  <script type="module" src="/020archive/archiveEyeGlitch.js"></script>
 </body>
 </html>

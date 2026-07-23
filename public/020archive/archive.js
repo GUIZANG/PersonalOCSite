@@ -11,12 +11,12 @@
       this.cardStream = cardStream;
       this.themePalette = {
         background: 0x050203,
-        particle: 0xffddd8,
-        hoverParticle: 0xff2338,
-        pressParticle: 0xffffff,
-        burstParticle: 0xff2338,
-        dust: 0xff2338,
-        ray: 0x9b0018,
+        particle: 0xffffff, // pure-white hypercube (dormant)
+        hoverParticle: 0xffffff, // cube is hidden on hover; kept white regardless
+        pressParticle: 0xff2338, // eye/rays turn red as the long-press deepens
+        burstParticle: 0xff2338, // red starfield after burst
+        dust: 0xffffff, // white eye so the difference blend renders a clean inverse
+        ray: 0xffffff, // white rays for the same inverse effect
         trail: 0xff2338,
       };
       const initialPalette = this.themePalette;
@@ -115,7 +115,12 @@
       this.hudEyeRecordActive = false;
       this.hudPressPhaseIndex = -1;
       this.scene = new THREE.Scene();
-      this.scene.background = new THREE.Color(this.background);
+      // Transparent while dormant so the DOM nested-frame background (z-index
+      // below the canvas) shows through the empty areas around the particles.
+      // Once the cube bursts into the card stream we restore an opaque dark
+      // backdrop (see animate) so the settled starfield keeps its soft look.
+      this.scene.background = null;
+      this.sceneBackgroundColor = new THREE.Color(this.background);
       this.fadeScene = new THREE.Scene();
       this.fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
       this.fadeMaterial = new THREE.MeshBasicMaterial({
@@ -133,10 +138,10 @@
       // The liquid-glass pass samples this WebGL canvas via drawImage(). Keep
       // the presented frame available so the card refraction can see the main
       // cardstream starfield/hypercube background instead of a cleared buffer.
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       this.renderer.setSize(window.innerWidth, window.innerHeight);
-      this.renderer.setClearColor(this.background, 1);
+      this.renderer.setClearColor(this.background, 0);
 
       this.container.insertBefore(this.renderer.domElement, this.container.firstChild);
       window.ArchiveCardVFX?.attachLiquidSource?.(this.renderer.domElement);
@@ -173,7 +178,7 @@
       this.foreground = palette.particle;
       this.baseRayColor.setHex(palette.ray);
       this.scene?.background?.setHex(palette.background);
-      this.renderer?.setClearColor(palette.background, 1);
+      this.renderer?.setClearColor(palette.background, 0);
       this.fadeMaterial?.color?.setHex(palette.background);
       this.mat?.uniforms.uColor.value.setHex(palette.particle);
       this.hoverDustMat?.uniforms.uColor.value.setHex(palette.dust);
@@ -189,12 +194,16 @@
         .lerp(this.themeTargetColor.setHex(palette.hoverParticle), this.hoverAmount)
         .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount)
         .lerp(this.themeTargetColor.setHex(palette.burstParticle), this.burstAmount);
+      // Eye + rays share one white->red ramp so the whole assembly reddens
+      // together as the long-press deepens. They are white by default so the
+      // canvas' difference blend (enabled only on hover) inverts the frames.
       this.themeDustRenderColor
         .setHex(palette.dust)
-        .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount * 0.72);
+        .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount);
 
       this.mat?.uniforms.uColor.value.copy(this.themeRenderColor);
       this.hoverDustMat?.uniforms.uColor.value.copy(this.themeDustRenderColor);
+      this.hoverDustRayMat?.uniforms.uColor.value.copy(this.themeDustRenderColor);
     }
 
     async init() {
@@ -522,6 +531,21 @@
         this.trailMat.uniforms.uBurst.value = trailAmount;
       }
 
+      // Transparent only while dormant/hover/press (so the frame background shows
+      // through); opaque dark backdrop once bursting into the card stream, which
+      // restores the soft look of the settled red starfield.
+      const opaqueStage = this.burstAmount > 0.001 || this.burstTarget > 0;
+      if (opaqueStage) {
+        this.sceneBackgroundColor.setHex(this.background);
+        if (this.scene.background !== this.sceneBackgroundColor) {
+          this.scene.background = this.sceneBackgroundColor;
+        }
+        this.renderer.setClearColor(this.background, 1);
+      } else {
+        if (this.scene.background !== null) this.scene.background = null;
+        this.renderer.setClearColor(this.background, 0);
+      }
+
       if (trailAmount > 0.001) {
         this.renderer.autoClear = false;
         this.fadeMaterial.opacity = THREE.MathUtils.lerp(0.34, 0.08, trailAmount);
@@ -543,16 +567,22 @@
         this.signalLossPeak = 0;
         this.signalLossStart = 0;
         this.signalLossDuration = 0;
-        this.nextSignalLossAt = time + 1800 + Math.random() * 2600;
+        this.nextSignalLossAt = time + 8000 + Math.random() * 7000;
       }
 
-      // Randomly schedule short dropout bursts while the cube is idle/hovered.
+      // Randomly schedule short dropout bursts (with the eyelid blink) on a
+      // random 8-15s cadence while the cube is idle/hovered.
+      // One eyelid blink per random 8-15s window, whether the cube is idle or
+      // mid long-press. A press does not add its own blink; if the scheduled
+      // moment lands during a press it simply blinks then and the timer resets
+      // (the press "uses up" that window). Otherwise it fires on the normal
+      // cadence.
       if (time >= this.nextSignalLossAt && this.burstTarget === 0) {
         this.signalLossStart = time;
         this.signalLossDuration = 90 + Math.random() * 160;
         this.signalLossPeak = 0.5 + Math.random() * 0.5;
-        this.nextSignalLossAt = time + 2200 + Math.random() * 4200;
-        this.triggerHudGlitch?.();
+        this.nextSignalLossAt = time + 8000 + Math.random() * 7000;
+        this.triggerBlink?.();
       }
 
       const elapsed = time - this.signalLossStart;
@@ -648,7 +678,9 @@
       }
 
       if (this.pressPointerId === event.pointerId) {
-        this.updateCursorSnap(event);
+        // During a long-press the cursor is pinned to the press center and stays
+        // there no matter how the pointer moves, until release.
+        this.lockCursorToPressCenter();
         return;
       }
 
@@ -737,7 +769,7 @@
       this.updateCursorPressState(true);
       this.updateAmbientHudPress(0);
       this.enterHover();
-      this.updateCursorSnap(event);
+      this.lockCursorToPressCenter();
       this.container.setPointerCapture?.(event.pointerId);
     }
 
@@ -1076,8 +1108,10 @@
         this.updateAmbientHudStaticPressCopy(phaseIndex);
         this.hudSummary.textContent = phase.summary;
         this.scrambleElement(this.hudSignal, phase.signal, 300);
-        this.scrambleElement(this.hudRecord, phase.title, 420);
-        this.triggerHudGlitch();
+        // Swap the wordmark copy directly (no per-glyph scramble): the VFX layer
+        // re-captures once per phase, so the transition stays smooth instead of
+        // thrashing the texture ~15x/phase.
+        this.hudRecord.textContent = phase.title;
       }
       if (this.hudScan) {
         this.hudScan.textContent = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
@@ -1151,6 +1185,9 @@
       }, 28);
     }
 
+    // Text-only HUD glitch: a short scanline jump on the wordmark. Does NOT flash
+    // the full-screen eyelid blink (that is reserved for triggerBlink, driven only
+    // by the 8-15s cadence), so state transitions don't add extra black blinks.
     triggerHudGlitch() {
       if (!this.ambientHud) return;
 
@@ -1164,6 +1201,22 @@
       }, 400);
     }
 
+    // Full eyelid blink: the black-screen shutter (+ HUD glitch). Only fired by the
+    // 8-15s signal-loss cadence, so there is at most one blink per random window,
+    // whether the cube is idle or mid long-press.
+    triggerBlink() {
+      this.triggerHudGlitch();
+      if (!this.container) return;
+
+      this.container.classList.remove("is-hud-glitch");
+      void this.container.offsetWidth;
+      this.container.classList.add("is-hud-glitch");
+      clearTimeout(this.blinkTimer);
+      this.blinkTimer = setTimeout(() => {
+        this.container?.classList.remove("is-hud-glitch");
+      }, 400);
+    }
+
     updateAmbientHudState(state) {
       if (!this.ambientHud) return;
 
@@ -1171,7 +1224,9 @@
       this.hudState = state;
       this.ambientHud.dataset.state = state.toLowerCase();
 
-      if (changed && this.burstTarget === 0) {
+      // Skip the state-change blink while a long-press is active: the press owns
+      // its single randomly-timed blink, so entering DECRYPTING must not add one.
+      if (changed && this.burstTarget === 0 && this.pressPointerId === null) {
         this.triggerHudGlitch();
         this.scrambleElement(this.hudSignal, state, 300);
       } else if (this.hudSignal) {
@@ -1464,7 +1519,10 @@
           uniform float uBurst;
 
           void main() {
-            gl_FragColor = vec4(uColor, uHover * (1.0 - uBurst) * 0.55);
+            // Full opacity so the canvas' hover difference-blend fully inverts the
+            // rays against the frames (a lower alpha washes them to mid-gray and
+            // they vanish over similarly toned bands).
+            gl_FragColor = vec4(uColor, uHover * (1.0 - uBurst));
           }
         `,
         transparent: true,
