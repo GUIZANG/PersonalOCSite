@@ -49,11 +49,13 @@ button,
   z-index: 0;
 }
 
-/* On hover the white cube is hidden and only the (white) eye + rays render, so
-   difference-blending the canvas against the black/white frames behind it turns
-   the eye + rays into a live inverse of the background. Off in every other
-   state so the dormant cube stays pure white and the burst stream is unchanged. */
-.hypercube-stage.is-hypercube-hovered > canvas:not(.archive-reference-background) {
+/* On plain hover the (white) eye + rays render with normal compositing, so they
+   read as pure white just like the dormant cube. Only during the long-press does
+   the canvas switch to difference-blending against the black/white frames behind
+   it, turning the reddening eye + rays into a live inverse of the background. The
+   switch is seamless because at press-start the eye core sits over the pure-black
+   center, where |white - black| = white (identical to normal blend). */
+.hypercube-stage.is-hud-pressing > canvas:not(.archive-reference-background) {
   mix-blend-mode: difference;
 }
 

@@ -13,7 +13,7 @@
         background: 0x050203,
         particle: 0xffffff, // pure-white hypercube (dormant)
         hoverParticle: 0xffffff, // cube is hidden on hover; kept white regardless
-        pressParticle: 0xff2338, // eye/rays turn red as the long-press deepens
+        pressParticle: 0xc21f2d, // eye/rays turn a slightly darker/deeper red on press
         burstParticle: 0xff2338, // red starfield after burst
         dust: 0xffffff, // white eye so the difference blend renders a clean inverse
         ray: 0xffffff, // white rays for the same inverse effect
@@ -194,9 +194,10 @@
         .lerp(this.themeTargetColor.setHex(palette.hoverParticle), this.hoverAmount)
         .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount)
         .lerp(this.themeTargetColor.setHex(palette.burstParticle), this.burstAmount);
-      // Eye + rays share one white->red ramp so the whole assembly reddens
-      // together as the long-press deepens. They are white by default so the
-      // canvas' difference blend (enabled only on hover) inverts the frames.
+      // Eye + rays are pure white on plain hover (normal compositing) and share one
+      // white->red ramp so the whole assembly reddens together as the long-press
+      // deepens. The canvas' difference blend is enabled ONLY during the press, so
+      // the reddening reads as a live inverse of the background frames.
       this.themeDustRenderColor
         .setHex(palette.dust)
         .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount);
@@ -389,14 +390,32 @@
               dot(worldRotation[1], tiltedSquare),
               dot(worldRotation[2], tiltedSquare)
             );
-            float hoverEase = cubicBezierEase(uHover);
+            // Delay the collapse so the cube spends the first ~20% of the hover as a
+            // full, spinning cube (the whip-spin is clearly visible) before it folds
+            // into the eye. On exit this keeps the cube fully expanded + spinning for
+            // the last stretch too, so both directions read the rotation strongly.
+            float morphProgress = smoothstep(0.3, 1.0, uHover);
+            float hoverEase = cubicBezierEase(morphProgress);
             float hoverMotion = smoothstep(0.72, 1.0, hoverEase) * (1.0 - uBurst);
             vec2 hoverDir = normalize(squarePos.xy + vec2(0.0001));
             vec2 hoverTangent = vec2(-hoverDir.y, hoverDir.x);
             float drift = sin(uTime * 2.4 + offset * 18.8496) * 0.012;
             float shimmer = cos(uTime * 3.1 + offset * 11.73) * 0.006;
             vec3 hoverWiggle = vec3(hoverTangent * drift + hoverDir * shimmer, 0.0) * hoverMotion;
-            vec3 collapsedPos = mix(cubePos, hoverTarget + hoverWiggle, hoverEase);
+            // Curved in-flight path: instead of sliding straight from the cube to
+            // the eye, each particle swirls in along an arc (a coherent whirlpool)
+            // that peaks mid-transition and vanishes at both ends, so the start /
+            // end positions are unchanged but the collapse reads as a fluid vortex.
+            vec3 straightPos = mix(cubePos, hoverTarget + hoverWiggle, hoverEase);
+            float arc = sin(hoverEase * 3.14159265) * (1.0 - uBurst);
+            vec3 flightVec = hoverTarget - cubePos;
+            // Coherent inward whirlpool: every particle is nudged the same rotational
+            // way (perpendicular to its own flight line) so the collapse reads as one
+            // clean vortex being drawn into the eye — no random depth scatter, so the
+            // "force" has a single, legible direction.
+            vec3 swirlTangent = normalize(vec3(-flightVec.y, flightVec.x, 0.0) + vec3(0.0, 0.0, 0.0001));
+            float swirlAmt = arc * (0.35 + 0.4 * fract(offset * 3.17));
+            vec3 collapsedPos = straightPos + swirlTangent * swirlAmt;
 
             float radius = length(burstPos.xy);
             float orbitSpeed = mix(0.05, 0.2, fract(offset * 19.73));
@@ -433,7 +452,7 @@
 
             vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
             float dustScale = mix(1.0, 0.72, burstEase);
-            gl_PointSize = (uResolution / 160.0) * dustScale * (1.0 / -mvPosition.z);
+            gl_PointSize = (uResolution / 190.5) * dustScale * (1.0 / -mvPosition.z);
             gl_Position = projectionMatrix * mvPosition;
           }
         `,
@@ -442,8 +461,12 @@
           varying float vAlpha;
 
           void main() {
-            if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
             if (vAlpha <= 0.001) discard;
+            // Rounded-square sprite: small corner radius, filled body.
+            vec2 p = abs(gl_PointCoord - vec2(0.5));
+            float r = 0.12;
+            vec2 q = p - (0.5 - r);
+            if (length(max(q, 0.0)) - r > 0.0) discard;
             gl_FragColor = vec4(uColor, vAlpha);
           }
         `,
@@ -476,14 +499,56 @@
 
     animate(time) {
       if (this.cubeCloud) {
+        // Incremental spin so the rotation SPEED can be modulated smoothly (an
+        // absolute time*speed formula would jump when the multiplier changes).
+        const nowSec = time / 1000;
+        const dt =
+          this.lastRotTime === undefined ? 0 : Math.min(nowSec - this.lastRotTime, 0.05);
+        this.lastRotTime = nowSec;
+
         const msToSeconds = this.duration / 1000;
-        const cubeRotationAmount = this.burstTarget > 0 ? 0 : 1;
-        this.cubeCloud.rotation.x = this.baseRotationX * cubeRotationAmount;
-        this.cubeCloud.rotation.y = (time / 1000) * (Math.PI * 2 / msToSeconds) * cubeRotationAmount;
-        this.cubeCloud.rotation.y %= Math.PI * 2;
+        const baseSpeed = (Math.PI * 2) / msToSeconds; // rad/s
+
+        if (this.burstTarget > 0) {
+          // Burst: ease the whole cube back to identity orientation. The red-dot
+          // starfield lives on this rotating cubeCloud, but the trails are a
+          // separate world-space object that is never rotated — so any leftover
+          // cube spin would make the dots and their trails point different ways.
+          // Easing (not snapping) keeps the collapse->starfield hand-off smooth.
+          this.cubeSpinY = (this.cubeSpinY || 0) * 0.9;
+          this.cubeCloud.rotation.x *= 0.9;
+          this.cubeCloud.rotation.y = this.cubeSpinY;
+        } else {
+          // Idle spin decelerates as the cube collapses into the eye so it settles
+          // on a near-still cube, then spins back up on exit.
+          const hoverSlow = 1 - smoothstep(0.05, 0.9, this.hoverAmount) * 0.9;
+
+          // Dramatic hand-off spin: whip through ~1.5 extra turns whenever the hover
+          // state is CHANGING (either direction), so entering AND leaving both give a
+          // clearly visible forward whoosh that eases out as it settles. Driven by
+          // the per-frame change in hoverAmount so it's always forward (never rewinds).
+          const hoverDelta = Math.abs(this.hoverAmount - (this.prevHoverAmount ?? this.hoverAmount));
+          this.prevHoverAmount = this.hoverAmount;
+          const spinTurns = 1.5;
+          const spinBoost = hoverDelta * spinTurns * Math.PI * 2;
+
+          this.cubeSpinY =
+            ((this.cubeSpinY || 0) + baseSpeed * dt * hoverSlow + spinBoost) % (Math.PI * 2);
+
+          // Mid-collapse tumble on X: peaks halfway through the transition and returns
+          // to the resting tilt at both ends, so the cube visibly rolls as it folds.
+          const tumble = Math.sin(smoothstep(0.0, 1.0, this.hoverAmount) * Math.PI) * 0.8;
+          this.cubeCloud.rotation.x = this.baseRotationX + tumble;
+          this.cubeCloud.rotation.y = this.cubeSpinY;
+        }
       }
 
-      this.hoverAmount += (this.hoverTarget - this.hoverAmount) * 0.08;
+      // Asymmetric easing: enter more slowly than exit. The exit whoosh already
+      // reads well at 0.08; entering at the same rate blurs the spin/fold into ~0.1s
+      // so it's hard to see. A slower enter spreads the same 1.5-turn whip over more
+      // time, making the wind-up-and-fold clearly legible.
+      const hoverRate = this.hoverTarget > this.hoverAmount ? 0.045 : 0.08;
+      this.hoverAmount += (this.hoverTarget - this.hoverAmount) * hoverRate;
       this.updateHoverDustState();
       this.hoverDustAmount += (this.hoverDustTarget - this.hoverDustAmount) * 0.12;
       this.updateHoverLookTransform();
@@ -830,7 +895,10 @@
         return;
       }
 
-      this.hoverDustTarget = this.hoverTarget === 1 && this.hoverAmount > 0.86 ? 1 : 0;
+      // Start the eye glow + rays cross-fading in mid-collapse (not after the cube
+      // has almost finished morphing) so there is no gap between "cube formed the
+      // eye" and "rays appear" — the whole hand-off reads as one continuous motion.
+      this.hoverDustTarget = this.hoverTarget === 1 && this.hoverAmount > 0.58 ? 1 : 0;
     }
 
     updateHoverLookTarget(event, active) {
@@ -1442,7 +1510,7 @@
             currentPos.xy += dustDir * (rayLength - suck + rayNoise) + dustTangent * rayNoise * 0.45;
 
             vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
-            gl_PointSize = (uResolution / 185.0) * (1.0 / -mvPosition.z);
+            gl_PointSize = (uResolution / 220.2) * (1.0 / -mvPosition.z);
             gl_Position = projectionMatrix * mvPosition;
             float pressGlow = 1.0 + uPress * 0.55 + pressSq * 0.6;
             vAlpha = alpha * pressGlow * mix(0.42, 1.0, clamp(rayStrength, 0.0, 1.0)) * fade;
@@ -1453,7 +1521,10 @@
           varying float vAlpha;
 
           void main() {
-            if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
+            vec2 p = abs(gl_PointCoord - vec2(0.5));
+            float r = 0.12;
+            vec2 q = p - (0.5 - r);
+            if (length(max(q, 0.0)) - r > 0.0) discard;
             gl_FragColor = vec4(uColor, vAlpha);
           }
         `,
