@@ -11,13 +11,15 @@
   // always solid black with no seam. Inside it sit the coloured rectangles,
   // none of which overscan, ramping black -> white -> black with a pure-black
   // centre. Adjacent rectangles always differ in colour.
-  const INNER_COUNT = 18; // coloured rectangles inside the frame (+2 extra layers toward the centre)
+  const INNER_COUNT = 32; // denser stack for a deeper tunnel without wide empty bands
   const BACKDROP_SCALE = 1.2; // fixed pure-black outer frame; overscans => seam-proof edge
   const INNER_OUTER = 0.965; // scale of the outermost coloured rectangle
-  const INNER_CENTER = 0.211; // scale of the central (black) rectangle (keeps the same per-layer spacing as before)
+  const INNER_CENTER = 0.075; // small final black rectangle deepens the vanishing point
   const MID_FRAC = 0.42; // position of the bright band among the inner rectangles
-  const OUTER_GRAY = 0.12; // luminance of the outermost coloured rectangle (distinct from the black frame)
-  const WHITE_LUM = 220 / 255; // peak brightness = #DCDCDC light gray, softer than pure white (and its inverse)
+  const OUTER_GRAY = 0.06; // keep the outer field close to black
+  const WHITE_LUM = 216 / 255; // peak brightness = #D8D8D8, softer than the surrounding white transition
+  const MIN_ADJACENT_GRAY_STEP = 6; // perceptible separation between neighbouring bands
+  const BRIGHT_RAMP_POWER = 1.8; // compress mid-grays so black occupies more of the tunnel
 
   // Moving vanishing point: the nested rectangles converge toward the pointer so
   // the stack reads as a tunnel whose centre slides under the cursor. The
@@ -33,9 +35,54 @@
 
   const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
-  function grayFromLum(lum) {
-    const v = Math.round(clamp01(lum) * 255);
+  function grayValueFromLum(lum) {
+    return Math.round(clamp01(lum) * 255);
+  }
+
+  function grayFromValue(value) {
+    const v = Math.min(255, Math.max(0, Math.round(value)));
     return `rgb(${v}, ${v}, ${v})`;
+  }
+
+  function buildGrayValues(brightIndex) {
+    const values = Array.from({ length: INNER_COUNT }, (_, index) => {
+      const lum = index <= brightIndex
+        ? OUTER_GRAY + (WHITE_LUM - OUTER_GRAY) *
+          Math.pow(index / brightIndex, BRIGHT_RAMP_POWER)
+        : WHITE_LUM *
+          Math.pow(
+            1 - (index - brightIndex) / (INNER_COUNT - 1 - brightIndex),
+            BRIGHT_RAMP_POWER
+          );
+      return grayValueFromLum(lum);
+    });
+
+    values[brightIndex] = grayValueFromLum(WHITE_LUM);
+    values[INNER_COUNT - 1] = 0;
+
+    // Work outward from the anchored white peak. This preserves the steeper
+    // dark-heavy curve while guaranteeing a difference visible through grain.
+    for (let index = brightIndex - 1; index >= 0; index -= 1) {
+      values[index] = Math.min(
+        values[index],
+        values[index + 1] - MIN_ADJACENT_GRAY_STEP
+      );
+    }
+    for (let index = brightIndex + 1; index < INNER_COUNT; index += 1) {
+      values[index] = Math.min(
+        values[index],
+        values[index - 1] - MIN_ADJACENT_GRAY_STEP
+      );
+    }
+    values[INNER_COUNT - 1] = 0;
+    for (let index = INNER_COUNT - 2; index > brightIndex; index -= 1) {
+      values[index] = Math.max(
+        values[index],
+        values[index + 1] + MIN_ADJACENT_GRAY_STEP
+      );
+    }
+
+    return values.map((value) => Math.min(255, Math.max(0, value)));
   }
 
   function buildNoiseDataUri() {
@@ -61,12 +108,12 @@
     const stage = document.getElementById("hypercube-stage");
     if (!root || !stage) return;
 
-    // Fixed pure-black outer frame: overscans the viewport and never moves, so
-    // the screen edge is always seamless solid black.
+    // Fixed pure-black outer frame: overscans the inset background aperture and
+    // never moves, so the area outside the four fixed corner marks stays black.
     const backdrop = document.createElement("div");
     backdrop.className = "strata-frames__band";
-    backdrop.style.width = `${(BACKDROP_SCALE * 100).toFixed(3)}vw`;
-    backdrop.style.height = `${(BACKDROP_SCALE * 100).toFixed(3)}vh`;
+    backdrop.style.width = `${(BACKDROP_SCALE * 100).toFixed(3)}%`;
+    backdrop.style.height = `${(BACKDROP_SCALE * 100).toFixed(3)}%`;
     backdrop.style.background = "rgb(0, 0, 0)";
     backdrop.style.zIndex = "1";
     root.appendChild(backdrop);
@@ -74,28 +121,16 @@
     const bands = [];
     const innerDelta = (INNER_CENTER - INNER_OUTER) / (INNER_COUNT - 1);
     const brightJ = Math.round(MID_FRAC * (INNER_COUNT - 1));
+    const grayValues = buildGrayValues(brightJ);
 
     for (let j = 0; j < INNER_COUNT; j++) {
       const scale = INNER_OUTER + innerDelta * j;
-
-      // Outer half ramps dark-gray -> near-white, inner half near-white -> black centre.
-      const lum = j <= brightJ
-        ? OUTER_GRAY + (WHITE_LUM - OUTER_GRAY) * (j / brightJ)
-        : WHITE_LUM * (1 - (j - brightJ) / (INNER_COUNT - 1 - brightJ));
-
-      let baseColor;
-      if (j === INNER_COUNT - 1) {
-        baseColor = "rgb(0, 0, 0)"; // pure-black centre
-      } else if (j === brightJ) {
-        baseColor = grayFromLum(WHITE_LUM); // near-white light-gray band
-      } else {
-        baseColor = grayFromLum(lum);
-      }
+      const baseColor = grayFromValue(grayValues[j]);
 
       const band = document.createElement("div");
       band.className = "strata-frames__band";
-      band.style.width = `${(scale * 100).toFixed(3)}vw`;
-      band.style.height = `${(scale * 100).toFixed(3)}vh`;
+      band.style.width = `${(scale * 100).toFixed(3)}%`;
+      band.style.height = `${(scale * 100).toFixed(3)}%`;
       band.style.background = baseColor;
       band.style.zIndex = String(j + 2); // above the black frame, inner on top
       root.appendChild(band);
@@ -128,8 +163,8 @@
       // screens (nx is [-0.5, 0.5], so nx * innerWidth * REACH puts a pointer at
       // the edge REACH*half-width toward that side). depth scales it from 0 at
       // the outermost rectangle to 1 at the innermost => vanishing point.
-      const reachX = window.innerWidth * REACH;
-      const reachY = window.innerHeight * REACH;
+      const reachX = root.clientWidth * REACH;
+      const reachY = root.clientHeight * REACH;
       bands.forEach((b, i) => {
         const tx = nx * reachX * b.depth;
         const ty = ny * reachY * b.depth;
@@ -158,10 +193,10 @@
 
     // ---- long-press colour cycle: each band hands its colour to the next, the
     // last wraps to the first, so the whole palette flows inward like a tunnel.
-    // Only the 18 inner bands cycle (a single black at the centre) so no two
-    // adjacent frames are ever the same colour. The outer black backdrop follows
-    // the outermost band while cycling (so the very edge flows too) and returns to
-    // pure black at rest for a seamless edge.
+    // All inner bands cycle (with a single black at the centre) so no two
+    // adjacent frames are ever the same colour. During the cycle the backdrop
+    // takes the preceding palette colour rather than copying the outer band,
+    // preserving a visible colour step at the edge.
     const bandCount = bands.length;
 
     function applyColorOffset(offset) {
@@ -169,8 +204,9 @@
         const src = ((i - offset) % bandCount + bandCount) % bandCount;
         bands[i].el.style.background = baseColors[src];
       }
+      const backdropSrc = ((bandCount - 1 - offset) % bandCount + bandCount) % bandCount;
       backdrop.style.background =
-        offset === 0 ? "rgb(0, 0, 0)" : bands[0].el.style.background;
+        offset === 0 ? "rgb(0, 0, 0)" : baseColors[backdropSrc];
     }
 
     let pressActive = false;
@@ -225,8 +261,9 @@
     window.addEventListener("archive:hypercube-long-press", onLongPress);
 
     function onPointerMove(event) {
-      const nx = event.clientX / window.innerWidth - 0.5;
-      const ny = event.clientY / window.innerHeight - 0.5;
+      const rect = root.getBoundingClientRect();
+      const nx = clamp01((event.clientX - rect.left) / rect.width) - 0.5;
+      const ny = clamp01((event.clientY - rect.top) / rect.height) - 0.5;
       applyTargets(nx, ny);
     }
 

@@ -7,7 +7,7 @@
 // /libs/vfx-js.min.js (self-contained ESM, three inlined) so it works offline.
 // If the import fails the module simply does nothing and the wordmark stays as
 // normal DOM text.
-import { VFX } from "/libs/vfx-js.min.js";
+import { VFX } from "../libs/vfx-js.min.js";
 
 // g (uGlitch) is 0 while idle and 1 during a burst. A single shared object so
 // the per-frame uniform function can read the latest value cheaply.

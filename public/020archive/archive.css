@@ -2,6 +2,16 @@
   box-sizing: border-box;
 }
 
+@font-face {
+  font-family: "supplyMono";
+  src: url("../assets/fonts/supplyMono/Supply-Light.otf");
+}
+
+@font-face {
+  font-family: "Formula";
+  src: url("../assets/fonts/Formula/PPFormula-CondensedBlack.otf");
+}
+
 html,
 body {
   width: 100%;
@@ -25,6 +35,7 @@ button,
 }
 
 .hypercube-stage {
+  --archive-frame-margin: clamp(24px, 3vw, 48px);
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -43,10 +54,174 @@ button,
   height: 100%;
 }
 
-.hypercube-stage > canvas:not(.archive-reference-background) {
+.archive-hypercube-visual-layer {
   position: absolute;
   inset: 0;
   z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.archive-hypercube-visual-layer > canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* The cube stays on one full-screen WebGL canvas. The movable frames update
+   this SVG clip path, so they reveal the real canvas coordinates instead of
+   scaling independent video copies. During the burst the clip is removed and
+   the card-stream transition returns to a full-screen render. */
+.hypercube-stage.is-hypercube-bursting .archive-hypercube-visual-layer {
+  clip-path: none !important;
+}
+
+/* ---- movable observation windows ------------------------------ */
+.archive-media-windows {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 520ms ease, visibility 520ms step-end;
+}
+
+.hypercube-stage.is-hypercube-bursting .archive-media-windows {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.archive-media-window {
+  --window-reveal: 0%;
+  --window-frame-color: rgba(255, 255, 255, 0.52);
+  position: absolute;
+  min-width: 180px;
+  border: 1px solid var(--window-frame-color);
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+  -webkit-mask-image: linear-gradient(#000, #000);
+  -webkit-mask-position: top left;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: var(--window-reveal) var(--window-reveal);
+  mask-image: linear-gradient(#000, #000);
+  mask-position: top left;
+  mask-repeat: no-repeat;
+  mask-size: var(--window-reveal) var(--window-reveal);
+  pointer-events: none;
+  user-select: none;
+  will-change: left, top;
+}
+
+.archive-media-window.is-reveal-complete {
+  pointer-events: auto;
+}
+
+/* Size decides depth permanently. There is intentionally no focus/active rule
+   that raises z-index: a large feed always stays under every smaller feed. */
+.archive-media-window--large {
+  z-index: 1;
+}
+
+.archive-media-window--medium {
+  z-index: 2;
+}
+
+.archive-media-window--small {
+  z-index: 3;
+}
+
+.archive-media-window__bar {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 7px;
+  border-bottom: 1px solid var(--window-frame-color);
+  background: rgba(0, 0, 0, 0.92);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: none;
+}
+
+.archive-media-window__bar::before {
+  content: "";
+  display: block;
+  flex: 0 0 auto;
+  width: 2px;
+  height: 2px;
+  background: currentColor;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.archive-media-window__bar > span:first-of-type {
+  min-width: 0;
+  margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archive-media-window__status {
+  flex: 0 0 auto;
+  color: inherit;
+  opacity: 0.62;
+  letter-spacing: 0.14em;
+}
+
+.archive-media-window.is-dragging {
+  border-color: #f7f8fa;
+  box-shadow:
+    0 0 0 1px rgba(247, 248, 250, 0.34),
+    7px 7px 0 rgba(0, 0, 0, 0.72);
+}
+
+.archive-media-window.is-dragging .archive-media-window__bar {
+  color: #020707;
+  background: #f7f8fa;
+  border-bottom-color: #f7f8fa;
+  text-shadow: none;
+}
+
+.archive-media-window.is-dragging .archive-media-window__bar::before {
+  color: #020707;
+}
+
+.archive-media-window__viewport {
+  position: relative;
+  width: 100%;
+  height: var(--window-content-height);
+  min-height: 64px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.archive-observation-clip-defs {
+  position: fixed;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .archive-media-window {
+    min-width: 0;
+  }
+
+  .archive-media-window--large {
+    width: 76vw !important;
+  }
+
+  .archive-media-window--medium {
+    width: 48vw !important;
+  }
+
+  .archive-media-window--small {
+    width: 30vw !important;
+  }
+
 }
 
 /* On plain hover the (white) eye + rays render with normal compositing, so they
@@ -55,17 +230,18 @@ button,
    it, turning the reddening eye + rays into a live inverse of the background. The
    switch is seamless because at press-start the eye core sits over the pure-black
    center, where |white - black| = white (identical to normal blend). */
-.hypercube-stage.is-hud-pressing > canvas:not(.archive-reference-background) {
+.hypercube-stage.is-hud-pressing .archive-hypercube-source {
   mix-blend-mode: difference;
 }
 
 /* ---- nested-frame background (true bottom layer) -------------- */
 .strata-frames {
   position: fixed;
-  inset: 0;
+  inset: var(--archive-frame-margin);
   z-index: -1; /* below the transparent WebGL canvas (z-index 0) */
   pointer-events: none;
   overflow: hidden;
+  background: #000;
   opacity: 1;
 }
 
@@ -80,7 +256,7 @@ button,
 .strata-frames__noise {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  z-index: 100;
   background-repeat: repeat;
   background-size: 150px 150px;
   opacity: 0.55;
@@ -431,6 +607,56 @@ button,
   );
   z-index: 1;
   will-change: transform;
+}
+
+.curzr__interaction-state {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: max-content;
+  padding: 3px 5px 2px;
+  border: 1px solid rgba(247, 248, 250, 0.48);
+  background: rgba(0, 0, 0, 0.82);
+  color: #f7f8fa;
+  font-family: "supplyMono", monospace;
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translate3d(
+    calc(var(--outer-x) + var(--cursor-outer-scaled-half-size) + 6px),
+    calc(var(--outer-y) + var(--cursor-outer-scaled-half-size) + 6px),
+    0
+  );
+  transition: opacity 90ms linear, border-color 90ms linear, color 90ms linear;
+  will-change: transform, opacity;
+}
+
+.curzr[data-interaction]:not([data-interaction=""]) .curzr__interaction-state {
+  opacity: 1;
+}
+
+.curzr[data-interaction="drag"] .curzr__interaction-state {
+  border-color: #f7f8fa;
+  background: #f7f8fa;
+  color: #020707;
+  box-shadow: 0 0 0 1px #020707;
+}
+
+.curzr[data-interaction="grab"] .curzr__interaction-state {
+  border-color: rgba(255, 255, 255, 0.72);
+}
+
+.curzr[data-interaction="hold"] .curzr__interaction-state {
+  border-color: rgba(255, 13, 26, 0.9);
+  color: #ff3542;
+}
+
+.curzr[data-interaction="stay"] .curzr__interaction-state {
+  border-color: rgba(0, 254, 255, 0.78);
+  color: #aefeff;
 }
 
 .curzr.is-hypercube-pressing::before {
@@ -1029,7 +1255,7 @@ body.is-screen-glitching .hypercube-stage {
   --st-signal: #00e5ff; /* Cyan accent instead of orange */
   --st-alert: #d32f2f; /* Deep cold red */
   --st-accent: var(--st-signal);
-  --st-pad: clamp(20px, 3vw, 40px);
+  --st-pad: var(--archive-frame-margin);
 
   position: fixed;
   inset: 0;
@@ -1125,32 +1351,70 @@ body.is-screen-glitching .hypercube-stage {
   mix-blend-mode: difference;
 }
 
-.strata-grid {
-  position: absolute;
-  background: var(--st-line);
-  pointer-events: none;
-  -webkit-mask-image: radial-gradient(circle at center, transparent 18vw, black 18.5vw);
-  mask-image: radial-gradient(circle at center, transparent 18vw, black 18.5vw);
-}
-.strata-grid--x {
-  top: 50%; left: 0; right: 0; height: 1px;
-  background: linear-gradient(to right, transparent, var(--st-line) 15%, var(--st-line) 85%, transparent);
-}
-.strata-grid--y {
-  left: 50%; top: 0; bottom: 0; width: 1px;
-  background: linear-gradient(to bottom, transparent, var(--st-line) 15%, var(--st-line) 85%, transparent);
-}
-
 .strata-corner {
   position: absolute;
-  width: clamp(16px, 2vw, 32px);
-  height: clamp(16px, 2vw, 32px);
+  width: clamp(18px, 1.8vw, 30px);
+  height: clamp(18px, 1.8vw, 30px);
   border: 1px solid var(--st-line-strong);
   pointer-events: none;
   mix-blend-mode: difference;
 }
-.strata-corner--tl { top: var(--st-pad); left: var(--st-pad); border-right: none; border-bottom: none; }
-.strata-corner--br { bottom: var(--st-pad); right: var(--st-pad); border-left: none; border-top: none; }
+
+.strata-corner::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.strata-corner--tl {
+  top: var(--archive-frame-margin);
+  left: var(--archive-frame-margin);
+  border-right: none;
+  border-bottom: none;
+}
+
+.strata-corner--tl::after {
+  top: -9px;
+  left: -9px;
+}
+
+.strata-corner--tr {
+  top: var(--archive-frame-margin);
+  right: var(--archive-frame-margin);
+  border-left: none;
+  border-bottom: none;
+}
+
+.strata-corner--tr::after {
+  top: -9px;
+  right: -9px;
+}
+
+.strata-corner--bl {
+  bottom: var(--archive-frame-margin);
+  left: var(--archive-frame-margin);
+  border-top: none;
+  border-right: none;
+}
+
+.strata-corner--bl::after {
+  bottom: -9px;
+  left: -9px;
+}
+
+.strata-corner--br {
+  right: var(--archive-frame-margin);
+  bottom: var(--archive-frame-margin);
+  border-top: none;
+  border-left: none;
+}
+
+.strata-corner--br::after {
+  right: -9px;
+  bottom: -9px;
+}
 
 .strata-header {
   position: absolute;
@@ -1371,11 +1635,11 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 /* canvas reacts subtly under press */
-.hypercube-stage > canvas:not(.archive-reference-background) {
+.archive-hypercube-source {
   transition: filter 380ms ease;
 }
 
-.hypercube-stage.is-hud-pressing > canvas:not(.archive-reference-background) {
+.hypercube-stage.is-hud-pressing .archive-hypercube-source {
   filter: contrast(1.12) saturate(1.08);
 }
 

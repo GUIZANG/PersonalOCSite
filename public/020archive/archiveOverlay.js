@@ -28,6 +28,7 @@
     let animationDuration = expandDuration;
     let animationFrame = null;
     let disabled = false;
+    let creditsTriggerActive = false;
 
     setupStarField();
     render();
@@ -44,7 +45,10 @@
       const height = window.innerHeight || document.documentElement.clientHeight;
       updatePointerReadout(event.clientX, event.clientY);
 
-      if (event.clientY <= expandThreshold) {
+      const isInsideTrigger = event.clientY <= expandThreshold;
+      updateCreditsTrigger(isInsideTrigger);
+
+      if (isInsideTrigger) {
         scheduleExpand();
       } else {
         cancelDwell();
@@ -52,6 +56,14 @@
           animateTo(0);
         }
       }
+    }
+
+    function updateCreditsTrigger(active) {
+      if (creditsTriggerActive === active) return;
+      creditsTriggerActive = active;
+      window.dispatchEvent(new CustomEvent("archive:credits-trigger", {
+        detail: { active },
+      }));
     }
 
     // Expand only after the pointer dwells at the top edge for a beat.
@@ -220,6 +232,7 @@
 
     function disableOverlay() {
       disabled = true;
+      updateCreditsTrigger(false);
       cancelDwell();
       animateTo(0);
       document.removeEventListener("pointermove", onPointerMove);

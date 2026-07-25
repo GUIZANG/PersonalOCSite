@@ -3,6 +3,7 @@
 
   function initCursor() {
     const cursor = document.querySelector(".curzr");
+    const interactionLabel = cursor?.querySelector(".curzr__interaction-state");
     const screenGlitch = document.querySelector(".screen-glitch");
     if (!cursor) return;
 
@@ -21,6 +22,8 @@
     const desktopDotSize = 8;
     let targetX = 0;
     let targetY = 0;
+    let physicalPointerX = 0;
+    let physicalPointerY = 0;
     let dotX = 0;
     let dotY = 0;
     let outerX = 0;
@@ -38,6 +41,10 @@
     let screenGlitchUntil = 0;
     let isHypercubePressing = false;
     let hypercubePressProgress = 0;
+    let isDragging = false;
+    let isGrabTarget = false;
+    let isHovering = false;
+    let isCreditsTriggerActive = false;
     let snapActive = false;
     let snapX = 0;
     let snapY = 0;
@@ -47,7 +54,10 @@
 
     cursor.removeAttribute("hidden");
     screenGlitch?.removeAttribute("hidden");
-    document.addEventListener("mousemove", moveCursor);
+    // Pointer events continue firing while a window title bar is being dragged.
+    // Mouse compatibility events can be suppressed after pointerdown.preventDefault(),
+    // which previously left the custom cursor frozen at the drag start position.
+    document.addEventListener("pointermove", moveCursor, { passive: true });
     document.addEventListener("pointerdown", startPressGlitch);
     document.addEventListener("pointerup", endPressGlitch);
     document.addEventListener("pointercancel", endPressGlitch);
@@ -55,6 +65,9 @@
     window.addEventListener("archive:hypercube-long-press", updateHypercubePressCursor);
     window.addEventListener("archive:cursor-snap", updateCursorSnap);
     window.addEventListener("archive:hypercube-burst", resetCursorAfterBurst);
+    window.addEventListener("archive:observation-drag-start", startDragCursorState);
+    window.addEventListener("archive:observation-drag-end", endDragCursorState);
+    window.addEventListener("archive:credits-trigger", updateCreditsTriggerState);
     window.addEventListener("resize", updateCursorSize);
     window.addEventListener("blur", endPressGlitch);
     updateCursorSize();
@@ -62,20 +75,25 @@
     function moveCursor(event) {
       const nextPointerX = event.clientX;
       const nextPointerY = event.clientY;
+      physicalPointerX = nextPointerX;
+      physicalPointerY = nextPointerY;
 
       if (!hasPointerPosition) {
         syncPointer(nextPointerX, nextPointerY);
         return;
-      } else {
-        previousTargetX = targetX;
-        previousTargetY = targetY;
-        targetX = nextPointerX;
-        targetY = nextPointerY;
       }
+
+      if (snapActive || isHypercubePressing) return;
+
+      previousTargetX = targetX;
+      previousTargetY = targetY;
+      targetX = nextPointerX;
+      targetY = nextPointerY;
 
       const distanceX = clamp(previousTargetX - targetX, -10, 10);
       const distanceY = clamp(previousTargetY - targetY, -10, 10);
-      hoverScale = isHoverTarget(event) ? 1.8 : 1;
+      updatePointerInteraction(event.target);
+      updateInteractionState();
 
       if (distanceX || distanceY) {
         cursor.style.setProperty("--cursor-shadow", `
@@ -140,12 +158,17 @@
 
     function updateHypercubePressCursor(event) {
       const detail = event.detail || {};
+      const wasHoldLocked = snapActive || isHypercubePressing;
       isHypercubePressing = Boolean(detail.active);
       hypercubePressProgress = isHypercubePressing ? clamp(Number(detail.progress) || 0, 0, 1) : 0;
 
       cursor.classList.toggle("is-hypercube-pressing", isHypercubePressing);
       cursor.style.setProperty("--press-progress", hypercubePressProgress.toFixed(3));
       cursor.style.setProperty("--cursor-outer-color", mixColor("#f7f8fa", "#ff0d1a", hypercubePressProgress));
+      updateInteractionState();
+      if (wasHoldLocked && !snapActive && !isHypercubePressing) {
+        releaseHoldLock();
+      }
       if (!isHypercubePressing && !isPressing && !isPressGlitching) {
         cursor.style.setProperty("--cursor-shadow", defaultShadow);
       }
@@ -158,20 +181,94 @@
       isPressGlitching = false;
       isHypercubePressing = false;
       hypercubePressProgress = 0;
+      isDragging = false;
+      isGrabTarget = false;
+      isHovering = false;
+      isCreditsTriggerActive = false;
       pressGlitchUntil = 0;
       cursor.classList.remove("is-hypercube-pressing");
       cursor.style.setProperty("--press-progress", "0");
       cursor.style.setProperty("--cursor-shadow", defaultShadow);
+      updateInteractionState();
+    }
+
+    function startDragCursorState() {
+      isDragging = true;
+      isGrabTarget = false;
+      isHovering = false;
+      hoverScale = 1;
+      snapActive = false;
+      updateInteractionState();
+    }
+
+    function endDragCursorState() {
+      isDragging = false;
+      const target = document.elementFromPoint(targetX, targetY);
+      updatePointerInteraction(target);
+      updateInteractionState();
+    }
+
+    function updateCreditsTriggerState(event) {
+      isCreditsTriggerActive = Boolean(event.detail?.active);
+      updateInteractionState();
+    }
+
+    function updatePointerInteraction(target) {
+      const stage = document.getElementById("hypercube-stage");
+      isGrabTarget =
+        !isDragging &&
+        target instanceof Element &&
+        Boolean(target.closest(".archive-media-window__bar"));
+      isHovering =
+        !isDragging &&
+        Boolean(stage?.classList.contains("is-hypercube-hovered"));
+      hoverScale = !isDragging && isHoverElement(target) ? 1.8 : 1;
+    }
+
+    function updateInteractionState() {
+      const state = isDragging
+        ? "drag"
+        : isGrabTarget
+          ? "grab"
+          : (snapActive || isHypercubePressing)
+            ? "hold"
+            : isHovering
+              ? "hover"
+              : isCreditsTriggerActive
+                ? "stay"
+                : "";
+
+      cursor.dataset.interaction = state;
+      if (interactionLabel) {
+        interactionLabel.textContent =
+          state === "hold" ? "HOLD" :
+          state === "drag" ? "DRAG" :
+          state === "grab" ? "GRAB" :
+          state === "hover" ? "HOVER" :
+          state === "stay" ? "STAY" : "";
+      }
     }
 
     function updateCursorSnap(event) {
       const detail = event.detail || {};
+      const wasHoldLocked = snapActive || isHypercubePressing;
       snapActive = Boolean(detail.active);
 
       if (snapActive) {
         snapX = Number(detail.x) || 0;
         snapY = Number(detail.y) || 0;
       }
+      if (wasHoldLocked && !snapActive && !isHypercubePressing) {
+        releaseHoldLock();
+      }
+      updateInteractionState();
+    }
+
+    function releaseHoldLock() {
+      previousTargetX = targetX;
+      previousTargetY = targetY;
+      targetX = physicalPointerX;
+      targetY = physicalPointerY;
     }
 
     function updateCursorSize() {
@@ -188,6 +285,7 @@
     }
 
     function animateCursor() {
+      const isHoldLocked = snapActive || isHypercubePressing;
       if (snapActive) {
         targetX = snapX;
         targetY = snapY;
@@ -195,7 +293,7 @@
 
       dotX += (targetX - dotX) * 0.34;
       dotY += (targetY - dotY) * 0.34;
-      if (snapActive) {
+      if (isHoldLocked) {
         // Pin the outer ring (long-press range) onto the inner dot so the two
         // cursor circles stay concentric with the snapped red center dot.
         outerX = dotX;
@@ -239,6 +337,8 @@
     }
 
     function syncPointer(x, y) {
+      physicalPointerX = x;
+      physicalPointerY = y;
       targetX = x;
       targetY = y;
       dotX = targetX;
@@ -289,13 +389,14 @@
       document.body.classList.add("is-screen-glitching");
     }
 
-    function isHoverTarget(event) {
-      const target = event.target;
+    function isHoverElement(target) {
+      if (isDragging || document.getElementById("hypercube-stage")?.classList.contains("is-observation-dragging")) {
+        return false;
+      }
       if (!(target instanceof Element)) return false;
 
       return Boolean(
-        target.closest("button, a, .hoverable, .curzr-hover") ||
-          document.querySelector(".is-hypercube-hovered")
+        target.closest("button, a, .hoverable, .curzr-hover")
       );
     }
 

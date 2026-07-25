@@ -1,4 +1,4 @@
-import { VFX } from "/libs/vfx-js.min.js";
+import { VFX } from "../libs/vfx-js.min.js";
 
 // Pixel-scan dissolve adapted from public/reference/reference.js.
 // Instead of being driven by enter/leave time, the dissolve front is locked to

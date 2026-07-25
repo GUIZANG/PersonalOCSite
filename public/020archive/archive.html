@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PRECOGNITIVE STRATA</title>
-  <link rel="icon" href="/assets/images/logo/brain.svg" type="image/x-icon" />
-  <link rel="stylesheet" href="/styles/fonts.css" />
-  <link rel="stylesheet" href="/styles/colors.css" />
+  <link rel="icon" href="../assets/images/logo/brain.svg" type="image/x-icon" />
+  <link rel="stylesheet" href="../styles/fonts.css" />
+  <link rel="stylesheet" href="../styles/colors.css" />
   <link rel="stylesheet" href="archive.css" />
 </head>
 <body>
@@ -15,46 +15,15 @@
     <div class="strata-glitch" aria-hidden="true"></div>
 
     <section class="strata" id="archiveAmbientHud" data-state="dormant" aria-label="Archive interface">
-      <!-- [NEW] Brutalist / Tech Noir Peripheral Elements -->
-      <div class="strata-grid strata-grid--x"></div>
-      <div class="strata-grid strata-grid--y"></div>
-      
       <div class="strata-corner strata-corner--tl"></div>
+      <div class="strata-corner strata-corner--tr"></div>
+      <div class="strata-corner strata-corner--bl"></div>
       <div class="strata-corner strata-corner--br"></div>
-
-      <div class="strata-watermark" aria-hidden="true">STRATA_</div>
-
-      <header class="strata-header">
-        <div class="strata-header__id">
-          <span class="strata-header__val">ARCHIVE // FIELD_LOG</span>
-          <span class="strata-header__stat">STABLE_</span>
-        </div>
-        <div class="strata-header__alert">
-          <div class="strata-alert-box" data-text-default="WARNING: AVOID DIRECT OBSERVATION" data-text-press="CRITICAL_OVERLOAD"></div>
-        </div>
-      </header>
-
-      <aside class="strata-sidebar">
-        <div class="strata-sidebar__ruler"></div>
-        <div class="strata-sidebar__data">
-          <span id="sb-lat">LAT: 47.3769</span>
-          <span id="sb-lng">LNG: 8.5417</span>
-          <span id="sb-elev">ELEV: -999M</span>
-        </div>
-      </aside>
 
       <div class="strata__record">
         <strong class="strata__record-title" id="archiveHudRecord">THE EYE</strong>
         <p class="strata__record-body" id="archiveHudSummary">It does not look at you. It remembers the version of you that has not happened yet.</p>
       </div>
-
-      <footer class="strata-footer">
-        <div class="strata-footer__barcode"></div>
-        <div class="strata-footer__text">
-          <span>SUBJECT: ANOMALY-00</span>
-          <span class="strata-redacted">SEVERITY: HIGH</span>
-        </div>
-      </footer>
     </section>
 
     <section class="archive-card-stream" id="archiveCardStream" aria-label="Archive card stream">
@@ -122,22 +91,29 @@
           <span>Eye artwork used in the hover interaction</span>
           <a href="http://xhslink.com/o/6VdDIWcSSeT" target="_blank" rel="noopener noreferrer">RedNote by xangie</a>
         </li>
+        <li>
+          <span>Movable overlapping live-feed window direction</span>
+          <a href="https://orage.studio/" target="_blank" rel="noopener noreferrer">Orage Studio</a>
+        </li>
       </ul>
     </div>
   </aside>
 
-  <div class="curzr" hidden aria-hidden="true"></div>
+  <div class="curzr" hidden aria-hidden="true">
+    <span class="curzr__interaction-state"></span>
+  </div>
   <div class="screen-glitch" hidden aria-hidden="true"></div>
 
-  <script src="/libs/three.min.js"></script>
-  <script src="/libs/gsap.min.js"></script>
-  <script type="module" src="/020archive/archiveCardVFX.js"></script>
-  <script src="/020archive/archiveReferenceBackground.js"></script>
-  <script src="/020archive/archiveCard.js"></script>
-  <script src="/020archive/archive.js"></script>
-  <script src="/020archive/archiveFrames.js"></script>
-  <script src="/020archive/archiveOverlay.js"></script>
-  <script src="/020archive/archiveCursor.js"></script>
-  <script type="module" src="/020archive/archiveEyeGlitch.js"></script>
+  <script src="../libs/three.min.js"></script>
+  <script src="../libs/gsap.min.js"></script>
+  <script type="module" src="archiveCardVFX.js"></script>
+  <script src="archiveReferenceBackground.js"></script>
+  <script src="archiveCard.js"></script>
+  <script src="archiveObservationWindows.js"></script>
+  <script src="archive.js"></script>
+  <script src="archiveFrames.js"></script>
+  <script src="archiveOverlay.js"></script>
+  <script src="archiveCursor.js"></script>
+  <script type="module" src="archiveEyeGlitch.js"></script>
 </body>
 </html>

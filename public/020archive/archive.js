@@ -143,25 +143,30 @@
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.renderer.setClearColor(this.background, 0);
 
-      this.container.insertBefore(this.renderer.domElement, this.container.firstChild);
+      this.visualLayer = document.createElement("div");
+      this.visualLayer.className = "archive-hypercube-visual-layer";
+      this.visualLayer.setAttribute("aria-hidden", "true");
+      this.container.insertBefore(this.visualLayer, this.container.firstChild);
+      this.renderer.domElement.classList.add("archive-hypercube-source");
+      this.visualLayer.appendChild(this.renderer.domElement);
       window.ArchiveCardVFX?.attachLiquidSource?.(this.renderer.domElement);
       this.pressTargetGuide = document.createElement("div");
       this.pressTargetGuide.className = "hypercube-press-target-guide";
-      this.container.appendChild(this.pressTargetGuide);
+      this.visualLayer.appendChild(this.pressTargetGuide);
       this.hoverExitGuide = document.createElement("div");
       this.hoverExitGuide.className = "hypercube-hover-exit-guide";
       this.hoverExitGuide.setAttribute("aria-hidden", "true");
-      this.container.appendChild(this.hoverExitGuide);
+      this.visualLayer.appendChild(this.hoverExitGuide);
       this.rayInnerRingEl = document.createElement("div");
       this.rayInnerRingEl.className = "hypercube-ray-inner-ring";
-      this.container.appendChild(this.rayInnerRingEl);
+      this.visualLayer.appendChild(this.rayInnerRingEl);
       this.eyeFxEl = document.createElement("div");
       this.eyeFxEl.className = "hypercube-eye-fx";
       this.eyeFxEl.setAttribute("aria-hidden", "true");
       this.eyeFxEl.innerHTML =
         '<span class="hypercube-eye-fx__scan"></span>' +
         '<span class="hypercube-eye-fx__ring"></span>';
-      this.container.appendChild(this.eyeFxEl);
+      this.visualLayer.appendChild(this.eyeFxEl);
 
       this.animate = this.animate.bind(this);
       this.onResize = this.onResize.bind(this);
@@ -211,7 +216,7 @@
       const cubeParticlesPerEdge = 400;
       const burstParticlesPerEdge = 200;
       const initialHoverCoreParticlesPerEdge = 1800;
-      const hoverCoreParticlesPerEdge = 10800;
+      const hoverCoreParticlesPerEdge = 7200;
       const hoverScatterParticlesPerEdge = 0;
       const hoverParticlesPerEdge = hoverCoreParticlesPerEdge + hoverScatterParticlesPerEdge;
       const outerScale = 0.5;
@@ -492,6 +497,7 @@
       this.container.addEventListener("pointerdown", this.onPointerDown);
       this.container.addEventListener("pointerup", this.onPointerUp);
       this.container.addEventListener("pointercancel", this.onPointerUp);
+      window.addEventListener("archive:observation-drag-start", () => this.clearHoverForDrag());
       this.updatePressTargetGuide();
       this.updateAmbientHudState("DORMANT");
       this.animate(0);
@@ -742,10 +748,30 @@
         return;
       }
 
+      if (this.container.classList.contains("is-observation-dragging")) {
+        this.activeInteractionRect = null;
+        this.resetHoverLookTarget();
+        this.clearHoverForDrag();
+        return;
+      }
+
       if (this.pressPointerId === event.pointerId) {
-        // During a long-press the cursor is pinned to the press center and stays
-        // there no matter how the pointer moves, until release.
+        // Pointer capture retargets move events to the stage, so the viewport
+        // check below would otherwise misread a tiny movement as leaving the
+        // observation window and collapse the eye back into the hypercube.
+        this.resetHoverLookTarget();
         this.lockCursorToPressCenter();
+        return;
+      }
+
+      const mediaViewport = event.target?.closest?.(".archive-media-window__viewport");
+      if (this.container.classList.contains("has-archive-media-windows") && !mediaViewport) {
+        this.activeInteractionRect = null;
+        this.resetHoverLookTarget();
+        this.exitHover();
+        this.cursorSnapActive = false;
+        window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
+        this.container.classList.remove("is-hud-scanning");
         return;
       }
 
@@ -821,8 +847,31 @@
       this.updateAmbientHudState("DORMANT");
     }
 
+    clearHoverForDrag() {
+      this.cancelLongPress();
+      this.hoverTarget = 0;
+      this.hoverAmount = 0;
+      this.hoverDustTarget = 0;
+      this.hoverDustAmount = 0;
+      this.isHoverDustExiting = false;
+      this.cursorSnapActive = false;
+      this.resetHoverLookTarget();
+      this.container.classList.remove("is-hypercube-hovered", "is-hud-scanning");
+      this.setAmbientHudEyeRecord(false);
+      this.updateAmbientHudState("DORMANT");
+      window.dispatchEvent(new CustomEvent("archive:cursor-snap", {
+        detail: { active: false },
+      }));
+    }
+
     onPointerDown(event) {
       if (event.button !== 0) return;
+      if (
+        this.container.classList.contains("has-archive-media-windows") &&
+        !event.target?.closest?.(".archive-media-window__viewport")
+      ) {
+        return;
+      }
 
       // Long-press only starts when the cursor is actually aimed at (snapped to)
       // the red center dot. We do NOT force-snap on press.
@@ -834,6 +883,7 @@
       this.updateCursorPressState(true);
       this.updateAmbientHudPress(0);
       this.enterHover();
+      this.resetHoverLookTarget();
       this.lockCursorToPressCenter();
       this.container.setPointerCapture?.(event.pointerId);
     }
@@ -845,10 +895,42 @@
       this.cursorSnapActive = false;
       window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
       this.container.releasePointerCapture?.(event.pointerId);
+      this.reconcileHoverAfterPress(event);
+    }
+
+    reconcileHoverAfterPress(event) {
+      if (this.burstTarget > 0) return;
+
+      const pointerTarget = document.elementFromPoint(event.clientX, event.clientY);
+      const mediaViewport = pointerTarget?.closest?.(".archive-media-window__viewport");
+      if (this.container.classList.contains("has-archive-media-windows") && !mediaViewport) {
+        this.activeInteractionRect = null;
+        this.resetHoverLookTarget();
+        this.exitHover();
+        this.container.classList.remove("is-hud-scanning");
+        this.updateAmbientHudState("DORMANT");
+        return;
+      }
+
+      const { distance, rect } = this.getCenterDistance(event);
+      const exitRadius = Math.min(rect.width, rect.height) * this.hoverExitRadiusRatio;
+      if (distance < exitRadius) {
+        this.enterHover();
+        this.updateHoverLookTarget(event, true);
+        this.updateCursorSnap(event);
+        this.updateAmbientHudPointer(event, false);
+        return;
+      }
+
+      this.activeInteractionRect = null;
+      this.resetHoverLookTarget();
+      this.exitHover();
+      this.container.classList.remove("is-hud-scanning");
+      this.updateAmbientHudState("DORMANT");
     }
 
     lockCursorToPressCenter() {
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.getActiveInteractionRect();
       const center = this.getPressCenter(rect);
       this.cursorSnapActive = true;
       window.dispatchEvent(new CustomEvent("archive:cursor-snap", {
@@ -928,6 +1010,7 @@
       const active = smoothstep(0.18, 0.92, this.hoverAmount) * (1 - this.burstAmount);
       const tiltX = this.hoverLookCurrent.y * this.hoverLookMaxTilt * active;
       const tiltY = this.hoverLookCurrent.x * this.hoverLookMaxTilt * active;
+      const interactionRect = this.renderer.domElement.getBoundingClientRect();
 
       if (this.hoverDustGroup) {
         this.hoverDustGroup.rotation.set(tiltX, tiltY, 0);
@@ -941,7 +1024,7 @@
       }
 
       if (this.hoverCenterDotEl) {
-        const rect = this.renderer.domElement.getBoundingClientRect();
+        const rect = interactionRect;
         const center = this.getPressCenter(rect);
         const cursorMetrics = this.getCursorMetrics();
         let ox = this.hoverLookCurrent.x;
@@ -970,6 +1053,7 @@
         this.hoverCenterDotEl.style.setProperty("--dot-y", `${dotY}px`);
         this.hoverCenterDotEl.style.setProperty("--dot-opacity", opacity.toFixed(3));
       }
+
     }
 
     activateBurst() {
@@ -1029,7 +1113,7 @@
     updatePressTargetGuide() {
       if (!this.pressTargetGuide) return;
 
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.getActiveInteractionRect();
       const diameter = this.getPressRadius(rect) * 2;
       const center = this.getPressCenter(rect);
 
@@ -1057,7 +1141,7 @@
     updateDebugCircles() {
       if (!this.rayInnerRingEl) return;
 
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.getActiveInteractionRect();
       const base = this.getHoverDustBaseSize();
       const pxPerWorld = rect.height / base;
       // Inner radius of the hover-dust ray field (see createHoverDust),
@@ -1106,7 +1190,7 @@
     updateAmbientHudPointer(event, isScanning) {
       if (!this.ambientHud || this.burstTarget > 0) return;
 
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.getInteractionRect(event);
       const x = Math.round(THREE.MathUtils.clamp(event.clientX - rect.left, 0, rect.width));
       const y = Math.round(THREE.MathUtils.clamp(event.clientY - rect.top, 0, rect.height));
       if (this.hudCoord) {
@@ -1381,7 +1465,7 @@
     }
 
     getPressDistance(event) {
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.getInteractionRect(event);
       const center = this.getPressCenter(rect);
 
       return {
@@ -1391,7 +1475,7 @@
     }
 
     getCenterDistance(event) {
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.getInteractionRect(event);
       const offset = this.getHypercubeScreenOffset(rect);
       const x = event.clientX - rect.left - rect.width / 2 - offset.x;
       const y = event.clientY - rect.top - rect.height / 2 - offset.y;
@@ -1400,6 +1484,16 @@
         distance: Math.hypot(x, y),
         rect,
       };
+    }
+
+    getInteractionRect(event) {
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      this.activeInteractionRect = rect;
+      return rect;
+    }
+
+    getActiveInteractionRect() {
+      return this.renderer.domElement.getBoundingClientRect();
     }
 
     setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, offsets, burst) {
@@ -1547,7 +1641,7 @@
     createHoverCenterDot() {
       this.hoverCenterDotEl = document.createElement("div");
       this.hoverCenterDotEl.className = "archive-hover-center-dot";
-      document.body.appendChild(this.hoverCenterDotEl);
+      this.visualLayer.appendChild(this.hoverCenterDotEl);
     }
 
     createHoverDustRayGuides(innerRadius, outerRadius, rayCount) {
@@ -1733,7 +1827,7 @@
 
     async loadHoverTargetPoints(total, coreParticlesPerEdge, particlesPerEdge) {
       try {
-        const image = await this.loadImage("/assets/images/fullEye.svg");
+        const image = await this.loadImage("../assets/images/fullEye.svg");
         const maxCanvasSide = 360;
         const scale = maxCanvasSide / Math.max(image.naturalWidth, image.naturalHeight);
         const width = Math.max(Math.round(image.naturalWidth * scale), 1);
