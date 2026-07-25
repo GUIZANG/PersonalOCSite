@@ -30,7 +30,6 @@
     let disabled = false;
     let creditsTriggerActive = false;
 
-    setupStarField();
     render();
     document.addEventListener("pointermove", onPointerMove);
     overlayContent?.addEventListener("scroll", updateScrollLine);
@@ -46,7 +45,8 @@
       updatePointerReadout(event.clientX, event.clientY);
 
       const isInsideTrigger = event.clientY <= expandThreshold;
-      updateCreditsTrigger(isInsideTrigger);
+      const canShowStay = progress <= 0.001 && targetProgress === 0;
+      updateCreditsTrigger(isInsideTrigger && canShowStay);
 
       if (isInsideTrigger) {
         scheduleExpand();
@@ -71,6 +71,7 @@
       if (targetProgress === 1 || dwellTimer) return;
       dwellTimer = setTimeout(() => {
         dwellTimer = null;
+        updateCreditsTrigger(false);
         animateTo(1);
       }, expandDwell);
     }
@@ -126,6 +127,17 @@
       overlay.style.setProperty("--archive-overlay-pointer-events", isOpen ? "auto" : "none");
       overlay.style.setProperty("--archive-overlay-readout-opacity", isOpen ? "1" : "0");
       document.body.classList.toggle("is-archive-overlay-open", isOpen);
+      overlay.setAttribute("aria-hidden", isOpen ? "false" : "true");
+
+      if (progress >= 0.999 && targetProgress === 1) {
+        if (!overlay.classList.contains("is-credits-revealed")) {
+          overlayContent?.scrollTo({ top: 0, behavior: "auto" });
+          overlay.classList.add("is-credits-revealed");
+        }
+      } else if (progress <= 0.001) {
+        overlay.classList.remove("is-credits-revealed");
+      }
+
       updateScrollLine();
     }
 
@@ -188,30 +200,6 @@
         const scanValue = Math.round(((x / Math.max(window.innerWidth, 1)) * 73 + (y / Math.max(window.innerHeight, 1)) * 27) % 100);
         scanReadoutState.textContent = `SCAN ${String(scanValue).padStart(2, "0")}`;
       }
-    }
-
-    // Seed three parallax layers of stars as box-shadow lists in CSS vars.
-    function setupStarField() {
-      const spread = 2000;
-      overlay.style.setProperty("--archive-overlay-stars-small", buildStars(700, spread));
-      overlay.style.setProperty("--archive-overlay-stars-medium", buildStars(200, spread));
-      overlay.style.setProperty("--archive-overlay-stars-big", buildStars(90, spread));
-
-      ["small", "medium", "big"].forEach((size) => {
-        const layer = document.createElement("div");
-        layer.className = `archive-overlay-stars archive-overlay-stars--${size}`;
-        overlay.insertBefore(layer, overlay.firstChild);
-      });
-    }
-
-    function buildStars(count, spread) {
-      const parts = [];
-      for (let i = 0; i < count; i++) {
-        const x = Math.floor(Math.random() * spread);
-        const y = Math.floor(Math.random() * spread);
-        parts.push(`${x}px ${y}px #FFF`);
-      }
-      return parts.join(", ");
     }
 
     // Once the hypercube bursts, the overlay is no longer reachable.

@@ -136,13 +136,18 @@
         viewport.className = "archive-media-window__viewport";
         viewport.setAttribute("aria-label", `${definition.label} observation aperture`);
 
-        frame.append(bar, viewport);
+        const content = document.createElement("div");
+        content.className = "archive-media-window__content";
+        content.append(bar, viewport);
+
+        frame.appendChild(content);
         this.layer.appendChild(frame);
         this.windows.push({
           definition,
           index,
           depth: WINDOW_DEPTH[definition.size] || 1,
           frame,
+          content,
           bar,
           viewport,
           clipRect: null,
@@ -281,14 +286,15 @@
 
     startEntranceAnimation() {
       const orderedWindows = [...this.windows].sort(
-        (a, b) => (a.definition.x + a.definition.y) - (b.definition.x + b.definition.y)
+        (a, b) =>
+          a.depth - b.depth ||
+          (a.definition.x + a.definition.y) - (b.definition.x + b.definition.y)
       );
       const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
       if (reduceMotion) {
         orderedWindows.forEach((item) => {
-          item.revealProgress = 1;
-          item.frame.style.setProperty("--window-reveal", "100%");
+          this.setRevealProgress(item, 1);
           item.frame.classList.add("is-reveal-complete");
         });
         this.refreshClip();
@@ -308,8 +314,7 @@
           const linearProgress = Math.min(1, Math.max(0, elapsed / duration));
           const easedProgress = 1 - Math.pow(1 - linearProgress, 4);
 
-          item.revealProgress = easedProgress;
-          item.frame.style.setProperty("--window-reveal", `${(easedProgress * 100).toFixed(3)}%`);
+          this.setRevealProgress(item, easedProgress);
 
           if (linearProgress >= 1) {
             item.frame.classList.add("is-reveal-complete");
@@ -323,6 +328,22 @@
       };
 
       window.requestAnimationFrame(tick);
+    }
+
+    setRevealProgress(item, progress) {
+      const clamped = Math.min(1, Math.max(0, progress));
+      const frameRect = item.frame.getBoundingClientRect();
+      item.revealProgress = clamped;
+      item.frame.style.setProperty("--window-reveal", `${(clamped * 100).toFixed(3)}%`);
+      item.frame.style.setProperty(
+        "--window-outline-width",
+        `${(frameRect.width * clamped).toFixed(2)}px`
+      );
+      item.frame.style.setProperty(
+        "--window-outline-height",
+        `${(frameRect.height * clamped).toFixed(2)}px`
+      );
+      item.frame.style.setProperty("--window-outline-opacity", clamped > 0 ? "1" : "0");
     }
 
     bindEvents() {
@@ -399,11 +420,13 @@
     }
 
     applyWindowSizes() {
-      this.windows.forEach(({ definition, frame }) => {
+      this.windows.forEach((item) => {
+        const { definition, frame } = item;
         const requestedWidth = Math.max(180, Math.round(window.innerWidth * definition.width));
         frame.style.width = `${requestedWidth}px`;
         const renderedWidth = frame.getBoundingClientRect().width || requestedWidth;
         frame.style.setProperty("--window-content-height", `${renderedWidth / definition.ratio}px`);
+        this.setRevealProgress(item, item.revealProgress);
       });
     }
 

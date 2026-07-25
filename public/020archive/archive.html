@@ -55,47 +55,88 @@
       <span id="archiveOverlayCoordReadout">X0000 / Y0000</span>
       <span id="archiveOverlayScanReadoutState">SCAN 00</span>
     </div>
-    <div class="archive-overlay-page__inner">
-      <span class="archive-overlay-page__kicker">References / Inspiration / Source Notes</span>
-      <h1 class="archive-overlay-page__title">CREDITS</h1>
-      <p class="archive-overlay-page__copy">
-        This visual experiment references the following public works and materials.
-        Copyright and authorship belong to their original creators.
+    <canvas class="archive-overlay-grid" id="archiveOverlayGrid" aria-hidden="true"></canvas>
+    <h1 class="archive-overlay-page__backdrop-title" aria-hidden="true">CREDITS</h1>
+    <aside class="archive-overlay-manifest" aria-label="Credits archive manifest">
+      <header class="archive-overlay-manifest__header">
+        <span>Archive manifest</span>
+        <b>020 / C</b>
+      </header>
+      <dl class="archive-overlay-manifest__data">
+        <div style="--manifest-order: 0">
+          <dt>Project</dt>
+          <dd>Precognitive Strata</dd>
+        </div>
+        <div style="--manifest-order: 1">
+          <dt>Format</dt>
+          <dd>Interactive field record</dd>
+        </div>
+        <div style="--manifest-order: 2">
+          <dt>Edition</dt>
+          <dd>020 / Archive experiment</dd>
+        </div>
+        <div style="--manifest-order: 3">
+          <dt>Source state</dt>
+          <dd>Linked / Retained</dd>
+        </div>
+      </dl>
+      <div class="archive-overlay-manifest__integrity">
+        <div>
+          <span>Reference integrity</span>
+          <b>08 / 08</b>
+        </div>
+        <div class="archive-overlay-manifest__ticks" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+      </div>
+      <p class="archive-overlay-manifest__note">
+        All linked works remain the property of their respective authors.
       </p>
+    </aside>
+    <div class="archive-overlay-page__inner">
+      <header class="archive-overlay-page__header">
+        <span class="archive-overlay-page__kicker">Archive / Acknowledgements / 007</span>
+        <p class="archive-overlay-page__copy">
+          Precognitive Strata is an independent visual experiment assembled from
+          public studies, interface references and original interaction work.
+          Copyright remains with each original author.
+        </p>
+      </header>
       <ul class="archive-overlay-credits" aria-label="Reference sources">
-        <li>
-          <span>Central rotating hypercube animation</span>
-          <a href="https://codepen.io/jkantner/pen/YPGrodj" target="_blank" rel="noopener noreferrer">CodePen by Jon Kantner</a>
+        <li style="--credit-order: 0">
+          <span><b>001</b> Core motion</span>
+          <a href="https://codepen.io/jkantner/pen/YPGrodj" target="_blank" rel="noopener noreferrer">Hypercube study / Jon Kantner</a>
         </li>
-        <li>
-          <span>Scrolling archive card layout and visual direction</span>
-          <a href="https://codepen.io/blacklead-studio/pen/xbwaqxE" target="_blank" rel="noopener noreferrer">CodePen by BL/S® Studio</a>
+        <li style="--credit-order: 1">
+          <span><b>002</b> Archive system</span>
+          <a href="https://codepen.io/blacklead-studio/pen/xbwaqxE" target="_blank" rel="noopener noreferrer">Card-stream direction / BL/S® Studio</a>
         </li>
-        <li>
-          <span>Starfield particles on credits overlay</span>
-          <a href="https://codepen.io/sarazond/pen/LYGbwj" target="_blank" rel="noopener noreferrer">CodePen by sarazond</a>
+        <li style="--credit-order: 2">
+          <span><b>003</b> Signal field</span>
+          <a href="https://codepen.io/StarKnightt/pen/VYvZeom" target="_blank" rel="noopener noreferrer">Particle direction / Prasen</a>
         </li>
-        <li>
-          <span>Main starfield background inspiration</span>
-          <a href="https://codepen.io/StarKnightt/pen/VYvZeom" target="_blank" rel="noopener noreferrer">CodePen by Prasen</a>
+        <li style="--credit-order: 3">
+          <span><b>004</b> Depth surface</span>
+          <a href="https://codepen.io/dackmin/pen/ZEaOEg" target="_blank" rel="noopener noreferrer">Parallax study / Dackmin</a>
         </li>
-        <li>
-          <span>Selected-card parallax block background inspiration</span>
-          <a href="https://codepen.io/dackmin/pen/ZEaOEg" target="_blank" rel="noopener noreferrer">CodePen by dackmin</a>
+        <li style="--credit-order: 4">
+          <span><b>005</b> Dissolve VFX</span>
+          <a href="https://codepen.io/fand/pen/MWMBdbj" target="_blank" rel="noopener noreferrer">Shader study / Amagi</a>
         </li>
-        <li>
-          <span>Dissolve shader effect used on archive cards</span>
-          <a href="https://codepen.io/fand/pen/MWMBdbj" target="_blank" rel="noopener noreferrer">CodePen by Amagi</a>
+        <li style="--credit-order: 5">
+          <span><b>006</b> Eye source</span>
+          <a href="http://xhslink.com/o/6VdDIWcSSeT" target="_blank" rel="noopener noreferrer">Visual reference / Xangie</a>
         </li>
-        <li>
-          <span>Eye artwork used in the hover interaction</span>
-          <a href="http://xhslink.com/o/6VdDIWcSSeT" target="_blank" rel="noopener noreferrer">RedNote by xangie</a>
-        </li>
-        <li>
-          <span>Movable overlapping live-feed window direction</span>
-          <a href="https://orage.studio/" target="_blank" rel="noopener noreferrer">Orage Studio</a>
+        <li style="--credit-order: 6">
+          <span><b>007</b> Credits system</span>
+          <a href="https://orage.studio/about/" target="_blank" rel="noopener noreferrer">Layout reference / Orage Studio</a>
         </li>
       </ul>
+      <footer class="archive-overlay-page__footer">
+        <span>Edition / 020</span>
+        <span>Status / Sources linked</span>
+        <span>Field / Precognitive Strata</span>
+      </footer>
     </div>
   </aside>
 
@@ -113,6 +154,7 @@
   <script src="archive.js"></script>
   <script src="archiveFrames.js"></script>
   <script src="archiveOverlay.js"></script>
+  <script src="archiveCreditsGrid.js"></script>
   <script src="archiveCursor.js"></script>
   <script type="module" src="archiveEyeGlitch.js"></script>
 </body>

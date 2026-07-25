@@ -111,6 +111,15 @@ function flashGlitch(duration) {
   }, duration);
 }
 
+window.addEventListener("archive:eye-glitch", (event) => {
+  if (stopped) return;
+  const requestedDuration = Number(event.detail?.duration);
+  const duration = Number.isFinite(requestedDuration)
+    ? Math.min(600, Math.max(80, requestedDuration))
+    : 240;
+  flashGlitch(duration);
+});
+
 function scheduleBurst() {
   const wait = GAP_MIN + Math.random() * GAP_RANDOM;
   window.setTimeout(() => {

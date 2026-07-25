@@ -94,6 +94,8 @@
       this.hudFrameCount = 0;
       this.hudMicroLast = 0;
       this.hudGlitchTimer = null;
+      this.initialBlinkTimer = null;
+      this.initialTextGlitchTimer = null;
       this.hudTelemetryLast = 0;
       this.hudTelemetryTargetAt = 0;
       this.hudTelemetry = {
@@ -501,6 +503,7 @@
       this.updatePressTargetGuide();
       this.updateAmbientHudState("DORMANT");
       this.animate(0);
+      this.scheduleInitialGlitches();
     }
 
     animate(time) {
@@ -1353,11 +1356,11 @@
       }, 400);
     }
 
-    // Full eyelid blink: the black-screen shutter (+ HUD glitch). Only fired by the
-    // 8-15s signal-loss cadence, so there is at most one blink per random window,
-    // whether the cube is idle or mid long-press.
-    triggerBlink() {
-      this.triggerHudGlitch();
+    // Full eyelid blink: the existing black-screen shutter. Normal scheduled
+    // blinks keep their accompanying HUD glitch; the one-off first-load blink
+    // can reuse the same shutter without making the separate text fault overlap.
+    triggerBlink(includeHudGlitch = true) {
+      if (includeHudGlitch) this.triggerHudGlitch();
       if (!this.container) return;
 
       this.container.classList.remove("is-hud-glitch");
@@ -1367,6 +1370,40 @@
       this.blinkTimer = setTimeout(() => {
         this.container?.classList.remove("is-hud-glitch");
       }, 400);
+    }
+
+    scheduleInitialGlitches() {
+      clearTimeout(this.initialBlinkTimer);
+      clearTimeout(this.initialTextGlitchTimer);
+
+      // Keep the two required first-load faults random but non-overlapping.
+      // One occupies an early window and the other a later window; their order
+      // is shuffled on every page entry. Both finish before the three-second mark.
+      const earlyDelay = 400 + Math.random() * 850;
+      const lateDelay = 1800 + Math.random() * 650;
+      const blinkFirst = Math.random() < 0.5;
+      const blinkDelay = blinkFirst ? earlyDelay : lateDelay;
+      const textDelay = blinkFirst ? lateDelay : earlyDelay;
+
+      this.initialBlinkTimer = setTimeout(
+        () => this.triggerInitialBlink(),
+        blinkDelay
+      );
+      this.initialTextGlitchTimer = setTimeout(
+        () => this.triggerInitialTextGlitch(),
+        textDelay
+      );
+    }
+
+    triggerInitialBlink() {
+      this.triggerBlink(false);
+    }
+
+    triggerInitialTextGlitch() {
+      this.triggerHudGlitch();
+      window.dispatchEvent(new CustomEvent("archive:eye-glitch", {
+        detail: { duration: 320 },
+      }));
     }
 
     updateAmbientHudState(state) {
