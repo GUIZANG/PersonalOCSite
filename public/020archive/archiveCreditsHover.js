@@ -35,19 +35,22 @@
 
       const mirrorCount = Math.min(letters.length, 2 + Math.floor(Math.random() * 2));
       const available = [...letters];
+      const blinkDelays = [0.1, 0.2, 0.3].sort(() => Math.random() - 0.5);
       for (let index = 0; index < mirrorCount; index += 1) {
         const selectedIndex = Math.floor(Math.random() * available.length);
-        available.splice(selectedIndex, 1)[0]?.classList.add("is-mirrored");
+        const selectedLetter = available.splice(selectedIndex, 1)[0];
+        selectedLetter?.style.setProperty("--credit-blink-delay", `${blinkDelays[index]}s`);
+        selectedLetter?.classList.add("is-mirrored");
       }
 
       item.classList.add("is-credit-glitching");
       resetTimers.set(item, window.setTimeout(() => {
         item.classList.remove("is-credit-glitching");
         letters.forEach((letter) => letter.classList.remove("is-mirrored"));
-      }, 440));
+      }, 680));
     };
 
-    item.addEventListener("pointerenter", triggerGlitch);
+    link.addEventListener("pointerenter", triggerGlitch);
     link.addEventListener("focus", triggerGlitch);
   });
 })();

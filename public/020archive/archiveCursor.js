@@ -232,10 +232,10 @@
           ? "grab"
           : (snapActive || isHypercubePressing)
             ? "hold"
-            : isHovering
-              ? "hover"
-              : isCreditsTriggerActive
-                ? "stay"
+            : isCreditsTriggerActive
+              ? "stay"
+              : isHovering
+                ? "hover"
                 : "";
 
       cursor.dataset.interaction = state;
