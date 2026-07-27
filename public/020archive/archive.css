@@ -2557,6 +2557,200 @@ body.is-screen-glitching .hypercube-stage {
   bottom: -9px;
 }
 
+/* ---- broken peripheral datum ---------------------------------
+   Four discontinuous information buses live in the black margin outside the
+   corner brackets. They imply one calibrated perimeter without rebuilding the
+   full four-sided frame that was deliberately removed. */
+.strata-edge-bus {
+  --edge-bus-ink: rgba(244, 247, 249, 0.56);
+  --edge-bus-dim: rgba(244, 247, 249, 0.27);
+  --edge-bus-inset: clamp(7px, 1vw, 15px);
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  align-items: center;
+  gap: clamp(7px, 0.75vw, 13px);
+  color: var(--edge-bus-ink);
+  font-family: "supplyMono", monospace;
+  font-size: clamp(5.5px, 0.39vw, 7px);
+  line-height: 1;
+  letter-spacing: 0.17em;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  mix-blend-mode: difference;
+  opacity: 0;
+}
+
+.strata-edge-bus__label,
+.strata-edge-bus__index {
+  display: block;
+  font-weight: 400;
+}
+
+.strata-edge-bus__index {
+  color: var(--edge-bus-dim);
+  letter-spacing: 0.12em;
+}
+
+.strata-edge-bus__rail,
+.strata-edge-bus__ticks {
+  display: block;
+  min-width: 0;
+}
+
+.strata-edge-bus--top,
+.strata-edge-bus--bottom {
+  right: calc(var(--archive-frame-margin) + clamp(28px, 2.5vw, 40px));
+  left: calc(var(--archive-frame-margin) + clamp(28px, 2.5vw, 40px));
+  height: 12px;
+  grid-template-columns:
+    auto
+    minmax(70px, 1fr)
+    minmax(38px, 10vw)
+    auto;
+}
+
+.strata-edge-bus--top {
+  top: var(--edge-bus-inset);
+  animation: strataEdgeBusFromLeft 1000ms linear 520ms both;
+}
+
+.strata-edge-bus--bottom {
+  bottom: var(--edge-bus-inset);
+  grid-template-columns:
+    auto
+    minmax(70px, 1fr)
+    minmax(38px, 10vw)
+    4px
+    auto;
+  animation: strataEdgeBusFromRight 1000ms linear 600ms both;
+}
+
+.strata-edge-bus--top .strata-edge-bus__rail,
+.strata-edge-bus--bottom .strata-edge-bus__rail {
+  height: 1px;
+  background:
+    linear-gradient(
+      to right,
+      rgba(245, 247, 249, 0.66) 0 18%,
+      transparent 18% 27%,
+      rgba(245, 247, 249, 0.22) 27% 63%,
+      transparent 63% 75%,
+      rgba(245, 247, 249, 0.42) 75% 100%
+    );
+}
+
+.strata-edge-bus--top .strata-edge-bus__ticks,
+.strata-edge-bus--bottom .strata-edge-bus__ticks {
+  height: 5px;
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(245, 247, 249, 0.32) 0 1px,
+      transparent 1px 9px
+    );
+}
+
+.strata-edge-bus--bottom .strata-edge-bus__rail {
+  background:
+    linear-gradient(
+      to left,
+      rgba(245, 247, 249, 0.62) 0 14%,
+      transparent 14% 25%,
+      rgba(245, 247, 249, 0.2) 25% 68%,
+      transparent 68% 79%,
+      rgba(245, 247, 249, 0.4) 79% 100%
+    );
+}
+
+.strata-edge-bus__signal {
+  display: block;
+  width: 4px;
+  height: 4px;
+  background: var(--st-signal);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.32);
+  mix-blend-mode: normal;
+}
+
+.strata-edge-bus--left,
+.strata-edge-bus--right {
+  top: calc(var(--archive-frame-margin) + clamp(28px, 2.5vw, 40px));
+  bottom: calc(var(--archive-frame-margin) + clamp(28px, 2.5vw, 40px));
+  width: 12px;
+  grid-template-rows:
+    auto
+    minmax(70px, 1fr)
+    minmax(38px, 10vh)
+    auto;
+  justify-items: center;
+}
+
+.strata-edge-bus--left {
+  left: var(--edge-bus-inset);
+  animation: strataEdgeBusFromCenter 720ms cubic-bezier(0.16, 1, 0.3, 1) 640ms both;
+}
+
+.strata-edge-bus--right {
+  right: var(--edge-bus-inset);
+  animation: strataEdgeBusFromCenter 720ms cubic-bezier(0.16, 1, 0.3, 1) 560ms both;
+}
+
+.strata-edge-bus--left .strata-edge-bus__label,
+.strata-edge-bus--left .strata-edge-bus__index,
+.strata-edge-bus--right .strata-edge-bus__label,
+.strata-edge-bus--right .strata-edge-bus__index {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.strata-edge-bus--left .strata-edge-bus__label,
+.strata-edge-bus--left .strata-edge-bus__index {
+  transform: rotate(180deg);
+}
+
+.strata-edge-bus--left .strata-edge-bus__rail,
+.strata-edge-bus--right .strata-edge-bus__rail {
+  width: 1px;
+  height: 100%;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(245, 247, 249, 0.42) 0 22%,
+      transparent 22% 34%,
+      rgba(245, 247, 249, 0.18) 34% 66%,
+      transparent 66% 78%,
+      rgba(245, 247, 249, 0.58) 78% 100%
+    );
+}
+
+.strata-edge-bus--left .strata-edge-bus__ticks,
+.strata-edge-bus--right .strata-edge-bus__ticks {
+  width: 5px;
+  height: 100%;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(245, 247, 249, 0.28) 0 1px,
+      transparent 1px 9px
+    );
+}
+
+@keyframes strataEdgeBusFromLeft {
+  from { opacity: 1; clip-path: inset(0 100% 0 0); }
+  to { opacity: 1; clip-path: inset(0); }
+}
+
+@keyframes strataEdgeBusFromRight {
+  from { opacity: 1; clip-path: inset(0 0 0 100%); }
+  to { opacity: 1; clip-path: inset(0); }
+}
+
+@keyframes strataEdgeBusFromCenter {
+  from { opacity: 0; clip-path: inset(50% 0 50% 0); }
+  to { opacity: 1; clip-path: inset(0); }
+}
+
 .strata-header {
   position: absolute;
   top: calc(var(--st-pad) + 4px);
@@ -2847,6 +3041,31 @@ body.is-screen-glitching .hypercube-stage {
     gap: 14px;
   }
 
+  .strata-edge-bus--top,
+  .strata-edge-bus--bottom {
+    right: calc(var(--archive-frame-margin) + 20px);
+    left: calc(var(--archive-frame-margin) + 20px);
+  }
+
+  .strata-edge-bus--top .strata-edge-bus__label,
+  .strata-edge-bus--bottom .strata-edge-bus__label {
+    display: none;
+  }
+
+  .strata-edge-bus--top {
+    grid-template-columns: minmax(38px, 1fr) minmax(28px, 17vw) auto;
+  }
+
+  .strata-edge-bus--bottom {
+    grid-template-columns: minmax(38px, 1fr) minmax(28px, 17vw) 4px auto;
+  }
+
+  .strata-edge-bus--left,
+  .strata-edge-bus--right {
+    top: calc(var(--archive-frame-margin) + 20px);
+    bottom: calc(var(--archive-frame-margin) + 20px);
+  }
+
   .strata__record {
     --record-offset-x: 12px;
     --record-block-height: 138px;
@@ -2910,6 +3129,24 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 @media (max-width: 460px) {
+  .strata-edge-bus--top,
+  .strata-edge-bus--bottom {
+    gap: 8px;
+  }
+
+  .strata-edge-bus--top .strata-edge-bus__ticks,
+  .strata-edge-bus--bottom .strata-edge-bus__ticks {
+    display: none;
+  }
+
+  .strata-edge-bus--top {
+    grid-template-columns: minmax(32px, 1fr) auto;
+  }
+
+  .strata-edge-bus--bottom {
+    grid-template-columns: minmax(32px, 1fr) 4px auto;
+  }
+
   .strata__record {
     --record-block-height: 130px;
   }
@@ -2956,6 +3193,12 @@ body.is-screen-glitching .hypercube-stage {
   .strata,
   .strata__record-title {
     animation: none !important;
+  }
+
+  .strata-edge-bus {
+    animation: none;
+    clip-path: none;
+    opacity: 1;
   }
 
   .strata__record-dormant,
@@ -3068,6 +3311,297 @@ body.is-archive-overlay-open .hypercube-stage {
 
 body.is-archive-overlay-open .archive-overlay-grid {
   opacity: 0.62;
+}
+
+/* Credits registration corners. Their unequal proportions keep the perimeter
+   calibrated without turning it into another conventional four-sided frame. */
+.archive-overlay-corners {
+  --credits-corner-inset: clamp(22px, 2.35vw, 38px);
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  transition: opacity 140ms linear;
+}
+
+.archive-overlay-corner {
+  --corner-width: 44px;
+  --corner-height: 34px;
+  position: absolute;
+  display: block;
+  width: var(--corner-width);
+  height: var(--corner-height);
+  color: rgba(244, 247, 249, 0.42);
+  font-family: "supplyMono", monospace;
+  font-size: clamp(5.5px, 0.4vw, 7px);
+  line-height: 1;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  opacity: 0;
+  transform-origin: var(--corner-origin);
+}
+
+.archive-overlay-corner::before,
+.archive-overlay-corner::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.archive-overlay-corner::before {
+  inset: 0;
+  border-color: rgba(242, 245, 248, 0.5);
+  border-style: solid;
+  border-width: 0;
+}
+
+/* A faint offset bracket produces a restrained registration error instead of
+   a second decorative outline. */
+.archive-overlay-corner::after {
+  width: 18px;
+  height: 18px;
+  border-color: rgba(242, 245, 248, 0.16);
+  border-style: solid;
+  border-width: 0;
+}
+
+.archive-overlay-corner i {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  width: 3px;
+  height: 3px;
+  background: rgba(245, 247, 249, 0.76);
+}
+
+.archive-overlay-corner b {
+  position: absolute;
+  display: block;
+  background:
+    linear-gradient(
+      var(--corner-rail-direction),
+      rgba(245, 247, 249, 0.5) 0 24%,
+      transparent 24% 39%,
+      rgba(245, 247, 249, 0.16) 39% 73%,
+      transparent 73% 83%,
+      rgba(245, 247, 249, 0.32) 83% 100%
+    );
+}
+
+.archive-overlay-corner em {
+  position: absolute;
+  display: block;
+  color: rgba(245, 247, 249, 0.28);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.archive-overlay-corner--tl {
+  --corner-width: clamp(48px, 4.8vw, 72px);
+  --corner-height: clamp(26px, 2.2vw, 34px);
+  --corner-origin: left top;
+  --corner-rail-direction: to right;
+  top: var(--credits-corner-inset);
+  left: var(--credits-corner-inset);
+}
+
+.archive-overlay-corner--tl::before {
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.archive-overlay-corner--tl::after {
+  top: 4px;
+  left: 4px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.archive-overlay-corner--tl i {
+  top: -1px;
+  left: -1px;
+}
+
+.archive-overlay-corner--tl b {
+  top: 7px;
+  left: calc(100% + 9px);
+  width: clamp(46px, 6vw, 92px);
+  height: 1px;
+}
+
+.archive-overlay-corner--tl em {
+  top: 14px;
+  left: calc(100% + 12px);
+}
+
+.archive-overlay-corner--tr {
+  --corner-width: clamp(25px, 2.2vw, 34px);
+  --corner-height: clamp(46px, 4.5vw, 68px);
+  --corner-origin: right top;
+  --corner-rail-direction: to bottom;
+  top: var(--credits-corner-inset);
+  right: var(--credits-corner-inset);
+}
+
+.archive-overlay-corner--tr::before {
+  border-top-width: 1px;
+  border-right-width: 1px;
+}
+
+.archive-overlay-corner--tr::after {
+  top: 4px;
+  right: 4px;
+  border-top-width: 1px;
+  border-right-width: 1px;
+}
+
+.archive-overlay-corner--tr i {
+  top: -1px;
+  right: -1px;
+}
+
+.archive-overlay-corner--tr b {
+  top: calc(100% + 9px);
+  right: 7px;
+  width: 1px;
+  height: clamp(42px, 6vh, 78px);
+}
+
+.archive-overlay-corner--tr em {
+  top: calc(100% + 12px);
+  right: 15px;
+  writing-mode: vertical-rl;
+}
+
+.archive-overlay-corner--bl {
+  --corner-width: clamp(27px, 2.5vw, 38px);
+  --corner-height: clamp(38px, 3.5vw, 54px);
+  --corner-origin: left bottom;
+  --corner-rail-direction: to top;
+  bottom: var(--credits-corner-inset);
+  left: var(--credits-corner-inset);
+}
+
+.archive-overlay-corner--bl::before {
+  border-bottom-width: 1px;
+  border-left-width: 1px;
+}
+
+.archive-overlay-corner--bl::after {
+  bottom: 4px;
+  left: 4px;
+  border-bottom-width: 1px;
+  border-left-width: 1px;
+}
+
+.archive-overlay-corner--bl i {
+  bottom: -1px;
+  left: -1px;
+}
+
+.archive-overlay-corner--bl b {
+  right: auto;
+  bottom: calc(100% + 9px);
+  left: 7px;
+  width: 1px;
+  height: clamp(40px, 5.5vh, 72px);
+}
+
+.archive-overlay-corner--bl em {
+  right: auto;
+  bottom: calc(100% + 12px);
+  left: 15px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.archive-overlay-corner--br {
+  --corner-width: clamp(52px, 5.4vw, 82px);
+  --corner-height: clamp(24px, 2vw, 31px);
+  --corner-origin: right bottom;
+  --corner-rail-direction: to left;
+  right: var(--credits-corner-inset);
+  bottom: var(--credits-corner-inset);
+}
+
+.archive-overlay-corner--br::before {
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.archive-overlay-corner--br::after {
+  right: 4px;
+  bottom: 4px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.archive-overlay-corner--br i {
+  right: -1px;
+  bottom: -1px;
+  background: #00e5ff;
+  box-shadow: 0 0 9px rgba(0, 229, 255, 0.34);
+}
+
+.archive-overlay-corner--br b {
+  right: calc(100% + 9px);
+  bottom: 7px;
+  width: clamp(48px, 6.4vw, 98px);
+  height: 1px;
+}
+
+.archive-overlay-corner--br em {
+  right: calc(100% + 12px);
+  bottom: 14px;
+}
+
+.archive-overlay-page.is-credits-revealed .archive-overlay-corner {
+  animation: archiveCreditsCornerResolve 280ms steps(4, end) both;
+}
+
+.archive-overlay-page.is-credits-revealed
+  .archive-overlay-corner--tl {
+  animation-delay: 100ms;
+}
+
+.archive-overlay-page.is-credits-revealed
+  .archive-overlay-corner--tr {
+  animation-delay: 125ms;
+}
+
+.archive-overlay-page.is-credits-revealed
+  .archive-overlay-corner--br {
+  animation-delay: 150ms;
+}
+
+.archive-overlay-page.is-credits-revealed
+  .archive-overlay-corner--bl {
+  animation-delay: 175ms;
+}
+
+.archive-overlay-page.is-depth-calibrating .archive-overlay-corners {
+  opacity: 0;
+}
+
+@keyframes archiveCreditsCornerResolve {
+  0% {
+    opacity: 0;
+    transform: scale(0.28);
+  }
+  36% {
+    opacity: 0.84;
+  }
+  52% {
+    opacity: 0.18;
+    transform: scale(0.7);
+  }
+  68% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* During the transition the live observation windows become the credit index.
@@ -3297,7 +3831,8 @@ body.is-archive-overlay-open .archive-overlay-grid {
   color: rgba(255, 255, 255, 0.105);
   opacity: var(--archive-depth-title-opacity, 1);
   filter: blur(var(--archive-depth-title-blur, 0));
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(-50%, -50%);
+  scale: none;
 }
 
 .archive-interface-morph__copy-source,
@@ -3370,41 +3905,6 @@ body.is-archive-overlay-open .archive-overlay-grid {
   transform-origin: left center;
 }
 
-.archive-overlay-scroll-percent {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  z-index: 5;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 10px;
-  line-height: 1;
-  letter-spacing: 0.18em;
-  opacity: var(--archive-overlay-readout-opacity, 0);
-  pointer-events: none;
-  mix-blend-mode: difference;
-}
-
-.archive-overlay-scan-readout {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 5;
-  display: flex;
-  gap: 18px;
-  color: rgba(255, 255, 255, 0.38);
-  font-size: 10px;
-  line-height: 1;
-  letter-spacing: 0.16em;
-  opacity: var(--archive-overlay-readout-opacity, 0);
-  pointer-events: none;
-  text-transform: uppercase;
-  mix-blend-mode: difference;
-}
-
-#archiveOverlayCoordReadout {
-  font-size: 10px;
-}
-
 .archive-overlay-page__backdrop-title {
   position: absolute;
   top: 50%;
@@ -3420,7 +3920,8 @@ body.is-archive-overlay-open .archive-overlay-grid {
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, -50%) scale(0.985);
+  transform: translate(-50%, -50%);
+  scale: none;
   transform-origin: center;
   user-select: none;
 }
@@ -3434,7 +3935,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
     color: rgba(255, 255, 255, 0);
     opacity: 0;
     filter: blur(8px);
-    transform: translate(-50%, -50%) scale(0.985);
+    transform: translate(-50%, -50%);
   }
   9% {
     color: rgba(255, 255, 255, 0.94);
@@ -3457,7 +3958,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
     color: rgba(255, 255, 255, 0.105);
     opacity: 1;
     filter: blur(0);
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -3745,6 +4246,12 @@ body.is-archive-overlay-open .archive-overlay-grid {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .archive-overlay-page.is-credits-revealed .archive-overlay-corner {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
   .archive-overlay-page.is-credits-revealed .archive-overlay-exit-hint {
     animation: none;
     opacity: 1;
@@ -3814,6 +4321,29 @@ body.is-archive-overlay-open .archive-overlay-grid {
 }
 
 @media (max-width: 540px) {
+  .archive-overlay-corners {
+    --credits-corner-inset: 16px;
+  }
+
+  .archive-overlay-corner--tl,
+  .archive-overlay-corner--tr {
+    top: 31px;
+  }
+
+  .archive-overlay-corner em {
+    display: none;
+  }
+
+  .archive-overlay-corner--tl b,
+  .archive-overlay-corner--br b {
+    width: 34px;
+  }
+
+  .archive-overlay-corner--tr b,
+  .archive-overlay-corner--bl b {
+    height: 34px;
+  }
+
   .archive-interface-morph__resolved i {
     font-size: 8px;
   }
@@ -3833,23 +4363,6 @@ body.is-archive-overlay-open .archive-overlay-grid {
 
   .archive-interface-morph__copy-resolved strong {
     font-size: 11px;
-  }
-
-  .archive-overlay-scroll-percent {
-    top: max(9px, env(safe-area-inset-top));
-    left: 10px;
-    font-size: 8px;
-  }
-
-  .archive-overlay-scan-readout {
-    top: max(9px, env(safe-area-inset-top));
-    right: 10px;
-    gap: 10px;
-    font-size: 8px;
-  }
-
-  #archiveOverlayCoordReadout {
-    display: none;
   }
 
   .archive-overlay-page__backdrop-title {

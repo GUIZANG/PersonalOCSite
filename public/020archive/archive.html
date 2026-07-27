@@ -20,6 +20,32 @@
       <div class="strata-corner strata-corner--bl"></div>
       <div class="strata-corner strata-corner--br"></div>
 
+      <div class="strata-edge-bus strata-edge-bus--top" aria-hidden="true">
+        <span class="strata-edge-bus__label">Field / 020</span>
+        <span class="strata-edge-bus__rail"></span>
+        <span class="strata-edge-bus__ticks"></span>
+        <span class="strata-edge-bus__index">Sync / 93.7</span>
+      </div>
+      <div class="strata-edge-bus strata-edge-bus--right" aria-hidden="true">
+        <span class="strata-edge-bus__label">Depth / 31</span>
+        <span class="strata-edge-bus__rail"></span>
+        <span class="strata-edge-bus__ticks"></span>
+        <span class="strata-edge-bus__index">R / 00</span>
+      </div>
+      <div class="strata-edge-bus strata-edge-bus--bottom" aria-hidden="true">
+        <span class="strata-edge-bus__label">Archive channel</span>
+        <span class="strata-edge-bus__rail"></span>
+        <span class="strata-edge-bus__ticks"></span>
+        <span class="strata-edge-bus__signal"></span>
+        <span class="strata-edge-bus__index">Datum / 007</span>
+      </div>
+      <div class="strata-edge-bus strata-edge-bus--left" aria-hidden="true">
+        <span class="strata-edge-bus__label">X—04</span>
+        <span class="strata-edge-bus__rail"></span>
+        <span class="strata-edge-bus__ticks"></span>
+        <span class="strata-edge-bus__index">Y—93</span>
+      </div>
+
       <div class="strata__record">
         <div class="strata__record-dormant">
           <div class="strata__fault-plate" id="strataFaultPlate">
@@ -78,12 +104,21 @@
 
   <aside class="archive-overlay-page" id="archiveOverlayPage" aria-hidden="true">
     <div class="archive-overlay-scroll-line" id="archiveOverlayScrollLine" aria-hidden="true"></div>
-    <div class="archive-overlay-scroll-percent" id="archiveOverlayScrollPercent" aria-hidden="true">00</div>
-    <div class="archive-overlay-scan-readout" id="archiveOverlayScanReadout" aria-hidden="true">
-      <span id="archiveOverlayCoordReadout">X0000 / Y0000</span>
-      <span id="archiveOverlayScanReadoutState">SCAN 00</span>
-    </div>
     <canvas class="archive-overlay-grid" id="archiveOverlayGrid" aria-hidden="true"></canvas>
+    <div class="archive-overlay-corners" aria-hidden="true">
+      <span class="archive-overlay-corner archive-overlay-corner--tl">
+        <i></i><b></b>
+      </span>
+      <span class="archive-overlay-corner archive-overlay-corner--tr">
+        <i></i><b></b>
+      </span>
+      <span class="archive-overlay-corner archive-overlay-corner--bl">
+        <i></i><b></b><em>GRID / 31</em>
+      </span>
+      <span class="archive-overlay-corner archive-overlay-corner--br">
+        <i></i><b></b><em>DATUM / 007</em>
+      </span>
+    </div>
     <h1 class="archive-overlay-page__backdrop-title" aria-hidden="true">CREDITS</h1>
     <div class="archive-overlay-page__inner">
       <header class="archive-overlay-page__header">

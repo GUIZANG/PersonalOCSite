@@ -6,9 +6,6 @@
     const overlay = document.getElementById("archiveOverlayPage");
     const overlayContent = overlay?.querySelector(".archive-overlay-page__inner");
     const scrollLine = document.getElementById("archiveOverlayScrollLine");
-    const scrollPercent = document.getElementById("archiveOverlayScrollPercent");
-    const coordReadout = document.getElementById("archiveOverlayCoordReadout");
-    const scanReadoutState = document.getElementById("archiveOverlayScanReadoutState");
     const exitHint = overlay?.querySelector(".archive-overlay-exit-hint");
     const maskPath = document.getElementById("archiveOverlayMaskPath");
     const stage = document.getElementById("hypercube-stage");
@@ -88,10 +85,7 @@
       const copy = document.createElement("div");
       copy.className = "archive-interface-morph__copy";
       copy.innerHTML = [
-        '<div class="archive-interface-morph__copy-source">',
-        "<strong>THE EYE</strong>",
-        "<span>It does not look at you. It remembers the version of you that has not happened yet.</span>",
-        "</div>",
+        '<div class="archive-interface-morph__copy-source" aria-hidden="true"></div>',
         '<div class="archive-interface-morph__copy-resolved">',
         "<strong>ARCHIVE / ACKNOWLEDGEMENTS / 007</strong>",
         "<span>Precognitive Strata is an independent visual experiment assembled from public studies, interface references and original interaction work.</span>",
@@ -116,7 +110,6 @@
     function onPointerMove(event) {
       if (disabled) return;
       const height = window.innerHeight || document.documentElement.clientHeight;
-      updatePointerReadout(event.clientX, event.clientY);
 
       const isInsideTrigger = event.clientY <= expandThreshold;
       const canRemap =
@@ -142,7 +135,6 @@
       if (event.pointerType === "mouse") return;
       const height = window.innerHeight || document.documentElement.clientHeight;
       const touchEdge = 44;
-      updatePointerReadout(event.clientX, event.clientY);
 
       if (event.clientY <= touchEdge && progress <= 0.001) {
         animateTo(1);
@@ -636,7 +628,6 @@
       const maxScroll = overlayContent.scrollHeight - overlayContent.clientHeight;
       const hasScroll = maxScroll > 1;
       const scrollProgress = hasScroll ? overlayContent.scrollTop / maxScroll : 1;
-      const percent = Math.round(scrollProgress * 100);
       overlay.style.setProperty(
         "--archive-overlay-scroll-progress",
         format(scrollProgress)
@@ -645,27 +636,6 @@
         "--archive-overlay-scroll-opacity",
         hasScroll && progress > 0.7 ? "1" : "0"
       );
-      if (scrollPercent) {
-        scrollPercent.textContent = String(percent).padStart(2, "0");
-      }
-    }
-
-    function updatePointerReadout(x, y) {
-      if (coordReadout) {
-        coordReadout.textContent =
-          `X${String(Math.round(x)).padStart(4, "0")} / ` +
-          `Y${String(Math.round(y)).padStart(4, "0")}`;
-      }
-      if (scanReadoutState) {
-        const scanValue = Math.round(
-          (
-            (x / Math.max(window.innerWidth, 1)) * 73 +
-            (y / Math.max(window.innerHeight, 1)) * 27
-          ) % 100
-        );
-        scanReadoutState.textContent =
-          `SCAN ${String(scanValue).padStart(2, "0")}`;
-      }
     }
 
     function watchForBurst() {
