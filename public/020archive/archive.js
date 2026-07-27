@@ -115,6 +115,7 @@
       };
       this.hudState = "DORMANT";
       this.hudEyeRecordActive = false;
+      this.hudEyeRecordClearTimer = 0;
       this.hudPressPhaseIndex = -1;
       this.scene = new THREE.Scene();
       // Transparent while dormant so the DOM nested-frame background (z-index
@@ -1100,7 +1101,7 @@
           this.hudPressPhaseIndex = -1;
           delete this.ambientHud.dataset.pressPhase;
           this.updateAmbientHudStaticPressCopy(-1);
-          this.hudRecord.textContent = "THE EYE";
+          this.setHudRecordText("THE EYE");
           this.hudSummary.textContent = "It does not look at you. It remembers the version of you that has not happened yet.";
         }
       }
@@ -1266,7 +1267,7 @@
         // Swap the wordmark copy directly (no per-glyph scramble): the VFX layer
         // re-captures once per phase, so the transition stays smooth instead of
         // thrashing the texture ~15x/phase.
-        this.hudRecord.textContent = phase.title;
+        this.setHudRecordText(phase.title);
       }
       if (this.hudScan) {
         this.hudScan.textContent = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
@@ -1432,18 +1433,44 @@
     setAmbientHudEyeRecord(active) {
       if (!this.hudRecord || !this.hudSummary || this.hudEyeRecordActive === active) return;
 
+      window.clearTimeout(this.hudEyeRecordClearTimer);
+      this.hudEyeRecordClearTimer = 0;
       this.hudEyeRecordActive = active;
+      this.ambientHud.dataset.eyeRecord = active ? "active" : "dormant";
       if (active) {
+        this.ambientHud.classList.remove("is-eye-record-exiting");
         this.hudPressPhaseIndex = -1;
-        this.hudRecord.textContent = "THE EYE";
+        this.setHudRecordText("THE EYE");
         this.hudSummary.textContent = "It does not look at you. It remembers the version of you that has not happened yet.";
+        window.dispatchEvent(new CustomEvent("archive:eye-record-visibility", {
+          detail: { active: true },
+        }));
         return;
       }
 
       this.hudPressPhaseIndex = -1;
       delete this.ambientHud.dataset.pressPhase;
-      this.hudRecord.textContent = "THE EYE";
-      this.hudSummary.textContent = "It does not look at you. It remembers the version of you that has not happened yet.";
+      this.ambientHud.classList.add("is-eye-record-exiting");
+      window.dispatchEvent(new CustomEvent("archive:eye-record-visibility", {
+        detail: { active: false },
+      }));
+      this.hudEyeRecordClearTimer = window.setTimeout(() => {
+        if (this.hudEyeRecordActive) return;
+        this.ambientHud.classList.remove("is-eye-record-exiting");
+        this.setHudRecordText("");
+        this.hudSummary.textContent = "";
+        this.hudEyeRecordClearTimer = 0;
+      }, 420);
+    }
+
+    setHudRecordText(text) {
+      if (!this.hudRecord) return;
+      const textLayer = this.hudRecord.querySelector(".strata__record-title-text");
+      if (textLayer) {
+        textLayer.textContent = text;
+        return;
+      }
+      this.hudRecord.textContent = text;
     }
 
     getAmbientHudSummary(word) {

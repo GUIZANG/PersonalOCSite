@@ -11,7 +11,7 @@ import { VFX } from "../libs/vfx-js.min.js";
 
 // g (uGlitch) is 0 while idle and 1 during a burst. A single shared object so
 // the per-frame uniform function can read the latest value cheaply.
-const state = { glitch: 0 };
+const state = { glitch: 0, reveal: 0 };
 
 // Random cadence + burst length (ms). Tweak here.
 const GAP_MIN = 4000;
@@ -26,6 +26,7 @@ uniform vec2 offset;
 uniform float time;
 uniform sampler2D src;
 uniform float uGlitch;
+uniform float uReveal;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 345.45));
@@ -44,6 +45,7 @@ vec4 samp(vec2 p) {
 void main() {
   vec2 uv = (gl_FragCoord.xy - offset) / resolution;
   float g = clamp(uGlitch, 0.0, 1.0);
+  float reveal = clamp(uReveal, 0.0, 1.0);
 
   // Confine everything to the wordmark's own box. The VFX canvas has overflow
   // padding around the element; sampling there hits clamped edge texels which
@@ -94,12 +96,61 @@ void main() {
              * smoothstep(0.0, pxUv.y * fade, uv.y)
              * smoothstep(0.0, pxUv.y * fade, 1.0 - uv.y);
 
-  gl_FragColor = vec4(cr.r, cg.g, cb.b, a) * mask;
+  // Reveal the raster itself in five softly staggered horizontal bands. The
+  // source element remains fully rendered, so repeat hover cycles never swap a
+  // half-clipped texture into the VFX canvas.
+  float revealBand = floor(uv.y * 5.0);
+  float bandOffset = (hash21(vec2(revealBand, 17.0)) - 0.5) * 0.09;
+  float revealEdge = reveal * 1.28 - 0.16 + bandOffset;
+  float revealMask = 1.0 - smoothstep(revealEdge, revealEdge + 0.075, uv.x);
+
+  gl_FragColor = vec4(cr.r, cg.g, cb.b, a) * mask * revealMask;
 }
 `;
 
 let stopped = false;
 let glitchOffTimer = 0;
+let revealRaf = 0;
+let revealHost = null;
+
+function setReveal(value) {
+  state.reveal = Math.min(1, Math.max(0, value));
+  if (revealHost) {
+    revealHost.style.setProperty(
+      "--eye-record-reveal",
+      state.reveal.toFixed(4),
+    );
+  }
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function tweenReveal(active) {
+  const target = active ? 1 : 0;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    window.cancelAnimationFrame(revealRaf);
+    setReveal(target);
+    return;
+  }
+  const start = state.reveal;
+  const duration = active ? 560 : 320;
+  const startedAt = performance.now();
+  window.cancelAnimationFrame(revealRaf);
+
+  const tick = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    setReveal(start + (target - start) * easeInOutCubic(progress));
+    if (progress < 1 && !stopped) {
+      revealRaf = window.requestAnimationFrame(tick);
+    }
+  };
+
+  revealRaf = window.requestAnimationFrame(tick);
+}
 
 // Fire a short glitch burst on demand (used both by the ambient scheduler and by
 // every wordmark text swap during the long-press).
@@ -118,6 +169,11 @@ window.addEventListener("archive:eye-glitch", (event) => {
     ? Math.min(600, Math.max(80, requestedDuration))
     : 240;
   flashGlitch(duration);
+});
+
+window.addEventListener("archive:eye-record-visibility", (event) => {
+  if (stopped) return;
+  tweenReveal(Boolean(event.detail?.active));
 });
 
 function scheduleBurst() {
@@ -181,6 +237,7 @@ function visibleText(el) {
 async function init() {
   const el = document.getElementById("archiveHudRecord");
   if (!el) return;
+  revealHost = document.getElementById("archiveAmbientHud");
 
   // Embed the font (and wait for the page fonts) before the first capture so the
   // wordmark keeps its Formula typeface.
@@ -196,8 +253,13 @@ async function init() {
   vfx.add(el, {
     shader: SHADER,
     overflow: 80,
-    uniforms: { uGlitch: () => state.glitch },
+    uniforms: {
+      uGlitch: () => state.glitch,
+      uReveal: () => state.reveal,
+    },
   });
+  document.documentElement.classList.add("has-eye-vfx");
+  setReveal(revealHost?.dataset.eyeRecord === "active" ? 1 : state.reveal);
 
   // Re-capture at most once per frame, so a text swap during the long-press or on
   // release re-renders smoothly instead of stalling.
@@ -211,10 +273,16 @@ async function init() {
     });
   };
 
-  // Font can finish loading right after the first capture; lock in the typeface.
+  // The VFX source is kept fully rendered by CSS, so one frame-aligned capture
+  // is enough for each word swap. Delayed captures used to replace the texture
+  // once more at the end of the reveal, producing a visible pause and width pop.
+  const recaptureAfterReveal = () => {
+    recapture();
+  };
+
+  // The font is already awaited above, so one capture is sufficient. Delayed
+  // refreshes would be able to resize a wordmark while it is already visible.
   recapture();
-  window.setTimeout(recapture, 250);
-  window.setTimeout(recapture, 800);
 
   // archive.js swaps the wordmark via textContent (press phases / release), which
   // also wipes the injected <style>. Re-insert the font, and only re-capture when
@@ -225,7 +293,7 @@ async function init() {
     const text = visibleText(el);
     if (text !== lastText) {
       lastText = text;
-      recapture();
+      recaptureAfterReveal();
       // Every wordmark swap (each long-press phase, and the release reset) fires
       // the box glitch so the change punches in with the chromatic block effect.
       flashGlitch(240);
@@ -240,6 +308,7 @@ async function init() {
     "archive:hypercube-burst",
     () => {
       stopped = true;
+      window.cancelAnimationFrame(revealRaf);
       observer.disconnect();
       try {
         vfx.remove(el);

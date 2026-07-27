@@ -211,15 +211,19 @@
 
     let pressActive = false;
     let pressProgress = 0;
+    let manualColorOffset = 0;
     let colorOffset = 0;
     let lastStep = 0;
     let pressRaf = null;
 
-    // Step cadence: already brisk at the start (no dead time), tightening toward
-    // the frame rate ceiling as the press deepens so it keeps accelerating.
+    // Start brisk, then accelerate non-linearly from roughly 20 to 150 palette
+    // steps per second. The tick can consume multiple accumulated steps in one
+    // rendered frame, so the final hold phase keeps gaining speed instead of
+    // flattening out at the display refresh rate.
     function stepInterval() {
       const p = Math.min(Math.max(pressProgress, 0), 1);
-      return 78 - 62 * (p * p * (3 - 2 * p)); // ~78ms -> ~16ms, eased
+      const stepsPerSecond = 20 + 130 * Math.pow(p, 2.2);
+      return 1000 / stepsPerSecond;
     }
 
     function pressTick(now) {
@@ -227,10 +231,13 @@
         pressRaf = null;
         return;
       }
-      if (now - lastStep >= stepInterval()) {
-        colorOffset += 1;
+      const interval = stepInterval();
+      const elapsed = now - lastStep;
+      if (elapsed >= interval) {
+        const elapsedSteps = Math.floor(elapsed / interval);
+        colorOffset += Math.min(elapsedSteps, 5);
         applyColorOffset(colorOffset);
-        lastStep = now;
+        lastStep = now - (elapsed % interval);
       }
       pressRaf = requestAnimationFrame(pressTick);
     }
@@ -253,12 +260,25 @@
           cancelAnimationFrame(pressRaf);
           pressRaf = null;
         }
-        colorOffset = 0;
-        applyColorOffset(0);
+        colorOffset = manualColorOffset;
+        applyColorOffset(manualColorOffset);
       }
     }
 
     window.addEventListener("archive:hypercube-long-press", onLongPress);
+    window.addEventListener("archive:strata-depth", (event) => {
+      const requestedIndex = Number(event.detail?.index);
+      if (!Number.isFinite(requestedIndex)) return;
+
+      manualColorOffset = Math.min(
+        bandCount - 1,
+        Math.max(0, Math.round(requestedIndex))
+      );
+      if (!pressActive) {
+        colorOffset = manualColorOffset;
+        applyColorOffset(manualColorOffset);
+      }
+    });
 
     function onPointerMove(event) {
       const rect = root.getBoundingClientRect();

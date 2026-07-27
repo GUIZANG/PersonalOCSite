@@ -43,6 +43,7 @@
     let hypercubePressProgress = 0;
     let isDragging = false;
     let isGrabTarget = false;
+    let isStrataScrubTarget = false;
     let isHovering = false;
     let isCreditsTriggerActive = false;
     let snapActive = false;
@@ -154,6 +155,10 @@
       cursor.style.setProperty("--outer-y", `${Math.round(outerY)}px`);
       cursor.style.setProperty("--cursor-render-scale", snappedRenderScale);
       cursor.style.setProperty("--cursor-outer-scaled-half-size", `${renderOuterSize / 2}px`);
+      cursor.style.setProperty(
+        "--cursor-outer-diagonal-offset",
+        `${renderOuterSize / (2 * Math.SQRT2)}px`
+      );
     }
 
     function updateHypercubePressCursor(event) {
@@ -183,6 +188,7 @@
       hypercubePressProgress = 0;
       isDragging = false;
       isGrabTarget = false;
+      isStrataScrubTarget = false;
       isHovering = false;
       isCreditsTriggerActive = false;
       pressGlitchUntil = 0;
@@ -219,6 +225,10 @@
         !isDragging &&
         target instanceof Element &&
         Boolean(target.closest(".archive-media-window__bar"));
+      isStrataScrubTarget =
+        !isDragging &&
+        target instanceof Element &&
+        Boolean(target.closest(".strata__fault-control"));
       isHovering =
         !isDragging &&
         Boolean(stage?.classList.contains("is-hypercube-hovered"));
@@ -228,6 +238,8 @@
     function updateInteractionState() {
       const state = isDragging
         ? "drag"
+        : isStrataScrubTarget
+          ? "scrub"
         : isGrabTarget
           ? "grab"
           : (snapActive || isHypercubePressing)
@@ -243,6 +255,7 @@
         interactionLabel.textContent =
           state === "hold" ? "HOLD" :
           state === "drag" ? "DRAG" :
+          state === "scrub" ? "SCRUB" :
           state === "grab" ? "GRAB" :
           state === "hover" ? "HOVER" :
           state === "stay" ? "STAY" : "";

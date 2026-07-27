@@ -14,15 +14,43 @@
     <div class="strata-frames" id="strataFrames" aria-hidden="true"></div>
     <div class="strata-glitch" aria-hidden="true"></div>
 
-    <section class="strata" id="archiveAmbientHud" data-state="dormant" aria-label="Archive interface">
+    <section class="strata" id="archiveAmbientHud" data-state="dormant" data-eye-record="dormant" aria-label="Archive interface">
       <div class="strata-corner strata-corner--tl"></div>
       <div class="strata-corner strata-corner--tr"></div>
       <div class="strata-corner strata-corner--bl"></div>
       <div class="strata-corner strata-corner--br"></div>
 
       <div class="strata__record">
-        <strong class="strata__record-title" id="archiveHudRecord">THE EYE</strong>
-        <p class="strata__record-body" id="archiveHudSummary">It does not look at you. It remembers the version of you that has not happened yet.</p>
+        <div class="strata__record-dormant">
+          <div class="strata__fault-plate" id="strataFaultPlate">
+            <div class="strata__fault-meta">
+              <span>Index / 020</span>
+              <span class="strata__fault-mode">
+                <i id="strataDepthReadout">Depth / 00</i>
+                <b>Drag / Depth</b>
+              </span>
+            </div>
+            <span class="strata__fault-rail"><i></i></span>
+            <div class="strata__fault-zero">
+              <b>00</b>
+              <b>00</b>
+              <b>00</b>
+            </div>
+            <button
+              class="strata__fault-control hoverable"
+              id="strataDepthControl"
+              type="button"
+              aria-label="Strata depth 00. Drag horizontally or use arrow keys."
+            ></button>
+          </div>
+        </div>
+        <div class="strata__record-relay" aria-hidden="true">
+          <i></i>
+          <i></i>
+          <i></i>
+        </div>
+        <strong class="strata__record-title" id="archiveHudRecord"><span class="strata__record-title-text"></span></strong>
+        <p class="strata__record-body" id="archiveHudSummary"></p>
       </div>
     </section>
 
@@ -128,6 +156,7 @@
   <script src="archiveObservationWindows.js"></script>
   <script src="archive.js"></script>
   <script src="archiveFrames.js"></script>
+  <script src="archiveStrataScrubber.js"></script>
   <script src="archiveOverlay.js"></script>
   <script src="archiveCreditsGrid.js"></script>
   <script src="archiveCreditsHover.js"></script>
