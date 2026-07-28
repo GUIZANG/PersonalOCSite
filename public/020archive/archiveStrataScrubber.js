@@ -1,5 +1,5 @@
 (function () {
-  const MAX_DEPTH = 31;
+  const MAX_DEPTH = 32;
 
   function initStrataScrubber() {
     const stage = document.getElementById("hypercube-stage");
@@ -20,6 +20,20 @@
     let skipTimer = 0;
     let tickTimer = 0;
     let pulseTimer = 0;
+
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      requestAnimationFrame(() => {
+        plate.classList.add("is-scrub-entering");
+      });
+    }
+    plate.addEventListener("animationend", (event) => {
+      if (
+        event.target === plate &&
+        event.animationName === "strataScrubPlateEnter"
+      ) {
+        plate.classList.remove("is-scrub-entering");
+      }
+    });
 
     function formatDepth(value) {
       return String(value).padStart(2, "0");
@@ -76,7 +90,7 @@
       plate.style.setProperty("--fault-progress", progress);
 
       if (Math.abs(depth - previous) > 1) showSkipFault();
-      tickCounter();
+      if (!options.skipTick) tickCounter();
       window.dispatchEvent(new CustomEvent("archive:strata-depth", {
         detail: { index: depth },
       }));
@@ -99,6 +113,7 @@
     control.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
       event.stopPropagation();
+      plate.classList.remove("is-scrub-entering");
       activePointerId = event.pointerId;
       startX = event.clientX;
       startDepth = depth;
@@ -156,7 +171,9 @@
     });
 
     const availabilityObserver = new MutationObserver(() => {
-      control.disabled = hud.dataset.eyeRecord === "active";
+      const unavailable = hud.dataset.eyeRecord === "active";
+      control.disabled = unavailable;
+      if (unavailable) plate.classList.remove("is-scrub-entering");
     });
     availabilityObserver.observe(hud, {
       attributes: true,
@@ -164,7 +181,7 @@
     });
 
     control.disabled = hud.dataset.eyeRecord === "active";
-    applyDepth(0, { force: true });
+    applyDepth(0, { force: true, skipTick: true });
   }
 
   if (document.readyState === "loading") {

@@ -796,10 +796,4 @@ window.ArchiveCardVFX = {
     bindLiquidSource();
   },
 
-  removeLiquidBackgroundSource(sourceCanvas) {
-    const index = liquidBackgroundSources.indexOf(sourceCanvas);
-    if (index !== -1) {
-      liquidBackgroundSources.splice(index, 1);
-    }
-  },
 };

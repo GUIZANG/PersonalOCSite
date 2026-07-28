@@ -18,9 +18,6 @@
       this.revealAmount = 0;
       this.revealTarget = 0;
       this.lastTime = performance.now();
-      this.isDragging = false;
-      this.isHoveringCard = false;
-      this.lastPointerX = 0;
       this.singleCycleWidth = 0;
       this.hasStarted = false;
       this.isIntroEntering = false;
@@ -90,13 +87,13 @@
       const loops = 3;
       this.line.innerHTML = "";
       for (let loop = 0; loop < loops; loop++) {
-        this.cards.forEach((card, index) => {
-          this.line.appendChild(this.createCard(card, index, loop));
+        this.cards.forEach((_, index) => {
+          this.line.appendChild(this.createCard(index, loop));
         });
       }
     }
 
-    createCard(card, index, loop) {
+    createCard(index, loop) {
       const wrapper = document.createElement("article");
       wrapper.className = "archive-card-wrapper hoverable";
       wrapper.dataset.cardIndex = index;
@@ -125,14 +122,9 @@
 
     setupEvents() {
       this.stream.addEventListener("pointerdown", (event) => this.startPointer(event));
-      this.line.addEventListener("pointerover", (event) => this.onCardHover(event));
-      this.line.addEventListener("pointerout", (event) => this.onCardLeave(event));
-      this.line.addEventListener("pointerleave", () => {
-        this.isHoveringCard = false;
-      });
       this.line.addEventListener("contextmenu", (event) => event.preventDefault());
       window.addEventListener("pointermove", (event) => this.onDrag(event));
-      window.addEventListener("pointerup", (event) => this.endPointer(event));
+      window.addEventListener("pointerup", () => this.endPointer());
       window.addEventListener("resize", () => {
         this.fitAsciiContent();
         this.calculateCycleWidth();
@@ -159,18 +151,13 @@
     }
 
     onDrag(event) {
-      if (this.pointerDownCard || this.isDragging) {
+      if (this.pointerDownCard) {
         const moved = Math.hypot(event.clientX - this.pointerDownX, event.clientY - this.pointerDownY);
         this.hasPointerMoved = this.hasPointerMoved || moved > 5;
       }
-
-      if (!this.isDragging || this.focusMode) return;
-      const delta = event.clientX - this.lastPointerX;
-      this.position += delta;
-      this.lastPointerX = event.clientX;
     }
 
-    endPointer(event) {
+    endPointer() {
       const clickedCard = this.hasPointerMoved ? null : this.pointerDownCard;
 
       if (this.focusMode && !this.hasPointerMoved) {
@@ -179,26 +166,8 @@
         this.focusCard(clickedCard);
       }
 
-      this.isDragging = false;
-      this.isHoveringCard = Boolean(this.line.querySelector(".archive-card-wrapper:hover"));
-      this.line.classList.remove("dragging");
       this.pointerDownCard = null;
       this.hasPointerMoved = false;
-      if (this.stream.hasPointerCapture?.(event.pointerId)) {
-        this.stream.releasePointerCapture(event.pointerId);
-      }
-    }
-
-    onCardHover(event) {
-      const card = event.target.closest(".archive-card-wrapper");
-      if (!card || card.contains(event.relatedTarget)) return;
-      this.isHoveringCard = true;
-    }
-
-    onCardLeave(event) {
-      const card = event.target.closest(".archive-card-wrapper");
-      if (!card || card.contains(event.relatedTarget)) return;
-      this.isHoveringCard = false;
     }
 
     animate() {
@@ -222,7 +191,7 @@
         this.position += (this.focusTargetPosition - this.position) * focusEase;
         this.scannerX += (this.scannerTargetX - this.scannerX) * scannerEase;
         this.updateFocusProgress();
-      } else if (this.active && !this.isDragging) {
+      } else if (this.active) {
         this.position += this.velocity * dt;
         this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
         this.scannerX += (window.innerWidth / 2 - this.scannerX) * 0.18;
@@ -329,12 +298,10 @@
         if (!asciiContent) return;
 
         const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
-        const card = this.cards[cardIndex % this.cards.length];
-
         asciiContent.style.fontSize = `${fontSize}px`;
         asciiContent.style.lineHeight = `${lineHeight}px`;
         asciiContent.style.padding = `${fittedPadding}px 0`;
-        asciiContent.textContent = this.generateCode(card, cardIndex, columns, rows);
+        asciiContent.textContent = this.generateCode(cardIndex, columns, rows);
       });
     }
 
@@ -459,9 +426,7 @@
       this.focusMode = "enter";
       this.focusSettled = false;
       this.isSwitchingFocus = wasFocused;
-      this.isDragging = false;
       this.pointerDownCard = null;
-      this.line.classList.remove("dragging");
       wrapper.classList.add("is-archive-card-focused");
       this.stream.classList.add("is-card-focusing");
       this.stream.classList.remove("is-card-focus-settled");
@@ -642,7 +607,7 @@
       this.hudRight.textContent = `X${String(Math.round(scannerX)).padStart(4, "0")} / D${String(distancePercent).padStart(3, "0")}`;
     }
 
-    generateCode(card, index, width = 54, height = 20) {
+    generateCode(index, width = 54, height = 20) {
       const passage =
         "If someone sees the One of Proper Enlightenment as liberated and free from all outflows, and as not being attached to all worlds, that person still has not certified to the Way-eye. If someone knows that the Thus Come One’s body and marks do not exist, and cultivates and attains this understanding, then that person will quickly become a Buddha. If one can look upon this world with a mind that is unmoving, and see Buddhas and living beings as the same, then such a one will accomplish supreme wisdom. If, with regard to the Buddha and the Dharma, one’s mind is completely level and equal, and the two thoughts do not manifest, then one will realize the position which is hard to conceive of. If there is someone who sees the Buddha and living beings as level and equal, and peacefully dwelling, yet without dwelling and without a place of entering, then that person will become one who is difficult to encounter. Forms and feelings are without number; thinking, processes, and consciousness are also like this. If one is able to know this, then one can become a great muni. If worldly and world-transcending views are leapt far beyond, and if one is well able to know all Dharmas, then such a one will accomplish great brilliance. If someone produces a mind of transference toward all-wisdom, and sees the mind as not being produced, then such a one will obtain great renown. Living beings are without production and also without extinction. If one is able to obtain this kind of wisdom, then one will accomplish the Unsurpassed Way. Within one there are the limitless, and within the limitless there is one. If one understands that they mutually arise, then one will accomplish fearlessness.";
       const lines = [];

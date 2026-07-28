@@ -143,9 +143,29 @@ button,
   pointer-events: auto;
 }
 
+.archive-media-window__shadow {
+  position: absolute;
+  background: transparent;
+  box-shadow:
+    0 0 6px rgba(0, 0, 0, 0.58),
+    0 8px 16px rgba(0, 0, 0, 0.62),
+    0 20px 28px rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.archive-media-window__shadow.is-reveal-complete {
+  opacity: 1;
+}
+
 /* Size decides depth permanently. There is intentionally no focus/active rule
    that raises z-index: a large feed always stays under every smaller feed. */
 .archive-media-window--large {
+  z-index: 1;
+}
+
+.archive-media-window__shadow--large {
   z-index: 1;
 }
 
@@ -153,7 +173,15 @@ button,
   z-index: 2;
 }
 
+.archive-media-window__shadow--medium {
+  z-index: 2;
+}
+
 .archive-media-window--small {
+  z-index: 3;
+}
+
+.archive-media-window__shadow--small {
   z-index: 3;
 }
 
@@ -664,10 +692,6 @@ button,
   cursor: none;
 }
 
-.archive-card-line.dragging {
-  cursor: none;
-}
-
 .archive-scanner-hud {
   position: fixed;
   bottom: calc(50% + 141px);
@@ -1084,33 +1108,6 @@ body.is-screen-glitching .hypercube-stage {
   clip-path: inset(0 100% 0 0);
 }
 
-.archive-card-kicker {
-  font-size: 11px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.archive-card-title {
-  max-width: 10ch;
-  margin: 0;
-  font-size: 46px;
-  font-weight: 300;
-  line-height: 0.95;
-  letter-spacing: -0.05em;
-  text-transform: uppercase;
-}
-
-.archive-card-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.58);
-  text-transform: uppercase;
-}
-
 .archive-ascii-content {
   position: absolute;
   inset: 0;
@@ -1476,12 +1473,8 @@ body.is-screen-glitching .hypercube-stage {
 .strata {
   --st-ink: #ffffff; /* Pure white for max contrast */
   --st-dim: #9ca3af; /* Brighter gray */
-  --st-faint: rgba(255, 255, 255, 0.25);
-  --st-line: rgba(255, 255, 255, 0.25);
   --st-line-strong: rgba(255, 255, 255, 0.6);
   --st-signal: #00e5ff; /* Cyan accent instead of orange */
-  --st-alert: #d32f2f; /* Deep cold red */
-  --st-accent: var(--st-signal);
   --st-pad: var(--archive-frame-margin);
 
   position: fixed;
@@ -1620,6 +1613,11 @@ body.is-screen-glitching .hypercube-stage {
 .strata__fault-plate {
   --fault-progress: 0%;
   --fault-label-y: clamp(9px, 1.2vh, 13px);
+  --fault-zero-bottom: clamp(2px, 0.6vh, 7px);
+  --fault-zero-height: clamp(86px, 11vh, 116px);
+  --fault-zero-top: calc(100% - var(--fault-zero-bottom) - var(--fault-zero-height));
+  --fault-zero-top-trim: clamp(7px, 0.8vh, 9px);
+  --fault-face-bottom-y: calc(var(--fault-zero-top) + var(--fault-zero-top-trim));
   position: absolute;
   top: 0;
   right: calc(0px - clamp(2px, 0.7vw, 10px));
@@ -1633,22 +1631,22 @@ body.is-screen-glitching .hypercube-stage {
       rgba(255, 255, 255, 0.018) 1px,
       transparent 1px,
       transparent 4px
-    ) top left / 82% clamp(44px, 5.6vh, 56px) no-repeat,
+    ) top left / 82% var(--fault-face-bottom-y) no-repeat,
     linear-gradient(to right, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.5))
-      top left / 82% clamp(44px, 5.6vh, 56px) no-repeat,
+      top left / 82% var(--fault-face-bottom-y) no-repeat,
     repeating-linear-gradient(
       to bottom,
       rgba(255, 255, 255, 0.014) 0,
       rgba(255, 255, 255, 0.014) 1px,
       transparent 1px,
       transparent 4px
-    ) bottom left / 74% calc(100% - clamp(58px, 7.2vh, 70px)) no-repeat,
+    ) bottom left / 74% calc(100% - var(--fault-face-bottom-y)) no-repeat,
     linear-gradient(
       to right,
       rgba(0, 0, 0, 0.68),
       rgba(0, 0, 0, 0.42) 66%,
       rgba(0, 0, 0, 0.12)
-    ) bottom left / 74% calc(100% - clamp(58px, 7.2vh, 70px)) no-repeat;
+    ) bottom left / 74% calc(100% - var(--fault-face-bottom-y)) no-repeat;
   opacity: 1;
   transform: translateX(0);
   transition:
@@ -1670,6 +1668,189 @@ body.is-screen-glitching .hypercube-stage {
   opacity: 0.42;
   transition: opacity 300ms ease;
   pointer-events: none;
+}
+
+.strata__fault-plate.is-scrub-entering {
+  animation: strataScrubPlateEnter 860ms steps(1, end) 680ms both;
+}
+
+.strata__fault-plate.is-scrub-entering::after {
+  animation: strataScrubDividerEnter 620ms steps(1, end) 850ms both;
+}
+
+.strata__fault-plate.is-scrub-entering .strata__fault-meta {
+  animation: strataScrubMetaEnter 560ms steps(1, end) 940ms both;
+}
+
+.strata__fault-plate.is-scrub-entering .strata__fault-rail {
+  animation: strataScrubRailEnter 720ms cubic-bezier(0.16, 1, 0.3, 1) 760ms both;
+}
+
+.strata__fault-plate.is-scrub-entering .strata__fault-zero {
+  animation: strataScrubZeroEnter 670ms steps(1, end) 860ms both;
+}
+
+@keyframes strataScrubPlateEnter {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-12px);
+  }
+
+  8% {
+    opacity: 0.86;
+    clip-path: inset(0 88% 0 0);
+    transform: translateX(4px);
+  }
+
+  17% {
+    opacity: 0.12;
+    clip-path: inset(0 71% 0 0);
+    transform: translateX(-7px);
+  }
+
+  26% {
+    opacity: 1;
+    clip-path: inset(0 47% 0 0);
+    transform: translateX(2px);
+  }
+
+  34% {
+    opacity: 0.32;
+    clip-path: inset(0 39% 0 0);
+    transform: translateX(11px);
+  }
+
+  43% {
+    opacity: 1;
+    clip-path: inset(0 18% 0 0);
+    transform: translateX(-2px);
+  }
+
+  55% {
+    opacity: 0.76;
+    clip-path: inset(0);
+    transform: translateX(3px);
+  }
+
+  67%,
+  100% {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translateX(0);
+  }
+}
+
+@keyframes strataScrubRailEnter {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px) scaleX(0);
+    transform-origin: left center;
+  }
+
+  38% {
+    opacity: 1;
+    transform: translateX(5px) scaleX(0.64);
+  }
+
+  52% {
+    opacity: 0.22;
+    transform: translateX(-3px) scaleX(0.82);
+  }
+
+  70%,
+  100% {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+    transform-origin: left center;
+  }
+}
+
+@keyframes strataScrubMetaEnter {
+  0%,
+  18% {
+    opacity: 0;
+    transform: translateX(-9px);
+  }
+
+  26% {
+    opacity: 1;
+    transform: translateX(5px);
+  }
+
+  38% {
+    opacity: 0.16;
+    transform: translateX(-3px);
+  }
+
+  52% {
+    opacity: 0.82;
+    transform: translateX(2px);
+  }
+
+  66%,
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes strataScrubZeroEnter {
+  0%,
+  12% {
+    opacity: 0;
+    transform: translateX(-14px) scaleX(0.92);
+  }
+
+  23% {
+    opacity: 0.68;
+    transform: translateX(8px) scaleX(1.05);
+  }
+
+  31% {
+    opacity: 0.14;
+    transform: translateX(-5px) scaleX(0.97);
+  }
+
+  43% {
+    opacity: 1;
+    transform: translateX(3px) scaleX(1);
+  }
+
+  51% {
+    opacity: 0.28;
+    transform: translateX(11px) scaleX(1.02);
+  }
+
+  64%,
+  100% {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+}
+
+@keyframes strataScrubDividerEnter {
+  0%,
+  35% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  46% {
+    opacity: 0.75;
+    transform: translateY(4px);
+  }
+
+  58% {
+    opacity: 0.12;
+    transform: translateY(-2px);
+  }
+
+  72%,
+  100% {
+    opacity: 0.42;
+    transform: translateY(0);
+  }
 }
 
 .strata__fault-meta {
@@ -1778,12 +1959,13 @@ body.is-screen-glitching .hypercube-stage {
 .strata__fault-zero {
   position: absolute;
   z-index: 1;
-  bottom: clamp(2px, 0.6vh, 7px);
+  bottom: var(--fault-zero-bottom);
   left: clamp(20px, 1.8vw, 28px);
   width: min(72%, 310px);
-  height: clamp(86px, 11vh, 116px);
+  height: var(--fault-zero-height);
+  clip-path: inset(var(--fault-zero-top-trim) -34% -18px -8px);
   opacity: 1;
-  transform: translateX(0) scale(1);
+  transform: translateX(0) scaleX(1);
   transform-origin: left bottom;
   transition:
     opacity 340ms ease 60ms,
@@ -1813,7 +1995,7 @@ body.is-screen-glitching .hypercube-stage {
   font-size: clamp(116px, 9.7vw, 162px);
   font-weight: 900;
   line-height: 0.72;
-  letter-spacing: -0.055em;
+  letter-spacing: -0.02em;
   white-space: nowrap;
   transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1950,23 +2132,8 @@ body.is-screen-glitching .hypercube-stage {
   100% { transform: translateY(0); filter: blur(0); }
 }
 
-.strata__record-meta {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding-right: 22px;
-  padding-bottom: clamp(9px, 1.1vh, 12px);
-  font-size: clamp(7px, 0.52vw, 9px);
-  line-height: 1;
-  letter-spacing: 0.19em;
-  color: rgba(220, 224, 229, 0.46);
-  white-space: nowrap;
-}
-
-.strata__record-meta,
 .strata__record-title,
-.strata__record-body,
-.strata__record-folio {
+.strata__record-body {
   opacity: 0;
   transform: translateY(5px);
   transition:
@@ -1979,32 +2146,18 @@ body.is-screen-glitching .hypercube-stage {
   transform: translateY(-5px);
 }
 
-.strata[data-eye-record="active"] .strata__record-meta,
 .strata[data-eye-record="active"] .strata__record-title,
-.strata[data-eye-record="active"] .strata__record-body,
-.strata[data-eye-record="active"] .strata__record-folio {
+.strata[data-eye-record="active"] .strata__record-body {
   opacity: 1;
   transform: translateY(0);
-}
-
-.strata[data-eye-record="active"] .strata__record-meta {
-  transition-delay: 70ms;
 }
 
 .strata[data-eye-record="active"] .strata__record-title {
   transition-delay: 110ms;
 }
 
-.strata[data-eye-record="active"] .strata__record-body,
-.strata[data-eye-record="active"] .strata__record-folio {
+.strata[data-eye-record="active"] .strata__record-body {
   transition-delay: 150ms;
-}
-
-.strata__record-meta::after {
-  content: "";
-  flex: 1 1 auto;
-  height: 1px;
-  background: linear-gradient(to right, rgba(235, 238, 242, 0.26), transparent);
 }
 
 .strata__record-title {
@@ -2068,130 +2221,6 @@ body.is-screen-glitching .hypercube-stage {
      wordmark vertically whenever the copy changes. */
 }
 
-.strata__record-folio {
-  align-self: flex-end;
-  margin-top: clamp(5px, 0.8vh, 9px);
-  font-size: clamp(7px, 0.5vw, 8px);
-  line-height: 1;
-  letter-spacing: 0.2em;
-  color: rgba(220, 224, 229, 0.3);
-}
-
-/* Active record / Signal Fault — the tunnel is locally broken into offset
-   horizontal strata. The typography sits on the rupture instead of inside a
-   card, and two glyph slices inherit the same registration error. */
-.strata__record-fault {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 180ms linear;
-}
-
-.strata__record-fault i {
-  --fault-x: 0px;
-  --fault-hold-x: 0px;
-  position: absolute;
-  display: block;
-  left: 0;
-  border: 0;
-  transform: translateX(var(--fault-x)) scaleX(0);
-  transform-origin: left center;
-  opacity: 0;
-  mix-blend-mode: difference;
-  transition:
-    opacity 140ms linear,
-    transform 540ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.strata__record-fault i:nth-child(1) {
-  top: 27%;
-  width: 86%;
-  height: 1px;
-  --fault-x: -9px;
-  --fault-hold-x: -15px;
-  background: rgba(242, 244, 246, 0.42);
-}
-
-.strata__record-fault i:nth-child(2) {
-  top: 41%;
-  left: 4%;
-  width: 73%;
-  height: 7px;
-  --fault-x: 15px;
-  --fault-hold-x: 23px;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(244, 246, 248, 0.16) 0,
-      rgba(244, 246, 248, 0.16) 1px,
-      rgba(244, 246, 248, 0.05) 1px,
-      rgba(244, 246, 248, 0.05) 3px
-    );
-}
-
-.strata__record-fault i:nth-child(3) {
-  top: 59%;
-  width: 91%;
-  height: 1px;
-  --fault-x: -12px;
-  --fault-hold-x: -21px;
-  background: rgba(242, 244, 246, 0.3);
-}
-
-.strata__record-fault i:nth-child(4) {
-  top: 72%;
-  left: 12%;
-  width: 66%;
-  height: 5px;
-  --fault-x: 20px;
-  --fault-hold-x: 31px;
-  background: rgba(242, 244, 246, 0.1);
-}
-
-.strata__record-fault i:nth-child(5) {
-  top: 86%;
-  left: 2%;
-  width: 79%;
-  height: 1px;
-  --fault-x: -5px;
-  --fault-hold-x: -12px;
-  background: rgba(242, 244, 246, 0.2);
-}
-
-.strata[data-eye-record="active"] .strata__record-fault {
-  opacity: 1;
-}
-
-.strata[data-eye-record="active"] .strata__record-fault i {
-  opacity: 0.72;
-  transform: translateX(var(--fault-x)) scaleX(1);
-}
-
-.strata[data-eye-record="active"] .strata__record-fault i:nth-child(1) {
-  transition-delay: 60ms;
-}
-
-.strata[data-eye-record="active"] .strata__record-fault i:nth-child(2) {
-  transition-delay: 100ms;
-}
-
-.strata[data-eye-record="active"] .strata__record-fault i:nth-child(3) {
-  transition-delay: 180ms;
-}
-
-.strata[data-eye-record="active"] .strata__record-fault i:nth-child(4) {
-  opacity: 0.42;
-  transition-delay: 220ms;
-}
-
-.strata[data-eye-record="active"] .strata__record-fault i:nth-child(5) {
-  opacity: 0.5;
-  transition-delay: 260ms;
-}
-
 .strata[data-eye-record="active"] .strata__record {
   display: grid;
   grid-template-columns: minmax(220px, 0.9fr) minmax(240px, 1.1fr);
@@ -2249,21 +2278,10 @@ body.is-screen-glitching .hypercube-stage {
   animation: none;
 }
 
-.strata[data-eye-record="active"] .strata__record-meta,
 .strata[data-eye-record="active"] .strata__record-title,
-.strata[data-eye-record="active"] .strata__record-body,
-.strata[data-eye-record="active"] .strata__record-folio {
+.strata[data-eye-record="active"] .strata__record-body {
   position: relative;
   z-index: 2;
-}
-
-.strata[data-eye-record="active"] .strata__record-meta {
-  grid-column: 1 / -1;
-  grid-row: 1;
-  align-self: center;
-  padding-right: 94px;
-  padding-bottom: 0;
-  color: rgba(226, 230, 235, 0.58);
 }
 
 .strata[data-eye-record="active"] .strata__record-title {
@@ -2329,13 +2347,6 @@ body.is-screen-glitching .hypercube-stage {
   overflow: visible;
 }
 
-.strata[data-eye-record="active"] .strata__record-folio {
-  position: absolute;
-  top: clamp(12px, 1.3vh, 15px);
-  right: clamp(18px, 1.8vw, 26px);
-  margin: 0;
-}
-
 @keyframes signalFaultOpen {
   0% {
     opacity: 0;
@@ -2372,13 +2383,6 @@ body.is-screen-glitching .hypercube-stage {
   .strata[data-eye-record="active"]
   .strata__record::before {
   animation: signalFaultHold 190ms steps(2, end) infinite;
-}
-
-.hypercube-stage.is-hud-pressing
-  .strata[data-eye-record="active"]
-  .strata__record-fault i {
-  opacity: 0.88;
-  transform: translateX(var(--fault-hold-x)) scaleX(1);
 }
 
 .hypercube-stage.is-hud-pressing
@@ -2641,22 +2645,6 @@ body.is-screen-glitching .hypercube-stage {
   }
 }
 
-/* ---- Strata Peripheral Elements (Tech Noir / Brutalism) ---- */
-.strata-watermark {
-  position: absolute;
-  top: 15%;
-  right: 5%;
-  font-family: "Formula", "supplyMono", sans-serif;
-  font-size: clamp(80px, 15vw, 250px);
-  font-weight: 900;
-  color: rgba(255, 255, 255, 0.15); /* Solid fill but readable opacity */
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  pointer-events: none;
-  user-select: none;
-  mix-blend-mode: difference;
-}
-
 .strata-corner {
   position: absolute;
   z-index: 7;
@@ -2917,214 +2905,12 @@ body.is-screen-glitching .hypercube-stage {
   to { opacity: 1; clip-path: inset(0); }
 }
 
-.strata-header {
-  position: absolute;
-  top: calc(var(--st-pad) + 4px);
-  left: calc(var(--st-pad) + clamp(20px, 3vw, 40px));
-  right: calc(var(--st-pad) + clamp(20px, 3vw, 40px));
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  font-size: clamp(10px, 0.85vw, 12px);
-  letter-spacing: 0.15em;
-  font-weight: 600;
-  pointer-events: none;
-  mix-blend-mode: difference;
-}
-
-.strata-header__id {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.strata-header__val {
-  color: var(--st-ink);
-  font-weight: 600;
-}
-
-.strata-header__stat {
-  color: var(--st-dim);
-}
-
-.strata-alert-box {
-  background: transparent;
-  color: var(--st-dim);
-  border: 1px solid var(--st-line);
-  padding: 4px 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  transition: all 0.2s;
-}
-.strata-alert-box::before {
-  content: attr(data-text-default);
-}
-
-.strata-sidebar {
-  position: absolute;
-  right: calc(var(--st-pad) + 4px);
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  mix-blend-mode: difference;
-}
-
-.strata-sidebar__ruler {
-  width: 1px;
-  height: clamp(150px, 25vh, 300px);
-  border-left: 1px solid var(--st-line-strong);
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent,
-    transparent 6px,
-    var(--st-ink) 6px,
-    var(--st-ink) 7px
-  );
-  opacity: 0.5;
-}
-
-.strata-sidebar__data {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  display: flex;
-  gap: 24px;
-  font-size: clamp(9px, 0.8vw, 11px);
-  color: var(--st-dim);
-  letter-spacing: 0.25em;
-  opacity: 1;
-  font-weight: 500;
-}
-
-.strata-footer {
-  position: absolute;
-  bottom: calc(var(--st-pad) + 4px);
-  right: calc(var(--st-pad) + clamp(20px, 3vw, 40px));
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  font-size: clamp(10px, 0.85vw, 12px);
-  text-align: right;
-  pointer-events: none;
-  mix-blend-mode: difference;
-}
-
-.strata-footer__barcode {
-  width: 140px;
-  height: 28px;
-  background: repeating-linear-gradient(
-    to right,
-    var(--st-ink),
-    var(--st-ink) 2px,
-    transparent 2px,
-    transparent 6px,
-    var(--st-ink) 6px,
-    var(--st-ink) 10px,
-    transparent 10px,
-    transparent 12px
-  );
-  opacity: 0.6;
-  mix-blend-mode: difference;
-}
-
-.strata-footer__text {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--st-ink);
-  letter-spacing: 0.1em;
-  font-weight: 600;
-}
-
-.strata-redacted {
-  background: var(--st-ink);
-  color: var(--st-ink);
-  padding: 1px 6px;
-  display: inline-block;
-  user-select: none;
-}
-
-/* ---- interaction states ------------------------------------- */
-.hypercube-stage.is-hud-scanning .strata,
-.hypercube-stage.is-hypercube-hovered .strata {
-  --st-accent: var(--st-signal);
-}
-
-/* Reactive HUD during long press */
-.hypercube-stage.is-hud-pressing .strata-alert-box {
-  background: var(--st-alert);
-  color: #fff;
-  border-color: var(--st-alert);
-  animation: strataAlertBlink 0.15s infinite step-end;
-}
-.hypercube-stage.is-hud-pressing .strata-alert-box::before {
-  content: attr(data-text-press);
-}
-.hypercube-stage.is-hud-pressing .strata-header__stat {
-  color: var(--st-alert);
-  animation: strataAlertBlink 0.15s infinite step-end;
-}
-.hypercube-stage.is-hud-pressing .strata-sidebar__data {
-  color: var(--st-alert);
-  filter: blur(0.5px);
-  animation: strataJitter 0.1s infinite;
-}
-.hypercube-stage.is-hud-pressing .strata-footer__barcode {
-  animation: strataBarcodeGlitch 0.2s infinite;
-  background: repeating-linear-gradient(
-    to right,
-    var(--st-alert),
-    var(--st-alert) 2px,
-    transparent 2px,
-    transparent 6px,
-    var(--st-alert) 6px,
-    var(--st-alert) 10px,
-    transparent 10px,
-    transparent 12px
-  );
-  mix-blend-mode: normal;
-}
-.hypercube-stage.is-hud-pressing .strata-redacted {
-  background: var(--st-alert);
-  color: #fff;
-}
-
-@keyframes strataAlertBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; background: transparent; color: var(--st-alert); }
-}
-@keyframes strataBarcodeGlitch {
-  0% { transform: translateX(0) scaleX(1); }
-  20% { transform: translateX(-4px) scaleX(1.05); }
-  40% { transform: translateX(4px) scaleX(0.95); }
-  60% { transform: translateX(-2px) scaleX(1); }
-  80% { transform: translateX(2px) scaleX(1.1); }
-  100% { transform: translateX(0) scaleX(1); }
-}
-@keyframes strataJitter {
-  0% { transform: translate(0, 0); }
-  25% { transform: translate(1px, -1px); }
-  50% { transform: translate(-1px, 2px); }
-  75% { transform: translate(-2px, -1px); }
-  100% { transform: translate(1px, 1px); }
-}
-
 .hypercube-stage.is-hud-pressing .strata__record-title {
   /* Wordmark stays put during the press: no jitter animation and no offset
      text-shadow, so its size / position never shifts (the VFX box glitch on the
      text supplies the only glitch motion). */
   color: var(--st-ink);
 }
-
-.strata[data-press-phase="2"],
-.strata[data-press-phase="3"] {
-  --st-accent: var(--st-alert);
-}
-
-/* The final press phase keeps the same ink title colour as the earlier phases
-   (no pure-red switch). */
 
 .strata.is-hud-glitch {
   animation: strataGlitch 260ms steps(3) 1;
@@ -3440,6 +3226,14 @@ body.is-archive-overlay-open .hypercube-stage {
 }
 
 .hypercube-stage.is-credits-morphing .archive-media-windows {
+  opacity: var(--archive-morph-source-opacity, 1);
+  transition: none;
+}
+
+/* The shrinking windows are frozen transition copies. Fade the live render
+   beneath them at the same rate so the Hypercube cannot show through the
+   newly exposed area during the Credits morph. */
+.hypercube-stage.is-credits-morphing .archive-hypercube-visual-layer {
   opacity: var(--archive-morph-source-opacity, 1);
   transition: none;
 }
@@ -4182,6 +3976,26 @@ body.is-archive-overlay-open .archive-overlay-grid {
   letter-spacing: 0.055em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.56);
+}
+
+.archive-overlay-page__header.is-copy-corrupting
+  :is(.archive-overlay-page__kicker, .archive-overlay-page__copy) {
+  animation: archiveCreditsCopyCorrupt 110ms steps(1, end) both;
+}
+
+@keyframes archiveCreditsCopyCorrupt {
+  0% {
+    opacity: 0.52;
+    text-shadow:
+      -1px 0 rgba(255, 255, 255, 0.66),
+      1px 0 rgba(0, 0, 0, 0.92);
+  }
+
+  42%,
+  100% {
+    opacity: 1;
+    text-shadow: none;
+  }
 }
 
 .archive-overlay-page__header {

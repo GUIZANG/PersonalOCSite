@@ -93,7 +93,6 @@
   class ArchiveObservationWindows {
     constructor(stage, sourceCanvas) {
       this.stage = stage;
-      this.sourceCanvas = sourceCanvas;
       this.visualLayer = sourceCanvas.closest(".archive-hypercube-visual-layer");
       this.layer = document.createElement("section");
       this.layer.className = "archive-media-windows";
@@ -117,6 +116,11 @@
 
     createWindows() {
       WINDOW_DEFS.forEach((definition, index) => {
+        const shadow = document.createElement("div");
+        shadow.className =
+          `archive-media-window__shadow archive-media-window__shadow--${definition.size}`;
+        shadow.setAttribute("aria-hidden", "true");
+
         const frame = document.createElement("article");
         frame.className = `archive-media-window archive-media-window--${definition.size}`;
         frame.dataset.windowId = definition.id;
@@ -141,17 +145,19 @@
         content.append(bar, viewport);
 
         frame.appendChild(content);
-        this.layer.appendChild(frame);
+        this.layer.append(shadow, frame);
         this.windows.push({
           definition,
           index,
           depth: WINDOW_DEPTH[definition.size] || 1,
+          shadow,
           frame,
           content,
           bar,
           viewport,
           clipRect: null,
           occlusionPath: null,
+          shadowOcclusionPath: null,
           revealProgress: 0,
         });
       });
@@ -181,9 +187,21 @@
         occlusionClip.appendChild(item.occlusionPath);
         defs.appendChild(occlusionClip);
 
+        const shadowOcclusionClip = document.createElementNS(svgNs, "clipPath");
+        shadowOcclusionClip.id = `${this.clipId}-${item.definition.id}-shadow`;
+        shadowOcclusionClip.setAttribute("clipPathUnits", "userSpaceOnUse");
+        item.shadowOcclusionPath = document.createElementNS(svgNs, "path");
+        item.shadowOcclusionPath.setAttribute("fill-rule", "evenodd");
+        item.shadowOcclusionPath.setAttribute("clip-rule", "evenodd");
+        shadowOcclusionClip.appendChild(item.shadowOcclusionPath);
+        defs.appendChild(shadowOcclusionClip);
+
         const occlusionUrl = `url("#${occlusionClip.id}")`;
         item.frame.style.clipPath = occlusionUrl;
         item.frame.style.webkitClipPath = occlusionUrl;
+        const shadowOcclusionUrl = `url("#${shadowOcclusionClip.id}")`;
+        item.shadow.style.clipPath = shadowOcclusionUrl;
+        item.shadow.style.webkitClipPath = shadowOcclusionUrl;
       });
 
       defs.appendChild(this.clipPath);
@@ -248,7 +266,11 @@
         const width = Math.max(0, frameRect.width);
         const height = Math.max(0, frameRect.height);
         let path = `M0 0H${width.toFixed(2)}V${height.toFixed(2)}H0Z`;
+        let shadowPath =
+          `M-30 -10H${(width + 30).toFixed(2)}` +
+          `V${(height + 50).toFixed(2)}H-30Z`;
         const occlusions = [];
+        const shadowOcclusions = [];
 
         rects.forEach(({ item: upperItem, visibleRect: upperRect }) => {
           const isAbove =
@@ -260,13 +282,26 @@
           const top = Math.max(frameRect.top, upperRect.top);
           const right = Math.min(frameRect.right, upperRect.right);
           const bottom = Math.min(frameRect.bottom, upperRect.bottom);
-          if (right <= left || bottom <= top) return;
+          if (right > left && bottom > top) {
+            const x1 = left - frameRect.left;
+            const y1 = top - frameRect.top;
+            const x2 = right - frameRect.left;
+            const y2 = bottom - frameRect.top;
+            occlusions.push({ x1, y1, x2, y2 });
+          }
 
-          const x1 = left - frameRect.left;
-          const y1 = top - frameRect.top;
-          const x2 = right - frameRect.left;
-          const y2 = bottom - frameRect.top;
-          occlusions.push({ x1, y1, x2, y2 });
+          const shadowLeft = Math.max(frameRect.left - 30, upperRect.left);
+          const shadowTop = Math.max(frameRect.top - 10, upperRect.top);
+          const shadowRight = Math.min(frameRect.right + 30, upperRect.right);
+          const shadowBottom = Math.min(frameRect.bottom + 50, upperRect.bottom);
+          if (shadowRight <= shadowLeft || shadowBottom <= shadowTop) return;
+
+          shadowOcclusions.push({
+            x1: shadowLeft - frameRect.left,
+            y1: shadowTop - frameRect.top,
+            x2: shadowRight - frameRect.left,
+            y2: shadowBottom - frameRect.top,
+          });
         });
 
         // Even-odd holes toggle visibility. If two raw occlusion rectangles
@@ -281,6 +316,13 @@
         });
 
         item.occlusionPath.setAttribute("d", path);
+        decomposeRectangleUnion(shadowOcclusions).forEach(({ x1, y1, x2, y2 }) => {
+          shadowPath +=
+            ` M${x1.toFixed(2)} ${y1.toFixed(2)}` +
+            `H${x2.toFixed(2)}V${y2.toFixed(2)}` +
+            `H${x1.toFixed(2)}Z`;
+        });
+        item.shadowOcclusionPath?.setAttribute("d", shadowPath);
       });
     }
 
@@ -296,6 +338,7 @@
         orderedWindows.forEach((item) => {
           this.setRevealProgress(item, 1);
           item.frame.classList.add("is-reveal-complete");
+          item.shadow.classList.add("is-reveal-complete");
         });
         this.refreshClip();
         return;
@@ -318,6 +361,7 @@
 
           if (linearProgress >= 1) {
             item.frame.classList.add("is-reveal-complete");
+            item.shadow.classList.add("is-reveal-complete");
           } else {
             complete = false;
           }
@@ -384,7 +428,7 @@
         moveEvent.preventDefault();
         moveEvent.stopPropagation();
         this.place(
-          item.frame,
+          item,
           moveEvent.clientX - pointerOffsetX,
           moveEvent.clientY - pointerOffsetY
         );
@@ -409,9 +453,10 @@
 
     layoutInitial() {
       this.applyWindowSizes();
-      this.windows.forEach(({ definition, frame }) => {
+      this.windows.forEach((item) => {
+        const { definition } = item;
         this.place(
-          frame,
+          item,
           Math.round(window.innerWidth * definition.x),
           Math.round(window.innerHeight * definition.y)
         );
@@ -427,17 +472,27 @@
         const renderedWidth = frame.getBoundingClientRect().width || requestedWidth;
         frame.style.setProperty("--window-content-height", `${renderedWidth / definition.ratio}px`);
         this.setRevealProgress(item, item.revealProgress);
+        this.syncShadow(item);
       });
     }
 
     clampAll() {
-      this.windows.forEach(({ frame }) => {
-        const rect = frame.getBoundingClientRect();
-        this.place(frame, rect.left, rect.top);
+      this.windows.forEach((item) => {
+        const rect = item.frame.getBoundingClientRect();
+        this.place(item, rect.left, rect.top);
       });
     }
 
-    place(frame, rawX, rawY) {
+    syncShadow({ frame, shadow }) {
+      const rect = frame.getBoundingClientRect();
+      shadow.style.left = frame.style.left;
+      shadow.style.top = frame.style.top;
+      shadow.style.width = `${rect.width}px`;
+      shadow.style.height = `${rect.height}px`;
+    }
+
+    place(item, rawX, rawY) {
+      const { frame } = item;
       const rect = frame.getBoundingClientRect();
       const visibleHandle = 72;
       const minX = Math.min(0, window.innerWidth - rect.width);
@@ -448,6 +503,7 @@
       const y = Math.min(Math.max(rawY, minY), maxY);
       frame.style.left = `${Math.round(x)}px`;
       frame.style.top = `${Math.round(y)}px`;
+      this.syncShadow(item);
     }
   }
 
