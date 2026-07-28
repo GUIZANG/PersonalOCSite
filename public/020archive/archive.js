@@ -66,7 +66,7 @@
       this.cursorSnapActive = false;
       this.hoverLookTarget = new THREE.Vector2();
       this.hoverLookCurrent = new THREE.Vector2();
-      this.hoverLookMaxTilt = 0.42;
+      this.hoverLookMaxTilt = 0.62;
       this.hoverCenterSnapRadius = 10;
       this.hoverTiltEuler = new THREE.Euler();
       this.hoverTiltMatrix4 = new THREE.Matrix4();
