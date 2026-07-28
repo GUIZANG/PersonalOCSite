@@ -9,12 +9,14 @@
     const exitHint = overlay?.querySelector(".archive-overlay-exit-hint");
     const maskPath = document.getElementById("archiveOverlayMaskPath");
     const stage = document.getElementById("hypercube-stage");
+    const topTriggerRail = stage?.querySelector(
+      ".strata-edge-bus--top .strata-edge-bus__rail"
+    );
     const creditItems = Array.from(
       overlay?.querySelectorAll(".archive-overlay-credits li") || []
     );
     if (!overlay || !maskPath || !stage || !creditItems.length) return;
 
-    const expandThreshold = 10;
     const retractThreshold = 60;
     const expandDwell = 2000;
     const expandDuration = 1180;
@@ -111,6 +113,10 @@
       if (disabled) return;
       const height = window.innerHeight || document.documentElement.clientHeight;
 
+      const topRailRect = topTriggerRail?.getBoundingClientRect();
+      const expandThreshold = topRailRect
+        ? topRailRect.top + topRailRect.height * 0.5
+        : 10;
       const isInsideTrigger = event.clientY <= expandThreshold;
       const canRemap =
         !pointerPressed &&

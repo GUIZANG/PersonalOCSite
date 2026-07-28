@@ -283,6 +283,14 @@ button,
   mix-blend-mode: difference;
 }
 
+/* The normal hold state deliberately inverts particles against the tunnel.
+   Vertical-sync roll is a self-contained video signal, so bypass that outer
+   blend while it is active; otherwise its black/red Shader output would be
+   inverted against the nested-frame background a second time. */
+.hypercube-stage.is-vertical-sync-roll .archive-hypercube-visual-layer {
+  mix-blend-mode: normal;
+}
+
 /* ---- nested-frame background (true bottom layer) -------------- */
 .strata-frames {
   position: fixed;

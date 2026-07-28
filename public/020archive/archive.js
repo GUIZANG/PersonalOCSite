@@ -117,6 +117,10 @@
       this.hudEyeRecordActive = false;
       this.hudEyeRecordClearTimer = 0;
       this.hudPressPhaseIndex = -1;
+      this.verticalSyncTriggered = false;
+      this.verticalSyncActive = false;
+      this.verticalSyncStart = 0;
+      this.verticalSyncDuration = 480;
       this.scene = new THREE.Scene();
       // Transparent while dormant so the DOM nested-frame background (z-index
       // below the canvas) shows through the empty areas around the particles.
@@ -145,6 +149,7 @@
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.renderer.setClearColor(this.background, 0);
+      this.createVerticalSyncPass();
 
       this.visualLayer = document.createElement("div");
       this.visualLayer.className = "archive-hypercube-visual-layer";
@@ -177,6 +182,140 @@
       this.onPointerLeave = this.onPointerLeave.bind(this);
       this.onPointerDown = this.onPointerDown.bind(this);
       this.onPointerUp = this.onPointerUp.bind(this);
+    }
+
+    createVerticalSyncPass() {
+      this.verticalSyncResolution = new THREE.Vector2();
+      this.verticalSyncTarget = new THREE.WebGLRenderTarget(1, 1, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        depthBuffer: false,
+        stencilBuffer: false,
+      });
+      this.verticalSyncTarget.texture.generateMipmaps = false;
+
+      this.verticalSyncScene = new THREE.Scene();
+      this.verticalSyncCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      this.verticalSyncMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          uScene: { value: this.verticalSyncTarget.texture },
+          uOffset: { value: 0 },
+          uEnvelope: { value: 0 },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+
+          void main() {
+            vUv = uv;
+            gl_Position = vec4(position.xy, 0.0, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D uScene;
+          uniform float uOffset;
+          uniform float uEnvelope;
+          varying vec2 vUv;
+
+          void main() {
+            vec2 rolledUv = vec2(vUv.x, fract(vUv.y - uOffset));
+            vec4 signal = texture2D(uScene, rolledUv);
+
+            float signalLevel = max(signal.r, max(signal.g, signal.b));
+            vec3 redSignal = vec3(0.82, 0.055, 0.105) * signalLevel * 1.16;
+            vec3 color = mix(signal.rgb, redSignal, uEnvelope);
+
+            float bandY = fract(uOffset);
+            float bandDistance = abs(vUv.y - bandY);
+            bandDistance = min(bandDistance, 1.0 - bandDistance);
+            float syncBand = 1.0 - smoothstep(0.0, 0.0065, bandDistance);
+            color += vec3(0.72, 0.07, 0.11) * syncBand * uEnvelope * 0.62;
+
+            // During the roll, transparent pixels become pure black. At both
+            // ends the envelope returns to zero, so the direct-render handoff
+            // remains visually seamless.
+            float alpha = mix(signal.a, 1.0, uEnvelope);
+            gl_FragColor = vec4(color, alpha);
+          }
+        `,
+        transparent: true,
+        blending: THREE.NoBlending,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      });
+
+      const quad = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        this.verticalSyncMaterial
+      );
+      quad.frustumCulled = false;
+      this.verticalSyncScene.add(quad);
+      this.resizeVerticalSyncTarget();
+      this.renderer.compile(this.verticalSyncScene, this.verticalSyncCamera);
+      this.renderer.setRenderTarget(this.verticalSyncTarget);
+      this.renderer.clear(true, true, true);
+      this.renderer.setRenderTarget(null);
+    }
+
+    resizeVerticalSyncTarget() {
+      if (!this.verticalSyncTarget || !this.renderer) return;
+      this.renderer.getDrawingBufferSize(this.verticalSyncResolution);
+      this.verticalSyncTarget.setSize(
+        Math.max(1, Math.round(this.verticalSyncResolution.x)),
+        Math.max(1, Math.round(this.verticalSyncResolution.y))
+      );
+    }
+
+    updateVerticalSyncRoll(time) {
+      const isHolding = this.pressPointerId !== null && this.burstTarget === 0;
+
+      if (!isHolding) {
+        this.verticalSyncTriggered = false;
+      } else if (
+        this.pressAmount >= 0.32 &&
+        !this.verticalSyncTriggered &&
+        !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+      ) {
+        this.verticalSyncTriggered = true;
+        this.verticalSyncActive = true;
+        this.verticalSyncStart = time;
+        this.container.classList.add("is-vertical-sync-roll");
+      }
+
+      if (this.burstTarget > 0) {
+        this.verticalSyncActive = false;
+        this.container.classList.remove("is-vertical-sync-roll");
+        return;
+      }
+      if (!this.verticalSyncActive || !this.verticalSyncMaterial) return;
+
+      const progress = Math.min(
+        1,
+        Math.max(0, (time - this.verticalSyncStart) / this.verticalSyncDuration)
+      );
+      const fadeIn = smoothstep(0, 0.065, progress);
+      const fadeOut = 1 - smoothstep(0.88, 1, progress);
+      const envelope = Math.min(fadeIn, fadeOut);
+
+      this.verticalSyncMaterial.uniforms.uOffset.value = progress;
+      this.verticalSyncMaterial.uniforms.uEnvelope.value = envelope;
+
+      if (progress >= 1) {
+        this.verticalSyncActive = false;
+        this.container.classList.remove("is-vertical-sync-roll");
+      }
+    }
+
+    renderVerticalSyncFrame() {
+      this.renderer.setRenderTarget(this.verticalSyncTarget);
+      this.renderer.autoClear = true;
+      this.renderer.clear(true, true, true);
+      this.renderer.render(this.scene, this.camera);
+
+      this.renderer.setRenderTarget(null);
+      this.renderer.autoClear = true;
+      this.renderer.render(this.verticalSyncScene, this.verticalSyncCamera);
     }
 
     applyArchiveThemeColors() {
@@ -580,6 +719,7 @@
 
       this.updateSignalLoss(time);
       this.updateArchiveThemeRenderColors();
+      this.updateVerticalSyncRoll(time);
 
       if (this.mat) {
         this.mat.uniforms.uTime.value = time / 1000;
@@ -621,7 +761,9 @@
         this.renderer.setClearColor(this.background, 0);
       }
 
-      if (trailAmount > 0.001) {
+      if (this.verticalSyncActive) {
+        this.renderVerticalSyncFrame();
+      } else if (trailAmount > 0.001) {
         this.renderer.autoClear = false;
         this.fadeMaterial.opacity = THREE.MathUtils.lerp(0.34, 0.08, trailAmount);
         this.renderer.render(this.fadeScene, this.fadeCamera);
@@ -730,6 +872,7 @@
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.resizeVerticalSyncTarget();
       this.updateEyeShift();
       this.applyHypercubeOffset();
 
