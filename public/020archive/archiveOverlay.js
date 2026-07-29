@@ -122,6 +122,17 @@
         progress <= 0.001 &&
         targetProgress === 0;
       updateCreditsTrigger(isInsideTrigger && canRemap);
+      const isClosing = targetProgress === 0 && progress > 0.001;
+      const exitFill =
+        isClosing
+          ? 1
+          : progress >= 0.9 && targetProgress === 1
+          ? clamp01(event.clientY / (height - retractThreshold))
+          : 0;
+      overlay.style.setProperty(
+        "--archive-exit-strength",
+        exitFill.toFixed(3)
+      );
 
       if (isInsideTrigger && canRemap) {
         scheduleExpand();
@@ -176,6 +187,9 @@
     }
 
     function animateTo(nextTarget) {
+      if (nextTarget === 0 && progress > 0.001) {
+        overlay.style.setProperty("--archive-exit-strength", "1");
+      }
       if (targetProgress === nextTarget && animationFrame) return;
       if (targetProgress === nextTarget && progress === nextTarget) return;
 
@@ -315,6 +329,7 @@
         }
       } else if (progress <= 0.001) {
         overlay.classList.remove("is-credits-revealed");
+        overlay.style.setProperty("--archive-exit-strength", "0");
       }
 
       updateScrollLine();
