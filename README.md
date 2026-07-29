@@ -1,29 +1,92 @@
-**PersonalOCSite**
+# PersonalOCSite
 
-A continuously evolving and iterative web visual project.
+An evolving web-based visual narrative and interaction laboratory by ZhuiYuYu.
 
-Repository: [https://github.com/GUIZANG/PersonalOCSite](https://github.com/GUIZANG/PersonalOCSite)
+[GitHub repository](https://github.com/GUIZANG/PersonalOCSite)
 
-This project is an exploratory space, attempting to combine visuals, interaction, and design language. It is both an experiment and an exercise—a continual exploration of the expressive potential of the web. The project is still under development, with many design and technical elements constantly being refined and optimized.
+PersonalOCSite explores the web as a medium for atmosphere, spatial interaction,
+experimental typography, and fragmented storytelling. The project combines
+WebGL particles, shader-driven faults, custom cursor states, industrial interface
+systems, and responsive editorial layouts into a connected set of scenes.
 
-🔹 **Requirements**
+The work is actively developed. Visual systems, timing, performance, and
+interaction details continue to change as the project evolves.
 
-See [`requirements.txt`](requirements.txt) for runtime and dependency notes.
+## Current Archive Experience
 
-- Node.js >= 18
-- npm >= 9
+`020archive` — **PRECOGNITIVE STRATA** — is the current main experimental scene.
+It is structured as three connected interface states:
 
-🔹 **Quick Start**
+### Hypercube
+
+- A shared Three.js particle field appears through five movable observation windows.
+- Recursive grayscale frames create a black → white → black depth tunnel beneath the scene.
+- Moving near the central object folds the Hypercube into an eye-like particle formation.
+- Holding the core for three seconds progressively destabilizes the interface:
+  particle polarity changes, the background depth cycles accelerate, HUD copy mutates,
+  and signal faults intensify.
+- Completing the hold breaks the Hypercube into a full-screen red particle field.
+- Random television-signal faults, image intrusions, blink shutters, and hidden eye
+  traces interrupt the otherwise controlled interface.
+
+### Card Stream
+
+The particle burst resolves into four minimal archive records:
+
+1. `SIGNAL`
+2. `VECTOR`
+3. `ORACLE`
+4. `NOESIS`
+
+Cards can be changed by dragging horizontally, using the mouse wheel, selecting the
+bottom index, pressing `1–4`, or using the arrow keys. The bottom rail acts as a
+fixed capture point while the surrounding records move through it.
+
+### Credits
+
+Dwelling above the upper edge rail remaps the observation interface into the
+Credits page. The transition preserves the perceived depth of the video windows
+while reorganizing them into an acknowledgement index.
+
+The Credits scene includes a grid-built SVG wordmark, source links, controlled
+text faults, and a bottom-edge return interaction. Moving to the lower edge
+restores the Archive through a dedicated depth-calibration transition.
+
+## Archive Controls
+
+| Context | Input | Result |
+| --- | --- | --- |
+| Hypercube | Move into the central observation area | Form and orient the particle eye |
+| Hypercube core | Hold primary mouse button for 3 seconds | Open the Card Stream |
+| Observation window bar | Drag | Reposition the window |
+| Lower-left depth control | Drag horizontally / arrow keys | Adjust the recursive background index |
+| Upper edge rail | Dwell for 2 seconds | Open Credits |
+| Credits | Move or tap near the lower edge | Return to Archive |
+| Card Stream | Horizontal drag | Move between records |
+| Card Stream | Mouse wheel / arrow keys | Select previous or next record |
+| Card Stream | Number keys `1–4` | Select a record directly |
+
+## Quick Start
+
+Requirements:
+
+- Node.js 18 or newer
+- npm 9 or newer
+
+Install and start the development server:
 
 ```bash
 npm install
 npm run dev
 ```
 
-This project does not use a root `index.html`. After the dev server starts, open a specific page directly, for example:
+Open [http://localhost:5173/](http://localhost:5173/). The root page redirects to
+the Awake entry scene.
 
-- Awake homepage: `http://localhost:5173/010awake/awake.html`
-- Archive scene: `http://localhost:5173/020archive/archive.html`
+Individual scenes can also be opened directly:
+
+- Awake entry: `http://localhost:5173/010awake/awake.html`
+- Precognitive Strata: `http://localhost:5173/020archive/archive.html`
 - Black Moon text: `http://localhost:5173/021blackMoon/010blackMoonText/blackMoonText.html`
 - Black Moon main scene: `http://localhost:5173/021blackMoon/020blackMoonMain/blackMoon.html`
 - Black Moon terminal: `http://localhost:5173/021blackMoon/030blackMoonTerminal/blackMoonTerminal.html`
@@ -35,72 +98,79 @@ npm run build
 npm run preview
 ```
 
-🔹 **Project Structure**
+## Project Structure
 
-- `public/` — main static multi-page site (HTML / CSS / JavaScript)
-- `public/010awake/` — awake homepage (entry) with scroll-driven narrative, shader scene, custom cursor, and music
-- `public/020archive/` — archive scene with a Three.js particle hypercube, full-screen particle expansion, scanning card stream, and custom cursor
-- `public/021blackMoon/` — Black Moon narrative modules (`010blackMoonText` / `020blackMoonMain` / `030blackMoonTerminal`), a branch off the archive scene
-- `public/reference/` — reference experiments used for visual interaction prototypes
-- `public/libs/` — locally bundled third-party libraries loaded by static pages
-- `src/` — leftover Vue scaffold files (currently unused by the live site)
-- `public/assets/` — shared static assets (`images/`, `fonts/`, `audio/`)
+```text
+public/
+├── 010awake/       Entry scene and scroll-driven narrative
+├── 020archive/     Hypercube, observation windows, Credits, and Card Stream
+├── 021blackMoon/   Black Moon narrative modules
+├── assets/         Shared images, fonts, and audio
+├── libs/           Locally bundled browser libraries
+└── reference/      Visual and interaction studies
 
-🔹 **Recent Update (Main Scene)**
+src/                Legacy Vue scaffold; not used by the current static scenes
+```
 
-- Added a liquid-glass card material with background refraction, spectral scattering, thickness absorption, Fresnel response, specular highlights, softened internal bubble motion, and card-edge thickness cues
-- Reworked the scanning archive cards so the scanned-left region reveals the Buddhist scripture ASCII text block while the unscanned-right region remains liquid glass
-- Expanded selected-card background states with per-card color palettes, glitch-assisted palette switching, and a darker red-toned focused scene
-- Refined hypercube and cursor feedback, including long-press cursor glitch behavior and press-progress color transition on the visible cursor ring
-- Stabilized the looping card focus flow so finite DOM clones continue to read as an infinite sequence during repeated card switching
+The live experience is primarily a static multi-page site served through Vite.
+Scene-specific HTML, CSS, and JavaScript remain under `public/` so each visual
+system can be developed independently.
 
-🔹 **Project Goal**
+## Recent Archive Update
 
-The project aims to explore the possibilities of the web as a medium for creation. Through experimental visual effects and interactive design, it seeks to present dynamic experiences that are difficult to achieve with traditional static interfaces. The goal is to convey an aesthetic feeling while maintaining simplicity and clarity, allowing users to experience immersion and a sense of discovery through interaction.
+- Rebuilt Card Stream as four clear title records over the persistent particle field.
+- Added a drag-responsive carousel with a fixed Roman-numeral capture rail.
+- Refined the custom SVG `CREDITS` wordmark and acknowledgement layout.
+- Preserved window depth during the Archive ↔ Credits metamorphosis.
+- Added responsive corner systems, signal faults, text glitches, image intrusions,
+  and long-press feedback.
+- Optimized Hypercube interaction without changing its particle count, motion,
+  color, timing, easing, or transition design:
+  pointer work is frame-coalesced, layout measurements are cached, and redundant
+  DOM/WebGL state writes are skipped.
 
-This project is not intended to achieve full functionality or commercialization; rather, it functions as a visual laboratory focused on:
+## Technical Direction
 
-* Exploration of visual style and color language
-* Experimentation with dynamic interactions and responsive layouts
-* Iteration of animation and visual effects
-* Subtle tuning of user perception and experience
+- **HTML, CSS, and JavaScript** for the scene and interface systems
+- **Three.js / WebGL** for particle geometry and shader rendering
+- **GSAP** for selected motion and depth-field interpolation
+- **SVG and Canvas** for typography, masks, grids, and signal layers
+- **Vite** for local development and production builds
+- Responsive layout, custom pointer handling, blend modes, clip paths, and
+  deliberately constrained monochrome/red/cyan color systems
 
-🔹 **Design Inspiration**
+The implementation favors visual continuity and precise interaction timing.
+Performance work is treated as part of the design: optimization should preserve
+the rendered composition rather than simplify it.
 
-The overall style of the project is inspired by Fictional Universes such as *Disco Elysium*, the *SCP Foundation*, and *Cultist Simulator*. These influences contribute elements like surreal and immersive atmospheres, cryptic and mysterious aesthetics, and an experimental approach to narrative and interaction, combining moody, dystopian textures with abstract and symbolic visual motifs.
+## Design Language
 
-🔹 **Technical Direction**
+The project combines:
 
-To achieve these design goals, the project experiments with various web technologies and tools:
+- glitch and damaged-signal aesthetics
+- industrial interfaces and diagnostic instrumentation
+- Brutalist composition
+- Swiss typographic restraint
+- recursive depth, surveillance, memory, and precognition motifs
 
-* **HTML / CSS / JavaScript** as foundational building blocks
-* **WebGL / Three.js** for visual rendering and effects
-* **Shader programming** for dynamic lighting, water surfaces, glows, and particle effects
-* **Responsive layouts and event listeners** to enhance interactivity
-* **Hybrid visual effects**, exploring layers, transparency, overlays, and blend-mode potentials
+Narrative influences include *Disco Elysium*, the *SCP Foundation*, and
+*Cultist Simulator*. Interface and motion references are credited within the
+Credits scene; copyright remains with each original author.
 
-Technology choices prioritize experimentation and exploration, emphasizing adjustability, iterability, and alignment with the design inspirations.
+## Status
 
-🔹 **Future Direction (Conceptual)**
+This is an independent, non-commercial visual experiment. It is not intended as
+a conventional product or finished application. The repository functions as both
+an artwork in progress and a record of iterative interaction research.
 
-In the future, the project will continue to seek a balance between visual experimentation and interactive exploration:
-
-* Delve deeper into the plasticity of contours, lines, and forms
-* Explore subtle feedback between interaction and user perception
-* Realize artistic experiments and visual storytelling within the web space
-* Continuously refine visual language and design style to integrate with modern web technologies
-
-This process is itself part of the project: constant experimentation, iteration, and adjustment, discovering unexpected effects and new possibilities along the way.
-
-This project is a dynamically growing experimental space, both a technical and a visual experiment. Updates are welcome, and so are ideas or inspirations for the experimental process. Each adjustment may bring new surprises, and every iteration is a fresh exploration.
-
-🔹 **License**
+## License
 
 This project is dual-licensed:
 
-- **Source code** (HTML / CSS / JavaScript / shaders / config) — [MIT License](LICENSE).
-- **Original creative content** (OC, text, visual designs, artwork, images, audio) — [CC BY-NC-ND 4.0](ContentLicense.md): sharing with attribution is allowed, but commercial use and derivative works are not.
+- **Source code** — [MIT License](LICENSE)
+- **Original creative content** — [CC BY-NC-ND 4.0](ContentLicense.md)
 
-Third-party libraries under `public/libs/` and other dependencies remain under their own respective licenses.
+Third-party libraries under `public/libs/`, referenced studies, and external
+assets remain under their respective licenses.
 
 © 2026 ZhuiYuYu.
