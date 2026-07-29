@@ -1,653 +1,363 @@
 (function () {
+  const THEMES = [
+    {
+      number: "01",
+      title: "SIGNAL",
+      kicker: "Memory residue / A",
+      status: "Carrier acquired",
+      metric: "93.7 KHZ",
+      summary:
+        "A transmission recovered before its sender existed. The carrier remains stable; the source does not.",
+      fragments: ["ECHO / 0041", "PHASE / LOCKED", "SOURCE / UNBORN"],
+      schema: "signal",
+    },
+    {
+      number: "02",
+      title: "VECTOR",
+      kicker: "Predicted motion / B",
+      status: "Trajectory unresolved",
+      metric: "08.2 SEC",
+      summary:
+        "Movement is archived as intention rather than position. Every route terminates one frame too early.",
+      fragments: ["PATH / NULL", "DRIFT / +08", "ARRIVAL / DENIED"],
+      schema: "vector",
+    },
+    {
+      number: "03",
+      title: "ORACLE",
+      kicker: "Future witness / C",
+      status: "Observer contaminated",
+      metric: "31.0 DB",
+      summary:
+        "The record changes when examined. Repeated observation produces a more accurate version of the error.",
+      fragments: ["EYE / OPEN", "CRC / FAILED", "WITNESS / ACTIVE"],
+      schema: "oracle",
+    },
+    {
+      number: "04",
+      title: "NOESIS",
+      kicker: "Synthetic thought / D",
+      status: "Cognition recursive",
+      metric: "∞ / 007",
+      summary:
+        "A thought without an owner continues to index itself. Retrieval is indistinguishable from infection.",
+      fragments: ["MIND / UNBOUND", "LOOP / 020", "OWNER / MISSING"],
+      schema: "noesis",
+    },
+  ];
+
+  const normalizeIndex = (index) =>
+    (index + THEMES.length) % THEMES.length;
+
   class ArchiveCardStream {
     constructor() {
       this.stream = document.getElementById("archiveCardStream");
-      this.line = document.getElementById("archiveCardLine");
-      this.scanner = this.stream?.querySelector(".archive-scanner");
-      this.hudLeft = document.getElementById("archiveScannerHudLeft");
-      this.hudRight = document.getElementById("archiveScannerHudRight");
-      this.cards = [
-        { kicker: "Archive 01", title: "Signal", meta: "Memory / A" },
-        { kicker: "Archive 02", title: "Vector", meta: "Trace / B" },
-        { kicker: "Archive 03", title: "Oracle", meta: "Index / C" },
-        { kicker: "Archive 04", title: "Noesis", meta: "Loop / D" },
-      ];
-      this.position = 0;
-      this.velocity = -58;
-      this.active = false;
-      this.revealAmount = 0;
-      this.revealTarget = 0;
-      this.lastTime = performance.now();
-      this.singleCycleWidth = 0;
-      this.hasStarted = false;
-      this.isIntroEntering = false;
-      this.pointerDownCard = null;
-      this.pointerDownX = 0;
-      this.pointerDownY = 0;
-      this.hasPointerMoved = false;
-      this.focusedCard = null;
-      this.focusMode = null;
-      this.focusSettled = false;
-      this.isSwitchingFocus = false;
-      this.focusTargetPosition = 0;
-      this.scannerX = window.innerWidth / 2;
-      this.scannerTargetX = this.scannerX;
-      this.referenceBackground = window.ArchiveReferenceBackground
-        ? new window.ArchiveReferenceBackground(document.getElementById("hypercube-stage") || document.body)
-        : null;
-      window.ArchiveCardVFX?.addLiquidBackgroundSource?.(this.referenceBackground?.canvas);
+      if (!this.stream) return;
 
-      this.animate = this.animate.bind(this);
-      this.populate();
-      this.setupEvents();
-      this.fitAsciiContent();
-      this.calculateCycleWidth();
-      this.position = -this.singleCycleWidth;
-      this.createDialog();
-      this.bindVFX();
-      this.bindLiquidGlass();
-      this.animate();
+      this.active = false;
+      this.themeIndex = 0;
+      this.transitionTimer = 0;
+      this.transitionEndTimer = 0;
+      this.backgroundTimer = 0;
+      this.wheelLockedUntil = 0;
+      this.referenceBackground = null;
+
+      this.build();
+      this.bindEvents();
+      this.applyTheme(0);
+    }
+
+    build() {
+      const indexItems = THEMES.map(
+        (theme, index) => `
+          <button
+            class="archive-index__item"
+            type="button"
+            data-theme-index="${index}"
+            aria-label="Open archive ${theme.number}: ${theme.title}"
+          >
+            <span>${theme.number}</span>
+            <strong>${theme.title}</strong>
+            <i>${theme.kicker.split(" / ")[0]}</i>
+            <b>${theme.metric}</b>
+          </button>
+        `
+      ).join("");
+
+      const visualSchemas = THEMES.map(
+        (theme, index) => `
+          <div
+            class="archive-schema archive-schema--${theme.schema}"
+            data-schema-index="${index}"
+            aria-hidden="true"
+          >
+            ${this.schemaMarkup(theme.schema)}
+          </div>
+        `
+      ).join("");
+
+      this.stream.innerHTML = `
+        <div class="archive-interface">
+          <div class="archive-interface__frame" aria-hidden="true">
+            <i></i><i></i><i></i><i></i>
+          </div>
+
+          <header class="archive-interface__header">
+            <span>Archive / Four strata / 020</span>
+            <i>Recovered interface</i>
+            <b>01—04 / Select record</b>
+          </header>
+
+          <nav class="archive-index" aria-label="Archive themes">
+            <div class="archive-index__label">
+              <span>Index</span><b>04 records</b>
+            </div>
+            ${indexItems}
+            <div class="archive-index__key">Keys 1—4 / Arrow keys</div>
+          </nav>
+
+          <main class="archive-output" aria-live="polite">
+            <div class="archive-output__rule" aria-hidden="true"></div>
+            <div class="archive-output__visual">${visualSchemas}</div>
+
+            <article class="archive-record">
+              <div class="archive-record__eyebrow">
+                <span data-record-number></span>
+                <i data-record-kicker></i>
+              </div>
+              <h1 data-record-title></h1>
+              <p data-record-summary></p>
+              <ul data-record-fragments></ul>
+            </article>
+
+            <aside class="archive-telemetry">
+              <span>State</span>
+              <strong data-record-status></strong>
+              <i data-record-metric></i>
+            </aside>
+
+            <div class="archive-output__position" aria-hidden="true">
+              <span>Near / 01</span>
+              <i><b></b></i>
+              <span>Deep / 04</span>
+            </div>
+          </main>
+
+          <footer class="archive-interface__footer">
+            <span>Selected / <b data-record-readout></b></span>
+            <i>Click index / Wheel / Keyboard</i>
+            <strong>Strata remains observable</strong>
+          </footer>
+
+          <div class="archive-interface__tear" aria-hidden="true"></div>
+        </div>
+      `;
+
+      this.themeButtons = Array.from(
+        this.stream.querySelectorAll("[data-theme-index]")
+      );
+      this.schemas = Array.from(
+        this.stream.querySelectorAll("[data-schema-index]")
+      );
+    }
+
+    schemaMarkup(schema) {
+      if (schema === "signal") {
+        return `
+          <div class="schema-signal__axis"></div>
+          <div class="schema-signal__bands">
+            ${Array.from({ length: 11 }, (_, index) => `<i style="--i:${index}"></i>`).join("")}
+          </div>
+          <span>Carrier / 93.7</span>
+        `;
+      }
+
+      if (schema === "vector") {
+        return `
+          <div class="schema-vector__origin"></div>
+          <div class="schema-vector__path">
+            ${Array.from({ length: 7 }, (_, index) => `<i style="--i:${index}"></i>`).join("")}
+          </div>
+          <span>Trajectory / unresolved</span>
+        `;
+      }
+
+      if (schema === "oracle") {
+        return `
+          <div class="schema-oracle__eye">
+            <i></i><i></i><i></i><b></b>
+          </div>
+          <div class="schema-oracle__scan"></div>
+          <span>Witness / active</span>
+        `;
+      }
+
+      return `
+        <div class="schema-noesis__depth">
+          ${Array.from({ length: 8 }, (_, index) => `<i style="--i:${index}"></i>`).join("")}
+        </div>
+        <div class="schema-noesis__node"></div>
+        <span>Recursion / 020</span>
+      `;
+    }
+
+    bindEvents() {
+      this.stream.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-theme-index]");
+        if (!button) return;
+        this.setTheme(Number(button.dataset.themeIndex), true);
+      });
+
+      this.stream.addEventListener("pointermove", (event) => {
+        if (!this.active) return;
+        const x = event.clientX / Math.max(window.innerWidth, 1);
+        const y = event.clientY / Math.max(window.innerHeight, 1);
+        this.stream.style.setProperty("--archive-pointer-x", x.toFixed(4));
+        this.stream.style.setProperty("--archive-pointer-y", y.toFixed(4));
+        this.stream.style.setProperty(
+          "--archive-parallax-x",
+          `${((x - 0.5) * 16).toFixed(2)}px`
+        );
+        this.stream.style.setProperty(
+          "--archive-parallax-y",
+          `${((y - 0.5) * 12).toFixed(2)}px`
+        );
+      });
+
+      this.stream.addEventListener(
+        "wheel",
+        (event) => {
+          if (!this.active || Math.abs(event.deltaY) < 5) return;
+          event.preventDefault();
+          const now = performance.now();
+          if (now < this.wheelLockedUntil) return;
+          this.wheelLockedUntil = now + 520;
+          this.setTheme(this.themeIndex + (event.deltaY > 0 ? 1 : -1), true);
+        },
+        { passive: false }
+      );
+
+      window.addEventListener("keydown", (event) => {
+        if (
+          !this.active ||
+          document.body.classList.contains("is-archive-overlay-open") ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.altKey
+        ) {
+          return;
+        }
+
+        if (/^[1-4]$/.test(event.key)) {
+          this.setTheme(Number(event.key) - 1, true);
+          return;
+        }
+
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          event.preventDefault();
+          this.setTheme(this.themeIndex + 1, true);
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          event.preventDefault();
+          this.setTheme(this.themeIndex - 1, true);
+        }
+      });
     }
 
     activate() {
+      if (!this.stream || this.active) return;
       this.active = true;
-      this.revealTarget = 1;
+      this.stream.classList.add("is-archive-interface-active");
 
-      if (!this.hasStarted) {
-        this.position = this.getIntroStartPosition();
-        this.isIntroEntering = true;
-        this.hasStarted = true;
-      }
-    }
+      window.clearTimeout(this.backgroundTimer);
+      this.backgroundTimer = window.setTimeout(() => {
+        const background = this.ensureReferenceBackground();
+        background?.setPalette?.(this.themeIndex);
+        background?.activate();
+      }, 760);
 
-    getIntroStartPosition() {
-      return window.innerWidth * (2 / 3);
-    }
-
-    bindVFX() {
-      if (!window.ArchiveCardVFX) return;
-      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
-        const normal = wrapper.querySelector(".archive-card-normal");
-        if (!normal) return;
-        window.ArchiveCardVFX.bind(
-          normal,
-          () => (typeof wrapper._scanQ === "number" ? wrapper._scanQ : -1),
-          () => this.revealAmount,
-          () => wrapper._dissolveSeed
-        );
+      window.requestAnimationFrame(() => {
+        this.stream.classList.add("is-archive-interface-ready");
       });
     }
 
-    bindLiquidGlass() {
-      if (!window.ArchiveCardVFX?.setLiquidCardProvider) return;
-      window.ArchiveCardVFX.setLiquidCardProvider(() => this.getLiquidGlassCards());
-    }
-
-    populate() {
-      const loops = 3;
-      this.line.innerHTML = "";
-      for (let loop = 0; loop < loops; loop++) {
-        this.cards.forEach((_, index) => {
-          this.line.appendChild(this.createCard(index, loop));
-        });
-      }
-    }
-
-    createCard(index, loop) {
-      const wrapper = document.createElement("article");
-      wrapper.className = "archive-card-wrapper hoverable";
-      wrapper.dataset.cardIndex = index;
-      wrapper.dataset.loop = loop;
-      wrapper._scanQ = -1;
-      wrapper._previousScanQ = -1;
-      wrapper._dissolveSeed = Math.random();
-      wrapper._liquidSeed = Math.random();
-
-      // Card front carries no text: it is a glass pane from the start. The
-      // normal layer stays as the (empty) anchor for the vfx dissolve passes
-      // and the scan clip, so the glass -> ascii transition keeps working.
-      const normal = document.createElement("div");
-      normal.className = "archive-card archive-card-normal";
-
-      const ascii = document.createElement("div");
-      ascii.className = "archive-card archive-card-ascii";
-      const asciiContent = document.createElement("pre");
-      asciiContent.className = "archive-ascii-content";
-      ascii.appendChild(asciiContent);
-
-      wrapper.appendChild(normal);
-      wrapper.appendChild(ascii);
-      return wrapper;
-    }
-
-    setupEvents() {
-      this.stream.addEventListener("pointerdown", (event) => this.startPointer(event));
-      this.line.addEventListener("contextmenu", (event) => event.preventDefault());
-      window.addEventListener("pointermove", (event) => this.onDrag(event));
-      window.addEventListener("pointerup", () => this.endPointer());
-      window.addEventListener("resize", () => {
-        this.fitAsciiContent();
-        this.calculateCycleWidth();
-        if (this.isIntroEntering && !this.focusMode) {
-          this.position = this.getIntroStartPosition();
-        }
-        this.applyResponsiveFocusLayout();
-        this.updateFocusTargets();
-      });
-      this.line.addEventListener("wheel", (event) => {
-        if (!this.active) return;
-        event.preventDefault();
-      }, { passive: false });
-    }
-
-    startPointer(event) {
-      if (!this.active || event.button === 2) return;
-      this.pointerDownCard = event.target.closest(".archive-card-wrapper");
-      this.pointerDownX = event.clientX;
-      this.pointerDownY = event.clientY;
-      this.hasPointerMoved = false;
-      // Dragging is disabled on the card page: the conveyor keeps auto-scrolling
-      // even while the pointer is held down. Only click-to-focus is supported.
-    }
-
-    onDrag(event) {
-      if (this.pointerDownCard) {
-        const moved = Math.hypot(event.clientX - this.pointerDownX, event.clientY - this.pointerDownY);
-        this.hasPointerMoved = this.hasPointerMoved || moved > 5;
-      }
-    }
-
-    endPointer() {
-      const clickedCard = this.hasPointerMoved ? null : this.pointerDownCard;
-
-      if (this.focusMode && !this.hasPointerMoved) {
-        this.handleFocusedClick(clickedCard, event);
-      } else if (clickedCard) {
-        this.focusCard(clickedCard);
+    ensureReferenceBackground() {
+      if (this.referenceBackground || !window.ArchiveReferenceBackground) {
+        return this.referenceBackground;
       }
 
-      this.pointerDownCard = null;
-      this.hasPointerMoved = false;
+      this.referenceBackground = new window.ArchiveReferenceBackground(
+        document.getElementById("hypercube-stage") || document.body
+      );
+      return this.referenceBackground;
     }
 
-    animate() {
-      const now = performance.now();
-      const dt = Math.min((now - this.lastTime) / 1000, 0.05);
-      this.lastTime = now;
+    setTheme(index, animate = true) {
+      const nextIndex = normalizeIndex(index);
+      if (nextIndex === this.themeIndex) return;
 
-      if (this.focusMode === "exit") {
-        // Release the card back into the ambient leftward drift from its centered
-        // position; the scanner glides slowly back to center meanwhile. No forced
-        // slide/wrap, so the focused copy stays continuous (the first card keeps
-        // its empty left side and the clicked card never jumps to a neighbour).
-        this.position += this.velocity * dt;
-        this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
-        this.scannerX += (this.scannerTargetX - this.scannerX) * 0.12;
-        this.wrapPosition();
-        this.updateFocusProgress();
-      } else if (this.focusMode) {
-        const focusEase = this.isSwitchingFocus && this.focusMode === "enter" ? 0.20 : 0.22;
-        const scannerEase = this.isSwitchingFocus && this.focusMode === "enter" ? 0.14 : 0.24;
-        this.position += (this.focusTargetPosition - this.position) * focusEase;
-        this.scannerX += (this.scannerTargetX - this.scannerX) * scannerEase;
-        this.updateFocusProgress();
-      } else if (this.active) {
-        this.position += this.velocity * dt;
-        this.velocity += ((this.velocity < 0 ? -58 : 58) - this.velocity) * 0.018;
-        this.scannerX += (window.innerWidth / 2 - this.scannerX) * 0.18;
+      window.clearTimeout(this.transitionTimer);
+      window.clearTimeout(this.transitionEndTimer);
+
+      if (!animate || !this.active) {
+        this.applyTheme(nextIndex);
+        return;
       }
 
-      this.revealAmount += (this.revealTarget - this.revealAmount) * 0.06;
+      this.stream.classList.remove(
+        "is-record-leaving",
+        "is-record-entering",
+        "is-record-tearing"
+      );
+      void this.stream.offsetWidth;
+      this.stream.classList.add("is-record-leaving", "is-record-tearing");
 
-      if (!this.focusMode) {
-        this.wrapPosition();
-      }
-      this.line.style.transform = `translate3d(${this.position}px, 0, 0)`;
-      this.updateScannerPosition();
-      this.updateScanning();
-      requestAnimationFrame(this.animate);
+      this.transitionTimer = window.setTimeout(() => {
+        this.applyTheme(nextIndex);
+        this.stream.classList.remove("is-record-leaving");
+        this.stream.classList.add("is-record-entering");
+
+        this.transitionEndTimer = window.setTimeout(() => {
+          this.stream.classList.remove("is-record-entering", "is-record-tearing");
+        }, 430);
+      }, 135);
     }
 
-    wrapPosition() {
-      if (!this.singleCycleWidth) return;
-      const min = -this.singleCycleWidth * 2;
-      const max = 0;
+    applyTheme(index) {
+      this.themeIndex = normalizeIndex(index);
+      const theme = THEMES[this.themeIndex];
+      this.stream.dataset.themeIndex = String(this.themeIndex);
+      this.stream.style.setProperty(
+        "--archive-theme-progress",
+        `${(this.themeIndex / (THEMES.length - 1)) * 100}%`
+      );
 
-      if (this.isIntroEntering) {
-        if (this.position > max) return;
-        this.isIntroEntering = false;
-      }
+      this.stream.querySelector("[data-record-number]").textContent =
+        `${theme.number} / 04`;
+      this.stream.querySelector("[data-record-kicker]").textContent = theme.kicker;
+      this.stream.querySelector("[data-record-title]").textContent = theme.title;
+      this.stream.querySelector("[data-record-summary]").textContent = theme.summary;
+      this.stream.querySelector("[data-record-status]").textContent = theme.status;
+      this.stream.querySelector("[data-record-metric]").textContent = theme.metric;
+      this.stream.querySelector("[data-record-readout]").textContent =
+        `${theme.number} / ${theme.title}`;
+      this.stream.querySelector("[data-record-fragments]").innerHTML =
+        theme.fragments.map((fragment) => `<li>${fragment}</li>`).join("");
 
-      if (this.position < min) {
-        this.position += this.singleCycleWidth;
-      } else if (this.position > max) {
-        this.position -= this.singleCycleWidth;
-      }
-    }
-
-    calculateCycleWidth() {
-      const wrappers = this.line.querySelectorAll(".archive-card-wrapper");
-      if (wrappers.length < this.cards.length) return;
-      const first = wrappers[0];
-      const fifth = wrappers[this.cards.length];
-      this.singleCycleWidth = Math.max(fifth.offsetLeft - first.offsetLeft, 1);
-    }
-
-    getMiddleLoopCard(wrapper) {
-      if (!wrapper) return null;
-      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
-      const wrappers = Array.from(this.line.querySelectorAll(".archive-card-wrapper"));
-      const middleLoop = Math.floor(wrappers.length / this.cards.length / 2);
-
-      return wrappers.find((candidate) =>
-        Number(candidate.dataset.cardIndex) === cardIndex &&
-        Number(candidate.dataset.loop) === middleLoop
-      ) || wrapper;
-    }
-
-    normalizeFocusedCardLoop() {
-      if (!this.focusedCard || !this.singleCycleWidth) return;
-      const current = this.focusedCard;
-      const middle = this.getMiddleLoopCard(current);
-      if (!middle || middle === current) return;
-
-      const delta = current.offsetLeft - middle.offsetLeft;
-      const wasSettled = this.focusSettled;
-      current.classList.remove("is-archive-card-focused", "is-archive-card-focus-settled");
-      middle.classList.add("is-archive-card-focused");
-      if (wasSettled) {
-        middle.classList.add("is-archive-card-focus-settled");
-      }
-
-      this.focusedCard = middle;
-      this.position += delta;
-      this.focusTargetPosition += delta;
-      this.line.style.transform = `translate3d(${this.position}px, 0, 0)`;
-      this.updateFocusTargets();
-    }
-
-    fitAsciiContent() {
-      const baseWidth = 380;
-      const baseHeight = 240;
-      const baseFontSize = 12;
-      const baseLineHeight = 14.4;
-      const minPadding = 2;
-
-      const firstWrapper = this.line.querySelector(".archive-card-wrapper");
-      if (!firstWrapper) return;
-
-      const cardWidth = firstWrapper.offsetWidth;
-      const cardHeight = firstWrapper.offsetHeight;
-      if (!cardWidth || !cardHeight) return;
-
-      const scale = Math.min(cardWidth / baseWidth, cardHeight / baseHeight);
-      const fontSize = baseFontSize * scale;
-      const lineHeight = baseLineHeight * scale;
-      const verticalPadding = minPadding * scale;
-      const availableHeight = Math.max(cardHeight - verticalPadding * 2, lineHeight);
-      const rows = Math.max(Math.floor(availableHeight / lineHeight), 1);
-      const fittedPadding = Math.max((cardHeight - rows * lineHeight) / 2, 0);
-      const firstAsciiContent = firstWrapper.querySelector(".archive-ascii-content");
-      if (!firstAsciiContent) return;
-
-      const charWidth = this.measureAsciiCharWidth(firstAsciiContent, fontSize, lineHeight);
-      const columns = Math.max(Math.floor(cardWidth / charWidth), 1);
-
-      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
-        const asciiContent = wrapper.querySelector(".archive-ascii-content");
-        if (!asciiContent) return;
-
-        const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
-        asciiContent.style.fontSize = `${fontSize}px`;
-        asciiContent.style.lineHeight = `${lineHeight}px`;
-        asciiContent.style.padding = `${fittedPadding}px 0`;
-        asciiContent.textContent = this.generateCode(cardIndex, columns, rows);
-      });
-    }
-
-    measureAsciiCharWidth(asciiContent, fontSize, lineHeight) {
-      const probe = document.createElement("span");
-      probe.textContent = "M".repeat(20);
-      probe.style.position = "absolute";
-      probe.style.visibility = "hidden";
-      probe.style.whiteSpace = "pre";
-      probe.style.fontFamily = getComputedStyle(asciiContent).fontFamily;
-      probe.style.fontSize = `${fontSize}px`;
-      probe.style.lineHeight = `${lineHeight}px`;
-      document.body.appendChild(probe);
-
-      const charWidth = probe.getBoundingClientRect().width / 20;
-      probe.remove();
-
-      return Math.max(charWidth, 1);
-    }
-
-    updateScanning() {
-      if (!this.active) return;
-      const scannerX = this.scannerX;
-      let nearestCard = null;
-      let nearestDistance = Infinity;
-
-      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
-        const rect = wrapper.getBoundingClientRect();
-        const ascii = wrapper.querySelector(".archive-card-ascii");
-        const centerDistance = Math.abs(rect.left + rect.width / 2 - scannerX);
-        const edgeAmount = Math.min(centerDistance / (window.innerWidth / 2), 1);
-        wrapper.style.transform = wrapper === this.focusedCard && this.focusMode
-          ? `scale(${this.focusMode === "exit" ? 1 : 1.2})`
-          : `scaleX(${1 + edgeAmount * 0.1})`;
-        if (centerDistance < nearestDistance) {
-          nearestDistance = centerDistance;
-          nearestCard = wrapper;
-        }
-
-        // Unclamped scanner position across the card in UV space, fed to the
-        // vfx dissolve shader. <0 = card fully right (intact), >1 = fully left (gone).
-        wrapper._scanQ = rect.width > 0 ? (scannerX - rect.left) / rect.width : -1;
-        // While entering/settled, non-focused cards stay intact. During exit they
-        // scan normally so they convert back to ascii progressively as the scanner
-        // returns to center, instead of all snapping at once when the exit ends.
-        if (this.focusMode && this.focusMode !== "exit" && wrapper !== this.focusedCard) {
-          wrapper._scanQ = -1;
-        }
-        if (wrapper === this.focusedCard && this.focusSettled) {
-          wrapper._scanQ = -1;
-        }
-        // Only keep the focused card free of scan effects while it dissolves out.
-        const suppressScanEffects = this.focusMode === "exit" && wrapper === this.focusedCard;
-        const scanAmount = Math.min(Math.max(wrapper._scanQ, 0), 1) * 100;
-        wrapper.style.setProperty("--clip-right", `${scanAmount}%`);
-        ascii.style.setProperty("--clip-left", `${scanAmount}%`);
-        wrapper.style.setProperty("--scan-fade-x", `${wrapper._scanQ * 100}%`);
-        wrapper.classList.toggle(
-          "is-scan-fading",
-          !suppressScanEffects && wrapper._scanQ >= 0 && wrapper._scanQ <= 1
-        );
-
-        // Refresh the dissolve seed when a card first crosses the scanner, so
-        // the pixel dissolve varies per pass. The white "scan flash" sweep was
-        // removed (it read as a repeating reflection on the glass cards).
-        const crossedScanner = !suppressScanEffects && !this.focusMode && wrapper._previousScanQ < 0 && wrapper._scanQ >= 0;
-        if (crossedScanner) {
-          wrapper._dissolveSeed = Math.random();
-        }
-        wrapper._previousScanQ = wrapper._scanQ;
+      this.themeButtons.forEach((button, buttonIndex) => {
+        const selected = buttonIndex === this.themeIndex;
+        button.classList.toggle("is-active", selected);
+        button.setAttribute("aria-pressed", String(selected));
+        button.setAttribute("tabindex", selected ? "0" : "-1");
       });
 
-      this.updateScannerHud(nearestCard, nearestDistance, scannerX);
-    }
-
-    getLiquidGlassCards() {
-      const pixelRatio = window.devicePixelRatio || 1;
-      const cards = [];
-
-      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
-        const rect = wrapper.getBoundingClientRect();
-        const offscreen = rect.right < -40 || rect.left > window.innerWidth + 40;
-        if (offscreen || this.revealAmount < 0.02) return;
-        if (rect.width <= 0.5 || rect.height <= 0.5) return;
-
-        const scanQ = typeof wrapper._scanQ === "number" ? wrapper._scanQ : -1;
-        const clipLeft = Math.min(Math.max(scanQ, 0), 1) * rect.width;
-        if (clipLeft >= rect.width - 0.5) return;
-
-        // Smoothly ease the per-card hover amount so the specular tint fades in
-        // and out instead of snapping when the pointer enters/leaves a card.
-        const hoverTarget = wrapper.matches(":hover") ? 1 : 0;
-        const prevHover = typeof wrapper._hoverAmount === "number" ? wrapper._hoverAmount : 0;
-        wrapper._hoverAmount = prevHover + (hoverTarget - prevHover) * 0.18;
-
-        // Full card rect plus a separate left clip. This preserves the material
-        // coordinates of the whole card while making glass the complement of
-        // the ASCII text block: text [0, scanX], glass [scanX, cardRight].
-        cards.push({
-          left: rect.left * pixelRatio,
-          bottom: (window.innerHeight - rect.bottom) * pixelRatio,
-          width: rect.width * pixelRatio,
-          height: rect.height * pixelRatio,
-          opacity: 1,
-          seed: wrapper._liquidSeed,
-          clipLeft: clipLeft * pixelRatio,
-          hover: wrapper._hoverAmount,
-        });
+      this.schemas.forEach((schema, schemaIndex) => {
+        schema.classList.toggle("is-active", schemaIndex === this.themeIndex);
       });
 
-      return cards;
-    }
-
-    focusCard(wrapper) {
-      if (!wrapper || !this.active) return;
-
-      const wasFocused = Boolean(this.focusedCard) && this.focusMode !== "exit";
-      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
-
-      this.focusedCard?.classList.remove("is-archive-card-focused", "is-archive-card-focus-settled");
-      this.focusedCard = wrapper;
-      this.focusMode = "enter";
-      this.focusSettled = false;
-      this.isSwitchingFocus = wasFocused;
-      this.pointerDownCard = null;
-      wrapper.classList.add("is-archive-card-focused");
-      this.stream.classList.add("is-card-focusing");
-      this.stream.classList.remove("is-card-focus-settled");
-      wrapper._dissolveSeed = Math.random();
-      this.referenceBackground?.setPalette?.(cardIndex, { glitch: wasFocused });
-      if (!wasFocused) {
-        this.referenceBackground?.activate();
-      }
-      this.updateFocusTargets();
-    }
-
-    handleFocusedClick(clickedCard, event) {
-      const dialog = event.target.closest(".archive-card-dialog");
-      if (dialog) return;
-
-      if (!clickedCard) {
-        this.exitFocus();
-        return;
-      }
-
-      if (clickedCard === this.focusedCard && this.focusSettled) {
-        this.openDialog(clickedCard);
-        return;
-      }
-
-      this.focusCard(clickedCard);
-    }
-
-    exitFocus() {
-      if (!this.focusMode || this.focusMode === "exit") return;
-
-      this.closeDialog();
-      this.focusMode = "exit";
-      this.focusSettled = false;
-      this.stream.classList.remove("is-card-focus-settled");
-      this.focusedCard?.classList.remove("is-archive-card-focus-settled");
-      this.clearScanEffects();
-      // Keep scannerX where it is (off to the left); it glides back to center in
-      // animate() while the card drifts. Position is left untouched so the card
-      // resumes the ambient conveyor from exactly where it was centered.
-      this.scannerTargetX = window.innerWidth / 2;
-      this.referenceBackground?.deactivate();
-    }
-
-    updateFocusTargets() {
-      if (!this.focusedCard || !this.focusMode) {
-        this.scannerTargetX = window.innerWidth / 2;
-        return;
-      }
-
-      if (this.focusMode === "exit") {
-        this.scannerTargetX = window.innerWidth / 2;
-        return;
-      }
-
-      this.focusTargetPosition = this.getFocusCenterPosition();
-      this.scannerTargetX = this.getScannerExitX();
-    }
-
-    updateFocusProgress() {
-      if (this.focusMode === "exit") {
-        // The card is free-drifting; finish once the scanner is back at center.
-        if (Math.abs(this.scannerX - this.scannerTargetX) >= 0.45) return;
-        this.scannerX = this.scannerTargetX;
-        this.focusedCard?.classList.remove("is-archive-card-focused", "is-archive-card-focus-settled");
-        this.focusedCard = null;
-        this.focusMode = null;
-        this.focusSettled = false;
-        this.isSwitchingFocus = false;
-        this.stream.classList.remove("is-card-focusing", "is-card-focus-settled");
-        return;
-      }
-
-      const positionDone = Math.abs(this.position - this.focusTargetPosition) < 0.45;
-      const scannerDone = Math.abs(this.scannerX - this.scannerTargetX) < 0.45;
-
-      if (!positionDone || !scannerDone) return;
-
-      this.position = this.focusTargetPosition;
-      this.scannerX = this.scannerTargetX;
-
-      if (this.focusMode === "enter") {
-        this.focusMode = "settled";
-        this.focusSettled = true;
-        this.isSwitchingFocus = false;
-        this.stream.classList.add("is-card-focus-settled");
-        this.focusedCard?.classList.add("is-archive-card-focus-settled");
-        this.normalizeFocusedCardLoop();
-      }
-    }
-
-    getScannerExitX() {
-      return -Math.max(40, window.innerWidth * 0.08);
-    }
-
-    getFocusCenterPosition() {
-      if (!this.focusedCard) return this.position;
-
-      return window.innerWidth / 2 -
-        (this.focusedCard.offsetLeft + this.focusedCard.offsetWidth / 2);
-    }
-
-    applyResponsiveFocusLayout() {
-      if (!this.focusMode) {
-        this.scannerX = window.innerWidth / 2;
-        return;
-      }
-
-      if (this.focusMode === "exit") {
-        this.scannerX = window.innerWidth / 2;
-        return;
-      }
-
-      if (this.focusMode === "settled" && this.focusedCard) {
-        this.position = this.getFocusCenterPosition();
-      }
-      this.scannerX = this.getScannerExitX();
-    }
-
-    clearScanEffects() {
-      this.line.querySelectorAll(".archive-card-wrapper").forEach((wrapper) => {
-        wrapper.classList.remove("is-scan-fading");
+      this.referenceBackground?.setPalette?.(this.themeIndex, {
+        glitch: this.active,
       });
     }
-
-    updateScannerPosition() {
-      if (!this.scanner) return;
-      this.scanner.style.left = `${this.scannerX}px`;
-    }
-
-    createDialog() {
-      this.dialog = document.createElement("div");
-      this.dialog.className = "archive-card-dialog";
-      this.dialog.hidden = true;
-      this.dialog.innerHTML = `
-        <div class="archive-card-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="archiveCardDialogTitle">
-          <button class="archive-card-dialog__close hoverable" type="button" aria-label="Close">&times;</button>
-          <span class="archive-card-dialog__kicker" id="archiveCardDialogKicker"></span>
-          <h2 class="archive-card-dialog__title" id="archiveCardDialogTitle"></h2>
-          <p class="archive-card-dialog__copy" id="archiveCardDialogCopy"></p>
-        </div>
-      `;
-      this.dialog.addEventListener("pointerdown", (event) => {
-        if (event.target === this.dialog || event.target.closest(".archive-card-dialog__close")) {
-          event.stopPropagation();
-          this.closeDialog();
-        }
-      });
-      document.body.appendChild(this.dialog);
-    }
-
-    openDialog(wrapper) {
-      if (!this.dialog) return;
-      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
-      const card = this.cards[cardIndex % this.cards.length];
-
-      this.dialog.querySelector("#archiveCardDialogKicker").textContent = card.kicker;
-      this.dialog.querySelector("#archiveCardDialogTitle").textContent = card.title;
-      this.dialog.querySelector("#archiveCardDialogCopy").textContent = `${card.meta} is locked at center.`;
-      this.dialog.hidden = false;
-      document.body.classList.add("is-archive-card-dialog-open");
-    }
-
-    closeDialog() {
-      if (!this.dialog) return;
-      this.dialog.hidden = true;
-      document.body.classList.remove("is-archive-card-dialog-open");
-    }
-
-    updateScannerHud(wrapper, distance, scannerX) {
-      if (!this.hudLeft || !this.hudRight || !wrapper) return;
-      const cardIndex = Number(wrapper.dataset.cardIndex) || 0;
-      const scanQ = typeof wrapper._scanQ === "number" ? wrapper._scanQ : 0;
-      const scanPercent = Math.round(Math.min(Math.max(scanQ, 0), 1) * 100);
-      const distancePercent = Math.round(Math.min(distance / Math.max(window.innerWidth / 2, 1), 1) * 100);
-
-      this.hudLeft.textContent = `${this.cards[cardIndex]?.kicker || "Archive"} / Q${String(scanPercent).padStart(3, "0")}`;
-      this.hudRight.textContent = `X${String(Math.round(scannerX)).padStart(4, "0")} / D${String(distancePercent).padStart(3, "0")}`;
-    }
-
-    generateCode(index, width = 54, height = 20) {
-      const passage =
-        "If someone sees the One of Proper Enlightenment as liberated and free from all outflows, and as not being attached to all worlds, that person still has not certified to the Way-eye. If someone knows that the Thus Come One’s body and marks do not exist, and cultivates and attains this understanding, then that person will quickly become a Buddha. If one can look upon this world with a mind that is unmoving, and see Buddhas and living beings as the same, then such a one will accomplish supreme wisdom. If, with regard to the Buddha and the Dharma, one’s mind is completely level and equal, and the two thoughts do not manifest, then one will realize the position which is hard to conceive of. If there is someone who sees the Buddha and living beings as level and equal, and peacefully dwelling, yet without dwelling and without a place of entering, then that person will become one who is difficult to encounter. Forms and feelings are without number; thinking, processes, and consciousness are also like this. If one is able to know this, then one can become a great muni. If worldly and world-transcending views are leapt far beyond, and if one is well able to know all Dharmas, then such a one will accomplish great brilliance. If someone produces a mind of transference toward all-wisdom, and sees the mind as not being produced, then such a one will obtain great renown. Living beings are without production and also without extinction. If one is able to obtain this kind of wisdom, then one will accomplish the Unsurpassed Way. Within one there are the limitless, and within the limitless there is one. If one understands that they mutually arise, then one will accomplish fearlessness.";
-      const lines = [];
-
-      for (const sentence of passage.split("\n")) {
-        const words = sentence.split(" ");
-        let current = "";
-
-        for (const word of words) {
-          const candidate = current ? `${current} ${word}` : word;
-          if (candidate.length <= width) {
-            current = candidate;
-          } else {
-            if (current) lines.push(current);
-            current = word.slice(0, width);
-          }
-        }
-        if (current) lines.push(current);
-      }
-
-      let text = "";
-      for (let row = 0; row < height; row++) {
-        const line = lines[(row + index) % lines.length] || "";
-        const raggedStart = Math.floor(width / 2);
-        const raggedRange = Math.max(width - raggedStart, 1);
-        const visibleWidth = raggedStart + Math.floor(hash(index * 131 + row * 29) * raggedRange);
-        const cutAt = line.length > visibleWidth ? line.lastIndexOf(" ", visibleWidth) : line.length;
-        const displayLine = line.slice(0, cutAt > 0 ? cutAt : line.length);
-
-        text += displayLine.padEnd(width, " ").slice(0, width);
-        if (row < height - 1) text += "\n";
-      }
-      return text;
-    }
-  }
-
-  function hash(value) {
-    const x = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
-
-    return x - Math.floor(x);
   }
 
   window.ArchiveCardStream = ArchiveCardStream;

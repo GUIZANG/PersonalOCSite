@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../styles/fonts.css" />
   <link rel="stylesheet" href="../styles/colors.css" />
   <link rel="stylesheet" href="archive.css" />
+  <link rel="stylesheet" href="archiveCardLab.css" />
 </head>
 <body>
   <main id="hypercube-stage" class="hypercube-stage" data-archive-theme="03" data-dossier-mood="mono" aria-label="Archive hypercube">
@@ -80,18 +81,11 @@
       </div>
     </section>
 
-    <section class="archive-card-stream" id="archiveCardStream" aria-label="Archive card stream">
-      <div class="archive-scanner" aria-hidden="true"></div>
-      <div class="archive-scanner-hud archive-scanner-hud--left" aria-hidden="true">
-        <span>SCAN FIELD</span>
-        <strong id="archiveScannerHudLeft">IDLE</strong>
-      </div>
-      <div class="archive-scanner-hud archive-scanner-hud--right" aria-hidden="true">
-        <span>EDGE SIGNAL</span>
-        <strong id="archiveScannerHudRight">000</strong>
-      </div>
-      <div class="archive-card-line" id="archiveCardLine"></div>
-    </section>
+    <section
+      class="archive-card-stream"
+      id="archiveCardStream"
+      aria-label="Archive theme index"
+    ></section>
   </main>
 
   <svg class="archive-overlay-mask" width="0" height="0" aria-hidden="true" focusable="false">
@@ -185,7 +179,6 @@
 
   <script src="../libs/three.min.js"></script>
   <script src="../libs/gsap.min.js"></script>
-  <script type="module" src="archiveCardVFX.js"></script>
   <script src="archiveReferenceBackground.js"></script>
   <script src="archiveCard.js"></script>
   <script src="archiveObservationWindows.js"></script>

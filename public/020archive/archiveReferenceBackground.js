@@ -78,7 +78,6 @@
       window.addEventListener("resize", this.onResize);
       this.onResize();
       this.seedField();
-      this.update();
     }
 
     setPalette(index, options = {}) {
@@ -141,6 +140,7 @@
       this.resetToRight();
       this.isEntering = true;
       this.pendingAction = null;
+      this.start();
       window.requestAnimationFrame(() => {
         this.enterStartTime = performance.now();
         this.canvas.classList.add("is-active");
@@ -274,6 +274,7 @@
     }
 
     update() {
+      this.animationFrame = null;
       const width = this.drawWidth;
       const height = window.innerHeight;
       const ctx = this.context;
@@ -309,7 +310,15 @@
         ctx.globalAlpha = 1;
       }
 
-      this.animationFrame = window.requestAnimationFrame(this.update);
+      if (live) {
+        this.animationFrame = window.requestAnimationFrame(this.update);
+      }
+    }
+
+    start() {
+      if (!this.animationFrame) {
+        this.animationFrame = window.requestAnimationFrame(this.update);
+      }
     }
 
     getParticleAlpha(mote) {

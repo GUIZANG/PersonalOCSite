@@ -19,7 +19,7 @@
     const retractThreshold = 60;
     const expandDwell = 2000;
     const expandDuration = 1180;
-    const retractDuration = 1280;
+    const retractDuration = 2000;
     const morph = createMorphLayer();
 
     let dwellTimer = null;
@@ -227,6 +227,7 @@
         const sourceWindow = observationWindows[index];
         if (!sourceWindow) {
           const offset = (index - observationWindows.length) * 18;
+          morph.cards[index].card.style.zIndex = "3";
           morph.cards[index].source.textContent =
             index === 5 ? "SOURCE LINK / 06" : "REFERENCE NODE / 07";
           clearSnapshot(morph.cards[index].snapshot);
@@ -238,6 +239,13 @@
           };
         }
         const rect = sourceWindow.getBoundingClientRect();
+        const sourceDepth = Number.parseInt(
+          window.getComputedStyle(sourceWindow).zIndex,
+          10
+        );
+        morph.cards[index].card.style.zIndex = String(
+          3 + (Number.isFinite(sourceDepth) ? sourceDepth : 1)
+        );
         morph.cards[index].source.textContent =
           sourceWindow.querySelector(
             ".archive-media-window__bar > span:first-of-type"
@@ -362,6 +370,13 @@
         setRectStyle(item.card, interpolateRect(source, target, local));
         item.card.style.opacity = opacity.toFixed(3);
         item.card.style.setProperty("--morph-collapse", local.toFixed(3));
+        const shadowHandoff = 1 - sourceFade;
+        const shadowCollapse =
+          1 - clamp01((local - 0.16) / 0.56);
+        item.card.style.setProperty(
+          "--morph-shadow-strength",
+          (shadowHandoff * shadowCollapse).toFixed(3)
+        );
 
         const snapshotOpacity = index < 5
           ? 1 - clamp01((value - 0.38) / 0.22)

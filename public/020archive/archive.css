@@ -3621,13 +3621,17 @@ body.is-archive-overlay-open .archive-overlay-grid {
 .archive-interface-morph__card {
   --morph-collapse: 0;
   --morph-bar-height: 22px;
+  --morph-shadow-strength: 0;
   position: fixed;
   z-index: 3;
   overflow: hidden;
   border: 1px solid
     rgb(255 255 255 / calc(0.68 - var(--morph-collapse) * 0.48));
   background: transparent;
-  box-shadow: none;
+  box-shadow:
+    0 0 6px rgb(0 0 0 / calc(0.5 * var(--morph-shadow-strength))),
+    0 8px 16px rgb(0 0 0 / calc(0.58 * var(--morph-shadow-strength))),
+    0 20px 28px rgb(0 0 0 / calc(0.34 * var(--morph-shadow-strength)));
   will-change: top, left, width, height, opacity;
 }
 
@@ -3831,6 +3835,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
 
 .archive-interface-morph__copy-resolved {
   opacity: 0;
+  visibility: hidden;
 }
 
 .archive-interface-morph__copy-resolved strong {
@@ -3922,19 +3927,6 @@ body.is-archive-overlay-open .archive-overlay-grid {
   }
 }
 
-@keyframes archiveCreditsLeftIn {
-  from {
-    opacity: 0;
-    clip-path: inset(0 0 0 100%);
-    transform: translateX(-18px);
-  }
-  to {
-    opacity: 1;
-    clip-path: inset(0 0 0 0);
-    transform: translateX(0);
-  }
-}
-
 .archive-overlay-page__inner {
   position: absolute;
   top: clamp(74px, 13vh, 128px);
@@ -3982,11 +3974,13 @@ body.is-archive-overlay-open .archive-overlay-grid {
   align-self: center;
   margin-top: 0;
   opacity: 0;
-  transform: translateX(-18px);
+  visibility: hidden;
+  filter: none;
+  transform: translateX(0);
 }
 
 .archive-overlay-page.is-credits-revealed .archive-overlay-page__header {
-  animation: archiveCreditsLeftIn 300ms steps(5, end) forwards;
+  animation: none;
 }
 
 .archive-overlay-page__credit-column {
@@ -4087,9 +4081,18 @@ body.is-archive-overlay-open .archive-overlay-grid {
   animation: archiveCreditGroupGlitch 350ms step-end forwards;
 }
 
-.archive-overlay-page__header.is-copy-hover-glitching
-  :is(.archive-overlay-page__kicker, .archive-overlay-page__copy) {
-  animation: archiveCreditGroupGlitch 350ms step-end forwards;
+.archive-overlay-page.is-credits-revealed
+  .archive-overlay-page__header.is-copy-scrambling,
+.archive-overlay-page.is-credits-revealed
+  .archive-overlay-page__header.is-copy-scramble-complete {
+  visibility: visible;
+  opacity: 1;
+}
+
+.archive-overlay-scramble-text {
+  display: inline;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
 }
 
 .archive-overlay-credit-char.is-mirrored {
