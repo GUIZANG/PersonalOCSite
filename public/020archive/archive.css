@@ -3978,26 +3978,6 @@ body.is-archive-overlay-open .archive-overlay-grid {
   color: rgba(255, 255, 255, 0.56);
 }
 
-.archive-overlay-page__header.is-copy-corrupting
-  :is(.archive-overlay-page__kicker, .archive-overlay-page__copy) {
-  animation: archiveCreditsCopyCorrupt 110ms steps(1, end) both;
-}
-
-@keyframes archiveCreditsCopyCorrupt {
-  0% {
-    opacity: 0.52;
-    text-shadow:
-      -1px 0 rgba(255, 255, 255, 0.66),
-      1px 0 rgba(0, 0, 0, 0.92);
-  }
-
-  42%,
-  100% {
-    opacity: 1;
-    text-shadow: none;
-  }
-}
-
 .archive-overlay-page__header {
   align-self: center;
   margin-top: 0;
@@ -4104,6 +4084,11 @@ body.is-archive-overlay-open .archive-overlay-grid {
 }
 
 .archive-overlay-credits li.is-credit-glitching > a {
+  animation: archiveCreditGroupGlitch 350ms step-end forwards;
+}
+
+.archive-overlay-page__header.is-copy-hover-glitching
+  :is(.archive-overlay-page__kicker, .archive-overlay-page__copy) {
   animation: archiveCreditGroupGlitch 350ms step-end forwards;
 }
 

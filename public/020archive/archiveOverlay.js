@@ -16,16 +16,6 @@
       overlay?.querySelectorAll(".archive-overlay-credits li") || []
     );
     if (!overlay || !maskPath || !stage || !creditItems.length) return;
-    const leftCopyHeader = overlay.querySelector(".archive-overlay-page__header");
-    const leftCopyNodes = Array.from(
-      leftCopyHeader?.querySelectorAll(
-        ".archive-overlay-page__kicker, .archive-overlay-page__copy"
-      ) || []
-    );
-    const leftCopyText = new Map(
-      leftCopyNodes.map((element) => [element, element.textContent])
-    );
-
     const retractThreshold = 60;
     const expandDwell = 2000;
     const expandDuration = 1180;
@@ -46,9 +36,6 @@
     let targetRects = [];
     let copySourceRect = null;
     let copyTargetRect = null;
-    let copyCorruptionEnabled = false;
-    let copyCorruptionWaitTimer = 0;
-    let copyCorruptionPulseTimer = 0;
 
     render();
     document.addEventListener("pointermove", onPointerMove);
@@ -224,173 +211,6 @@
       render();
     }
 
-    function setCopyCorruptionEnabled(nextEnabled) {
-      const reduceMotion = window.matchMedia?.(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-      const enabled = Boolean(nextEnabled && !reduceMotion && leftCopyNodes.length);
-      if (enabled === copyCorruptionEnabled) return;
-
-      copyCorruptionEnabled = enabled;
-      window.clearTimeout(copyCorruptionWaitTimer);
-      window.clearTimeout(copyCorruptionPulseTimer);
-      copyCorruptionWaitTimer = 0;
-      copyCorruptionPulseTimer = 0;
-      restoreLeftCopy();
-
-      if (enabled) scheduleCopyCorruption(true);
-    }
-
-    function scheduleCopyCorruption(isFirst = false) {
-      if (!copyCorruptionEnabled) return;
-      window.clearTimeout(copyCorruptionWaitTimer);
-      const delay = isFirst
-        ? 1200 + Math.random() * 1800
-        : 4000 + Math.random() * 4000;
-      copyCorruptionWaitTimer = window.setTimeout(
-        triggerCopyCorruption,
-        delay
-      );
-    }
-
-    function triggerCopyCorruption() {
-      copyCorruptionWaitTimer = 0;
-      if (!copyCorruptionEnabled) return;
-      if (document.hidden) {
-        scheduleCopyCorruption();
-        return;
-      }
-
-      const target =
-        leftCopyNodes[Math.floor(Math.random() * leftCopyNodes.length)];
-      const source = leftCopyText.get(target) || "";
-      const fault = createCopyIntrusion(source);
-      if (!fault) {
-        scheduleCopyCorruption();
-        return;
-      }
-
-      const recoveryFrames = fault.word.length;
-      let frame = 0;
-      restoreLeftCopy();
-      leftCopyHeader?.classList.add("is-copy-corrupting");
-      target.textContent = renderCopyIntrusion(fault, 0);
-
-      const renderFaultFrame = () => {
-        if (!copyCorruptionEnabled) {
-          restoreLeftCopy();
-          return;
-        }
-
-        frame += 1;
-        target.textContent = renderCopyIntrusion(
-          fault,
-          frame / recoveryFrames
-        );
-
-        if (frame < recoveryFrames) {
-          copyCorruptionPulseTimer = window.setTimeout(renderFaultFrame, 110);
-          return;
-        }
-
-        copyCorruptionPulseTimer = window.setTimeout(() => {
-          copyCorruptionPulseTimer = 0;
-          restoreLeftCopy();
-          scheduleCopyCorruption();
-        }, 100);
-      };
-
-      copyCorruptionPulseTimer = window.setTimeout(renderFaultFrame, 260);
-    }
-
-    function createCopyIntrusion(source) {
-      const words = [
-        "DEATH",
-        "DEATH",
-        "DEATH",
-        "DECAY",
-        "HOLLOW",
-        "BURIED",
-        "WATCHING",
-        "REMAINS",
-        "MISSING",
-        "VOID",
-      ];
-      const sentenceRanges = Array.from(
-        source.matchAll(/[^.!?]+(?:[.!?]+|$)/g)
-      )
-        .map((match) => {
-          let start = match.index || 0;
-          let end = start + match[0].length;
-          while (start < end && /\s/.test(source[start])) start += 1;
-          while (end > start && /\s/.test(source[end - 1])) end -= 1;
-          return { start, end };
-        })
-        .filter(({ start, end }) => end - start >= 12);
-      if (!sentenceRanges.length) return null;
-
-      const sentence =
-        sentenceRanges[Math.floor(Math.random() * sentenceRanges.length)];
-      let word = words[Math.floor(Math.random() * words.length)];
-      const sentenceLength = sentence.end - sentence.start;
-      const intrusionStart = sentence.start + Math.floor(sentenceLength * 0.5);
-      const intrusionEnd = sentence.start + Math.floor(sentenceLength * 0.8);
-      let candidates = [];
-
-      for (let index = intrusionStart; index <= intrusionEnd; index += 1) {
-        if (
-          /[A-Za-z0-9]/.test(source[index] || "") &&
-          index + word.length <= sentence.end
-        ) {
-          candidates.push(index);
-        }
-      }
-
-      if (!candidates.length && word !== "DEATH") {
-        word = "DEATH";
-        for (let index = intrusionStart; index <= intrusionEnd; index += 1) {
-          if (
-            /[A-Za-z0-9]/.test(source[index] || "") &&
-            index + word.length <= sentence.end
-          ) {
-            candidates.push(index);
-          }
-        }
-      }
-      if (!candidates.length) return null;
-
-      return {
-        source,
-        word,
-        start: candidates[Math.floor(Math.random() * candidates.length)],
-      };
-    }
-
-    function renderCopyIntrusion(fault, recovery) {
-      const glyphs = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789/#%*+<>[]";
-      const characters = Array.from(fault.source);
-      const revealed = Math.floor(fault.word.length * recovery);
-
-      for (let index = 0; index < fault.word.length; index += 1) {
-        const characterIndex = fault.start + index;
-        if (recovery <= 0) {
-          characters[characterIndex] = fault.word[index];
-        } else if (index >= revealed) {
-          characters[characterIndex] =
-            glyphs[Math.floor(Math.random() * glyphs.length)];
-        }
-      }
-
-      return characters.join("");
-    }
-
-    function restoreLeftCopy() {
-      leftCopyNodes.forEach((element) => {
-        element.textContent = leftCopyText.get(element) || "";
-      });
-      leftCopyHeader?.classList.remove("is-copy-corrupting");
-    }
-
     function captureMorphGeometry() {
       const observationWindows = Array.from(
         stage.querySelectorAll(".archive-media-window")
@@ -489,9 +309,6 @@
         overlay.classList.remove("is-credits-revealed");
       }
 
-      setCopyCorruptionEnabled(
-        progress >= 0.999 && targetProgress === 1 && !disabled
-      );
       updateScrollLine();
     }
 
@@ -844,7 +661,6 @@
 
     function disableOverlay() {
       disabled = true;
-      setCopyCorruptionEnabled(false);
       updateCreditsTrigger(false);
       cancelDwell();
       animateTo(0);
