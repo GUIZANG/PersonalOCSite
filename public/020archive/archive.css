@@ -4102,12 +4102,13 @@ body.is-archive-overlay-open .archive-overlay-grid {
   top: 50%;
   left: 48%;
   z-index: 2;
+  width: min(76vw, 1080px);
   margin: 0;
   color: rgba(255, 255, 255, 0);
   font-family: "Formula", "supplyMono", sans-serif;
-  font-size: clamp(132px, 24vw, 430px);
+  font-size: 0 !important;
   font-weight: 900;
-  line-height: 0.72;
+  line-height: 0;
   letter-spacing: 0.012em;
   white-space: nowrap;
   opacity: 0;
@@ -4116,6 +4117,14 @@ body.is-archive-overlay-open .archive-overlay-grid {
   scale: none;
   transform-origin: center;
   user-select: none;
+}
+
+.archive-overlay-page__backdrop-mark {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  fill: currentColor;
 }
 
 .archive-overlay-page.is-credits-revealed .archive-overlay-page__backdrop-title {
@@ -4493,7 +4502,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
   .archive-overlay-page__backdrop-title {
     top: 22%;
     left: 50%;
-    font-size: clamp(104px, 25vw, 190px);
+    width: min(91vw, 700px);
   }
 
   .archive-overlay-page__inner {
@@ -4583,7 +4592,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
 
   .archive-overlay-page__backdrop-title {
     top: 18%;
-    font-size: clamp(76px, 25vw, 126px);
+    width: 92vw;
   }
 
   .archive-overlay-page__inner {
@@ -4626,7 +4635,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
 @media (max-height: 560px) and (min-width: 700px) {
   .archive-overlay-page__backdrop-title {
     top: 50%;
-    font-size: clamp(112px, 20vw, 210px);
+    width: min(72vw, 780px);
   }
 
   .archive-overlay-page__inner {
