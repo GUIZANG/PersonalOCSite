@@ -107,6 +107,20 @@
     const root = document.getElementById("strataFrames");
     const stage = document.getElementById("hypercube-stage");
     if (!root || !stage) return;
+    let rootRect = null;
+
+    function refreshRootRect() {
+      const rect = root.getBoundingClientRect();
+      rootRect = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
+    refreshRootRect();
+    window.addEventListener("resize", refreshRootRect, { passive: true });
 
     // Fixed pure-black outer frame: overscans the inset background aperture and
     // never moves, so the area outside the four fixed corner marks stays black.
@@ -163,8 +177,8 @@
       // screens (nx is [-0.5, 0.5], so nx * innerWidth * REACH puts a pointer at
       // the edge REACH*half-width toward that side). depth scales it from 0 at
       // the outermost rectangle to 1 at the innermost => vanishing point.
-      const reachX = root.clientWidth * REACH;
-      const reachY = root.clientHeight * REACH;
+      const reachX = rootRect.width * REACH;
+      const reachY = rootRect.height * REACH;
       bands.forEach((b, i) => {
         const tx = nx * reachX * b.depth;
         const ty = ny * reachY * b.depth;
@@ -280,14 +294,30 @@
       }
     });
 
-    function onPointerMove(event) {
-      const rect = root.getBoundingClientRect();
-      const nx = clamp01((event.clientX - rect.left) / rect.width) - 0.5;
-      const ny = clamp01((event.clientY - rect.top) / rect.height) - 0.5;
+    let pointerRaf = null;
+    let pointerX = 0;
+    let pointerY = 0;
+
+    function renderPointerTargets() {
+      pointerRaf = null;
+      const nx = clamp01((pointerX - rootRect.left) / rootRect.width) - 0.5;
+      const ny = clamp01((pointerY - rootRect.top) / rootRect.height) - 0.5;
       applyTargets(nx, ny);
     }
 
+    function onPointerMove(event) {
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      if (pointerRaf === null) {
+        pointerRaf = requestAnimationFrame(renderPointerTargets);
+      }
+    }
+
     function onPointerLeave() {
+      if (pointerRaf !== null) {
+        cancelAnimationFrame(pointerRaf);
+        pointerRaf = null;
+      }
       applyTargets(0, 0);
     }
 
@@ -299,11 +329,12 @@
     const lngEl = document.getElementById("sb-lng");
     const elevEl = document.getElementById("sb-elev");
     let lastScrambleTime = 0;
+    let telemetryWasPressing = null;
 
     gsap.ticker.add((time, deltaTime) => {
       if (!latEl || !lngEl || !elevEl) return;
       
-      const isPressing = document.getElementById("hypercube-stage").classList.contains("is-hud-pressing");
+      const isPressing = stage.classList.contains("is-hud-pressing");
       
       if (isPressing) {
         // Scramble every ~50ms
@@ -313,12 +344,13 @@
           elevEl.textContent = `ELEV: -${Math.floor(Math.random() * 9999)}M`;
           lastScrambleTime = time;
         }
-      } else {
+      } else if (telemetryWasPressing !== false) {
         // Reset to original values when not pressing
         latEl.textContent = "LAT: 47.3769";
         lngEl.textContent = "LNG: 8.5417";
         elevEl.textContent = "ELEV: -999M";
       }
+      telemetryWasPressing = isPressing;
     });
   }
 

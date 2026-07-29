@@ -1,4 +1,35 @@
 (function () {
+  const HUD_PRESS_PHASES = [
+    {
+      threshold: 0,
+      signal: "CORE LOCK",
+      title: "THE EYE",
+      summary: "It does not look at you. It remembers the version of you that has not happened yet.",
+      instruction: "CORE LOCK",
+    },
+    {
+      threshold: 0.28,
+      signal: "MEMORY LEAK",
+      title: "IT HEARS YOU",
+      summary: "Something behind the iris is repeating thoughts you have never spoken.",
+      instruction: "MEMORY LEAK",
+    },
+    {
+      threshold: 0.58,
+      signal: "IDENTITY LOSS",
+      title: "IT KNOWS YOU",
+      summary: "Your name has appeared in records written before your birth.",
+      instruction: "IDENTITY BREACH",
+    },
+    {
+      threshold: 0.82,
+      signal: "BREACH IMMINENT",
+      title: "DO NOT RELEASE",
+      summary: "The archive is opening from the other side.",
+      instruction: "CONTAINMENT FAILURE",
+    },
+  ];
+
   window.addEventListener("DOMContentLoaded", () => {
     const stage = document.getElementById("hypercube-stage");
     const cardStream = new window.ArchiveCardStream();
@@ -70,6 +101,26 @@
       this.hoverTiltEuler = new THREE.Euler();
       this.hoverTiltMatrix4 = new THREE.Matrix4();
       this.hoverTiltMatrix3 = new THREE.Matrix3();
+      this.activeInteractionRect = null;
+      this.cachedCursorMetrics = null;
+      this.hoverDotStyleCache = {
+        size: "",
+        x: "",
+        y: "",
+        opacity: "",
+      };
+      this.lastCursorPressActive = null;
+      this.lastCursorPressProgress = null;
+      this.lastCursorSnapActive = null;
+      this.lastCursorSnapX = null;
+      this.lastCursorSnapY = null;
+      this.lastOpaqueStage = null;
+      this.pointerMoveFrame = null;
+      this.pendingPointerMove = null;
+      this.hudPressStyleCache = {
+        progress: "",
+        tension: "",
+      };
       this.trails = null;
       this.trailMat = null;
       this.burstPositionAttribute = null;
@@ -156,6 +207,7 @@
       this.container.insertBefore(this.visualLayer, this.container.firstChild);
       this.renderer.domElement.classList.add("archive-hypercube-source");
       this.visualLayer.appendChild(this.renderer.domElement);
+      this.refreshInteractionRect();
       window.ArchiveCardVFX?.attachLiquidSource?.(this.renderer.domElement);
       this.pressTargetGuide = document.createElement("div");
       this.pressTargetGuide.className = "hypercube-press-target-guide";
@@ -749,15 +801,16 @@
       // through); opaque dark backdrop once bursting into the card stream, which
       // restores the soft look of the settled red starfield.
       const opaqueStage = this.burstAmount > 0.001 || this.burstTarget > 0;
-      if (opaqueStage) {
-        this.sceneBackgroundColor.setHex(this.background);
-        if (this.scene.background !== this.sceneBackgroundColor) {
+      if (opaqueStage !== this.lastOpaqueStage) {
+        this.lastOpaqueStage = opaqueStage;
+        if (opaqueStage) {
+          this.sceneBackgroundColor.setHex(this.background);
           this.scene.background = this.sceneBackgroundColor;
+          this.renderer.setClearColor(this.background, 1);
+        } else {
+          this.scene.background = null;
+          this.renderer.setClearColor(this.background, 0);
         }
-        this.renderer.setClearColor(this.background, 1);
-      } else {
-        if (this.scene.background !== null) this.scene.background = null;
-        this.renderer.setClearColor(this.background, 0);
       }
 
       if (this.verticalSyncActive) {
@@ -871,6 +924,9 @@
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.activeInteractionRect = null;
+      this.cachedCursorMetrics = null;
+      this.refreshInteractionRect();
       this.resizeVerticalSyncTarget();
       this.updateEyeShift();
       this.applyHypercubeOffset();
@@ -890,6 +946,23 @@
     }
 
     onPointerMove(event) {
+      this.pendingPointerMove = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        pointerId: event.pointerId,
+        target: event.target,
+      };
+      if (this.pointerMoveFrame !== null) return;
+
+      this.pointerMoveFrame = window.requestAnimationFrame(() => {
+        this.pointerMoveFrame = null;
+        const pending = this.pendingPointerMove;
+        this.pendingPointerMove = null;
+        if (pending) this.processPointerMove(pending);
+      });
+    }
+
+    processPointerMove(event) {
       if (this.burstTarget > 0) {
         return;
       }
@@ -916,7 +989,7 @@
         this.resetHoverLookTarget();
         this.exitHover();
         this.cursorSnapActive = false;
-        window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
+        this.dispatchCursorSnap(false);
         this.container.classList.remove("is-hud-scanning");
         return;
       }
@@ -943,17 +1016,12 @@
       const center = this.getPressCenter(rect);
       const active = distance <= this.getCursorSnapRadius();
       this.cursorSnapActive = active;
-
-      window.dispatchEvent(new CustomEvent("archive:cursor-snap", {
-        detail: {
-          active,
-          x: center.x,
-          y: center.y,
-        },
-      }));
+      this.dispatchCursorSnap(active, center.x, center.y);
     }
 
     getCursorMetrics() {
+      if (this.cachedCursorMetrics) return this.cachedCursorMetrics;
+
       // Mirror the responsive sizing in archiveCursor.js (updateCursorSize) so
       // the red center dot tracks the real cursor's outer ring / inner dot on
       // any viewport height.
@@ -963,10 +1031,11 @@
       const scale = window.innerHeight / desktopReferenceHeight;
       const snapEven = (value) => Math.max(2, Math.round(value / 2) * 2);
 
-      return {
+      this.cachedCursorMetrics = {
         outer: snapEven(desktopOuterSize * scale),
         dot: snapEven(desktopDotSize * scale),
       };
+      return this.cachedCursorMetrics;
     }
 
     getCursorSnapRadius() {
@@ -978,13 +1047,18 @@
     }
 
     onPointerLeave() {
+      if (this.pointerMoveFrame !== null) {
+        window.cancelAnimationFrame(this.pointerMoveFrame);
+        this.pointerMoveFrame = null;
+      }
+      this.pendingPointerMove = null;
       this.resetHoverLookTarget();
       if (this.pressPointerId !== null) {
         return;
       }
 
       this.cursorSnapActive = false;
-      window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
+      this.dispatchCursorSnap(false);
       if (this.burstTarget > 0) return;
 
       this.cancelLongPress();
@@ -1005,9 +1079,7 @@
       this.container.classList.remove("is-hypercube-hovered", "is-hud-scanning");
       this.setAmbientHudEyeRecord(false);
       this.updateAmbientHudState("DORMANT");
-      window.dispatchEvent(new CustomEvent("archive:cursor-snap", {
-        detail: { active: false },
-      }));
+      this.dispatchCursorSnap(false);
     }
 
     onPointerDown(event) {
@@ -1039,7 +1111,7 @@
 
       this.cancelLongPress();
       this.cursorSnapActive = false;
-      window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
+      this.dispatchCursorSnap(false);
       this.container.releasePointerCapture?.(event.pointerId);
       this.reconcileHoverAfterPress(event);
     }
@@ -1079,12 +1151,21 @@
       const rect = this.getActiveInteractionRect();
       const center = this.getPressCenter(rect);
       this.cursorSnapActive = true;
+      this.dispatchCursorSnap(true, center.x, center.y);
+    }
+
+    dispatchCursorSnap(active, x = 0, y = 0) {
+      if (
+        this.lastCursorSnapActive === active &&
+        (!active || (this.lastCursorSnapX === x && this.lastCursorSnapY === y))
+      ) {
+        return;
+      }
+      this.lastCursorSnapActive = active;
+      this.lastCursorSnapX = x;
+      this.lastCursorSnapY = y;
       window.dispatchEvent(new CustomEvent("archive:cursor-snap", {
-        detail: {
-          active: true,
-          x: center.x,
-          y: center.y,
-        },
+        detail: active ? { active, x, y } : { active: false },
       }));
     }
 
@@ -1135,7 +1216,7 @@
         return;
       }
 
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.getActiveInteractionRect();
       const center = this.getPressCenter(rect);
       const base = Math.min(rect.width, rect.height);
       const x = (event.clientX - center.x) / (base * 0.5);
@@ -1156,7 +1237,7 @@
       const active = smoothstep(0.18, 0.92, this.hoverAmount) * (1 - this.burstAmount);
       const tiltX = this.hoverLookCurrent.y * this.hoverLookMaxTilt * active;
       const tiltY = this.hoverLookCurrent.x * this.hoverLookMaxTilt * active;
-      const interactionRect = this.renderer.domElement.getBoundingClientRect();
+      const interactionRect = this.getActiveInteractionRect();
 
       if (this.hoverDustGroup) {
         this.hoverDustGroup.rotation.set(tiltX, tiltY, 0);
@@ -1194,10 +1275,28 @@
         const dotY = center.y + oy * dotOffset;
         const opacity = Math.max(this.hoverDustAmount, this.pressAmount) * (1 - this.burstAmount);
 
-        this.hoverCenterDotEl.style.setProperty("--dot-size", `${cursorMetrics.dot}px`);
-        this.hoverCenterDotEl.style.setProperty("--dot-x", `${dotX}px`);
-        this.hoverCenterDotEl.style.setProperty("--dot-y", `${dotY}px`);
-        this.hoverCenterDotEl.style.setProperty("--dot-opacity", opacity.toFixed(3));
+        const dotSize = `${cursorMetrics.dot}px`;
+        const dotXValue = `${dotX}px`;
+        const dotYValue = `${dotY}px`;
+        const dotOpacity = opacity.toFixed(3);
+        const cache = this.hoverDotStyleCache;
+
+        if (cache.size !== dotSize) {
+          cache.size = dotSize;
+          this.hoverCenterDotEl.style.setProperty("--dot-size", dotSize);
+        }
+        if (cache.x !== dotXValue) {
+          cache.x = dotXValue;
+          this.hoverCenterDotEl.style.setProperty("--dot-x", dotXValue);
+        }
+        if (cache.y !== dotYValue) {
+          cache.y = dotYValue;
+          this.hoverCenterDotEl.style.setProperty("--dot-y", dotYValue);
+        }
+        if (cache.opacity !== dotOpacity) {
+          cache.opacity = dotOpacity;
+          this.hoverCenterDotEl.style.setProperty("--dot-opacity", dotOpacity);
+        }
       }
 
     }
@@ -1219,7 +1318,7 @@
       this.container.style.setProperty("--archive-hud-tension", "0");
       this.updateAmbientHudState("OPEN");
       this.cursorSnapActive = false;
-      window.dispatchEvent(new CustomEvent("archive:cursor-snap", { detail: { active: false } }));
+      this.dispatchCursorSnap(false);
       window.dispatchEvent(new CustomEvent("archive:hypercube-burst"));
       if (this.cardStream) {
         this.cardStream.activate();
@@ -1325,10 +1424,19 @@
     }
 
     updateCursorPressState(active) {
+      const progress = active ? this.pressAmount : 0;
+      if (
+        this.lastCursorPressActive === active &&
+        (!active || this.lastCursorPressProgress === progress)
+      ) {
+        return;
+      }
+      this.lastCursorPressActive = active;
+      this.lastCursorPressProgress = progress;
       window.dispatchEvent(new CustomEvent("archive:hypercube-long-press", {
         detail: {
           active,
-          progress: active ? this.pressAmount : 0,
+          progress,
         },
       }));
     }
@@ -1355,50 +1463,30 @@
       const clamped = THREE.MathUtils.clamp(progress, 0, 1);
       const tension = clamped * clamped;
       const remaining = Math.max(0, (this.longPressDuration * (1 - clamped)) / 1000);
-      this.container.classList.add("is-hud-pressing");
-      this.ambientHud.style.setProperty("--archive-hud-progress", clamped.toFixed(3));
-      this.container.style.setProperty("--archive-hud-progress", clamped.toFixed(3));
-      this.container.style.setProperty("--archive-hud-tension", tension.toFixed(3));
+      const progressValue = clamped.toFixed(3);
+      const tensionValue = tension.toFixed(3);
+      if (!this.container.classList.contains("is-hud-pressing")) {
+        this.container.classList.add("is-hud-pressing");
+      }
+      if (this.hudPressStyleCache.progress !== progressValue) {
+        this.hudPressStyleCache.progress = progressValue;
+        this.ambientHud.style.setProperty("--archive-hud-progress", progressValue);
+        this.container.style.setProperty("--archive-hud-progress", progressValue);
+      }
+      if (this.hudPressStyleCache.tension !== tensionValue) {
+        this.hudPressStyleCache.tension = tensionValue;
+        this.container.style.setProperty("--archive-hud-tension", tensionValue);
+      }
       this.updateAmbientHudState("DECRYPTING");
       this.applyAmbientHudPressCopy(clamped, remaining);
     }
 
     applyAmbientHudPressCopy(progress, remaining = this.longPressDuration / 1000) {
-      const phases = [
-        {
-          threshold: 0,
-          signal: "CORE LOCK",
-          title: "THE EYE",
-          summary: "It does not look at you. It remembers the version of you that has not happened yet.",
-          instruction: "CORE LOCK",
-        },
-        {
-          threshold: 0.28,
-          signal: "MEMORY LEAK",
-          title: "IT HEARS YOU",
-          summary: "Something behind the iris is repeating thoughts you have never spoken.",
-          instruction: "MEMORY LEAK",
-        },
-        {
-          threshold: 0.58,
-          signal: "IDENTITY LOSS",
-          title: "IT KNOWS YOU",
-          summary: "Your name has appeared in records written before your birth.",
-          instruction: "IDENTITY BREACH",
-        },
-        {
-          threshold: 0.82,
-          signal: "BREACH IMMINENT",
-          title: "DO NOT RELEASE",
-          summary: "The archive is opening from the other side.",
-          instruction: "CONTAINMENT FAILURE",
-        },
-      ];
-      const phaseIndex = phases.reduce(
+      const phaseIndex = HUD_PRESS_PHASES.reduce(
         (currentIndex, candidate, index) => progress >= candidate.threshold ? index : currentIndex,
         0
       );
-      const phase = phases[phaseIndex];
+      const phase = HUD_PRESS_PHASES[phaseIndex];
 
       if (phaseIndex !== this.hudPressPhaseIndex) {
         this.hudPressPhaseIndex = phaseIndex;
@@ -1412,10 +1500,16 @@
         this.setHudRecordText(phase.title);
       }
       if (this.hudScan) {
-        this.hudScan.textContent = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
+        const scanText = `${String(Math.round(progress * 100)).padStart(3, "0")}%`;
+        if (this.hudScan.textContent !== scanText) {
+          this.hudScan.textContent = scanText;
+        }
       }
       if (this.hudInstruction) {
-        this.hudInstruction.textContent = `${phase.instruction} / ${remaining.toFixed(2)} SEC`;
+        const instructionText = `${phase.instruction} / ${remaining.toFixed(2)} SEC`;
+        if (this.hudInstruction.textContent !== instructionText) {
+          this.hudInstruction.textContent = instructionText;
+        }
       }
     }
 
@@ -1554,21 +1648,28 @@
 
       const changed = this.hudState !== state;
       this.hudState = state;
-      this.ambientHud.dataset.state = state.toLowerCase();
+      const stateValue = state.toLowerCase();
+      if (this.ambientHud.dataset.state !== stateValue) {
+        this.ambientHud.dataset.state = stateValue;
+      }
 
       // Skip the state-change blink while a long-press is active: the press owns
       // its single randomly-timed blink, so entering DECRYPTING must not add one.
       if (changed && this.burstTarget === 0 && this.pressPointerId === null) {
         this.triggerHudGlitch();
         this.scrambleElement(this.hudSignal, state, 300);
-      } else if (this.hudSignal) {
+      } else if (this.hudSignal && this.hudSignal.textContent !== state) {
         this.hudSignal.textContent = state;
       }
 
       if (state === "OPEN" && this.hudInstruction) {
-        this.hudInstruction.textContent = "ARCHIVE CHANNEL OPEN";
+        if (this.hudInstruction.textContent !== "ARCHIVE CHANNEL OPEN") {
+          this.hudInstruction.textContent = "ARCHIVE CHANNEL OPEN";
+        }
       } else if (state !== "DECRYPTING" && this.hudInstruction) {
-        this.hudInstruction.textContent = "HOLD CORE / 03.00 SEC TO DECODE";
+        if (this.hudInstruction.textContent !== "HOLD CORE / 03.00 SEC TO DECODE") {
+          this.hudInstruction.textContent = "HOLD CORE / 03.00 SEC TO DECODE";
+        }
       }
     }
 
@@ -1693,13 +1794,24 @@
     }
 
     getInteractionRect(event) {
-      const rect = this.renderer.domElement.getBoundingClientRect();
-      this.activeInteractionRect = rect;
-      return rect;
+      return this.getActiveInteractionRect();
     }
 
     getActiveInteractionRect() {
-      return this.renderer.domElement.getBoundingClientRect();
+      return this.activeInteractionRect || this.refreshInteractionRect();
+    }
+
+    refreshInteractionRect() {
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      this.activeInteractionRect = {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+      return this.activeInteractionRect;
     }
 
     setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, offsets, burst) {
