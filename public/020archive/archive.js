@@ -69,7 +69,8 @@
       this.pressStartTime = 0;
       this.pressPointerId = null;
       this.longPressDuration = 3000;
-      this.hoverEnterRadiusRatio = 0.16;
+      this.restingCubeScale = 1.15;
+      this.hoverEnterRadiusRatio = 0.16 * this.restingCubeScale;
       this.hoverExitRadiusRatio = 0.4;
       this.pressRadiusRatio = 0.06;
       this.pressOffsetXRatio = 0;
@@ -412,8 +413,8 @@
       const hoverCoreParticlesPerEdge = 7200;
       const hoverScatterParticlesPerEdge = 0;
       const hoverParticlesPerEdge = hoverCoreParticlesPerEdge + hoverScatterParticlesPerEdge;
-      const outerScale = 0.5;
-      const innerScale = 0.25;
+      const outerScale = 0.5 * this.restingCubeScale;
+      const innerScale = 0.25 * this.restingCubeScale;
       // 12 wireframe edges expressed as ordered corner-index pairs.
       const edgeLinks = [
         [0, 1], [1, 3], [3, 2], [2, 0],
@@ -2145,7 +2146,7 @@
 
     async loadHoverTargetPoints(total, coreParticlesPerEdge, particlesPerEdge) {
       try {
-        const image = await this.loadImage("../assets/images/fullEye.svg");
+        const image = await this.loadImage("../assets/images/04radiantThornEyeVector.svg");
         const maxCanvasSide = 360;
         const scale = maxCanvasSide / Math.max(image.naturalWidth, image.naturalHeight);
         const width = Math.max(Math.round(image.naturalWidth * scale), 1);

@@ -31,16 +31,21 @@ It is structured as three connected interface states:
 
 ### Card Stream
 
-The particle burst resolves into four minimal archive records:
+The particle burst resolves into a single physical 3D archive display. The
+screen rotates in from depth with a visible back shell, edge thickness, red rim
+light, scanlines, and four indexed channels:
 
 1. `SIGNAL`
 2. `VECTOR`
 3. `ORACLE`
 4. `NOESIS`
 
-Cards can be changed by dragging horizontally, using the mouse wheel, selecting the
-bottom index, pressing `1–4`, or using the arrow keys. The bottom rail acts as a
-fixed capture point while the surrounding records move through it.
+Records can be changed by dragging the bottom capture rail, using the mouse
+wheel, pressing `1–4`, or using the arrow keys. Hovering or clicking the rail
+does not change the record. During a change, the display turns edge-on and
+swaps its channel while the front face is hidden, then settles back toward the
+viewer with a short mechanical recoil. Each theme retains a distinct internal
+signal structure.
 
 ### Credits
 
@@ -62,7 +67,7 @@ restores the Archive through a dedicated depth-calibration transition.
 | Lower-left depth control | Drag horizontally / arrow keys | Adjust the recursive background index |
 | Upper edge rail | Dwell for 2 seconds | Open Credits |
 | Credits | Move or tap near the lower edge | Return to Archive |
-| Card Stream | Horizontal drag | Move between records |
+| Card Stream bottom rail | Horizontal drag | Scrub and select a record |
 | Card Stream | Mouse wheel / arrow keys | Select previous or next record |
 | Card Stream | Number keys `1–4` | Select a record directly |
 
@@ -118,8 +123,8 @@ system can be developed independently.
 
 ## Recent Archive Update
 
-- Rebuilt Card Stream as four clear title records over the persistent particle field.
-- Added a drag-responsive carousel with a fixed Roman-numeral capture rail.
+- Rebuilt Card Stream as a rotating 3D archive display with physical depth,
+  four theme channels, edge-on content swaps, and a drag-only capture rail.
 - Refined the custom SVG `CREDITS` wordmark and acknowledgement layout.
 - Preserved window depth during the Archive ↔ Credits metamorphosis.
 - Added responsive corner systems, signal faults, text glitches, image intrusions,

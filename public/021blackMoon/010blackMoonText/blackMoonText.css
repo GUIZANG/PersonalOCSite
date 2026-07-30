@@ -154,8 +154,8 @@ body {
   z-index: 1;
   background: #111111;
 
-  -webkit-mask: url("/assets/images/natureSmaller.png");
-  mask: url("/assets/images/natureSmaller.png");
+  -webkit-mask: url("/assets/images/07neuralTerrainMask.png");
+  mask: url("/assets/images/07neuralTerrainMask.png");
   -webkit-mask-size: 7100% 100%;
   mask-size: 7100% 100%;
 

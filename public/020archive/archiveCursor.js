@@ -46,6 +46,7 @@
     let isStrataScrubTarget = false;
     let isHovering = false;
     let isCreditsTriggerActive = false;
+    let isLedgerHoverTarget = false;
     let snapActive = false;
     let snapX = 0;
     let snapY = 0;
@@ -113,6 +114,11 @@
       }
 
       if (event.button === 2) {
+        cursor.classList.toggle(
+          "is-ledger-context-pressing",
+          cursor.classList.contains("is-cardstream-cursor") &&
+            !document.body.classList.contains("is-archive-overlay-open")
+        );
         isScreenPressing = true;
         screenGlitchUntil = performance.now() + 140;
         applyScreenGlitch();
@@ -122,6 +128,11 @@
       isPressing = true;
       pressGlitchUntil = performance.now() + 140;
       isClicking = true;
+      cursor.classList.toggle(
+        "is-ledger-pressing",
+        cursor.classList.contains("is-cardstream-cursor") &&
+          !document.body.classList.contains("is-archive-overlay-open")
+      );
       applyPressGlitch(performance.now());
       renderCursor();
 
@@ -132,6 +143,11 @@
     }
 
     function endPressGlitch() {
+      cursor.classList.remove(
+        "is-ledger-pressing",
+        "is-ledger-context-pressing"
+      );
+
       if (isScreenPressing) {
         isScreenPressing = false;
         screenGlitchUntil = Math.max(screenGlitchUntil, performance.now() + 110);
@@ -180,6 +196,15 @@
     }
 
     function resetCursorAfterBurst() {
+      // Keep the custom cursor exactly where the hold completed. Releasing the
+      // magnetic snap used to retarget it to the slightly offset physical
+      // pointer, which produced a visible nudge during the Card Stream reveal.
+      targetX = dotX;
+      targetY = dotY;
+      previousTargetX = dotX;
+      previousTargetY = dotY;
+      outerX = dotX;
+      outerY = dotY;
       snapActive = false;
       isPressing = false;
       isClicking = false;
@@ -191,8 +216,15 @@
       isStrataScrubTarget = false;
       isHovering = false;
       isCreditsTriggerActive = false;
+      isLedgerHoverTarget = false;
       pressGlitchUntil = 0;
       cursor.classList.remove("is-hypercube-pressing");
+      cursor.classList.add("is-cardstream-cursor");
+      cursor.classList.remove(
+        "is-ledger-hovering",
+        "is-ledger-pressing",
+        "is-ledger-context-pressing"
+      );
       cursor.style.setProperty("--press-progress", "0");
       cursor.style.setProperty("--cursor-shadow", defaultShadow);
       updateInteractionState();
@@ -221,6 +253,12 @@
 
     function updatePointerInteraction(target) {
       const stage = document.getElementById("hypercube-stage");
+      const isCardStreamActive = Boolean(
+        stage?.classList.contains("is-hypercube-bursting")
+      );
+      const isCardStreamCursorActive =
+        isCardStreamActive &&
+        !document.body.classList.contains("is-archive-overlay-open");
       isGrabTarget =
         !isDragging &&
         target instanceof Element &&
@@ -232,7 +270,19 @@
       isHovering =
         !isDragging &&
         Boolean(stage?.classList.contains("is-hypercube-hovered"));
-      hoverScale = !isDragging && isHoverElement(target) ? 1.8 : 1;
+      isLedgerHoverTarget =
+        isCardStreamCursorActive &&
+        !isDragging &&
+        target instanceof Element &&
+        Boolean(target.closest(".archive-carousel__capture-body"));
+      cursor.classList.toggle(
+        "is-ledger-hovering",
+        isLedgerHoverTarget
+      );
+      hoverScale =
+        !isCardStreamCursorActive && !isDragging && isHoverElement(target)
+          ? 1.8
+          : 1;
     }
 
     function updateInteractionState() {
