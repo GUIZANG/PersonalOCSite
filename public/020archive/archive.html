@@ -232,9 +232,17 @@
   <div class="screen-glitch" hidden aria-hidden="true"></div>
 
   <script src="../libs/three.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/libs/three.module.min.js"
+      }
+    }
+  </script>
   <script src="../libs/gsap.min.js"></script>
   <script src="archiveReferenceBackground.js"></script>
   <script src="archiveCard.js"></script>
+  <script type="module" src="archiveCardModel.js"></script>
   <script src="archiveObservationWindows.js"></script>
   <script src="archive.js"></script>
   <script src="archiveFrames.js"></script>

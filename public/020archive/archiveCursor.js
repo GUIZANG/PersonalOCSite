@@ -274,7 +274,7 @@
         isCardStreamCursorActive &&
         !isDragging &&
         target instanceof Element &&
-        Boolean(target.closest(".archive-carousel__capture-body"));
+        Boolean(target.closest(".archive-card-model"));
       cursor.classList.toggle(
         "is-ledger-hovering",
         isLedgerHoverTarget

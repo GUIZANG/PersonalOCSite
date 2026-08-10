@@ -296,9 +296,14 @@
     }
 
     function triggerFault() {
+      const cardStream = document.getElementById("archiveCardStream");
+      const cardStreamVisible =
+        cardStream?.classList.contains("is-archive-interface-ready") &&
+        !document.body.classList.contains("is-archive-overlay-open");
       if (
         document.hidden ||
         active ||
+        cardStreamVisible ||
         document.body.classList.contains("is-screen-glitching")
       ) {
         nextTimer = window.setTimeout(

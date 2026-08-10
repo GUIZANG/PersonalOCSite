@@ -57,16 +57,22 @@
       this.suppressClick = false;
       this.wheelLockedUntil = 0;
       this.railProgress = 0;
+      this.orbitPosition = 0;
       this.railAnimating = false;
       this.railAnimationFrame = 0;
       this.themeSwapTimer = 0;
       this.transitionTimer = 0;
       this.entranceTimer = 0;
       this.detentTimer = 0;
+      this.modelView = null;
 
       this.build();
       this.bindEvents();
       this.applyTheme(0);
+      window.archiveCardStreamInstance = this;
+      window.dispatchEvent(
+        new CustomEvent("archive-card-stream-ready", { detail: this })
+      );
     }
 
     buildChannel(theme, index) {
@@ -105,110 +111,99 @@
       `;
     }
 
-    build() {
-      const channels = THEMES.map((theme, index) =>
-        this.buildChannel(theme, index)
-      ).join("");
+    buildScreen(theme, index) {
+      return `
+        <article
+          class="archive-screen-module"
+          data-module-index="${index}"
+          style="--archive-module-angle: ${index * 90}deg; --archive-module-order: ${index}"
+          aria-label="Archive screen ${theme.number}: ${theme.title}"
+        >
+          <div class="archive-screen__arm" aria-hidden="true"><i></i><i></i></div>
+          <div class="archive-screen__cables" aria-hidden="true"><i></i><i></i></div>
 
-      const railButtons = THEMES.map(
-        (theme, index) => `
-          <button
-            class="archive-carousel__rail-button"
-            type="button"
-            data-theme-index="${index}"
-            aria-label="Select ${theme.number}: ${theme.title}"
-          >
-            <span>
-              <i>${theme.number}</i>
-              <b>${theme.title}</b>
-            </span>
-          </button>
-        `
+          <div class="archive-screen__shell">
+            <div class="archive-screen__face archive-screen__face--back">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="archive-screen__face archive-screen__face--left"></div>
+            <div class="archive-screen__face archive-screen__face--right"></div>
+            <div class="archive-screen__face archive-screen__face--top"></div>
+            <div class="archive-screen__face archive-screen__face--bottom"></div>
+
+            <div class="archive-screen__face archive-screen__face--front">
+              <div class="archive-screen__hardware" aria-hidden="true">
+                <span>GB / ${theme.number}</span>
+                <i></i><i></i><i></i><i></i>
+                <b>${theme.state}</b>
+              </div>
+
+              <div class="archive-screen__glass">
+                ${this.buildChannel(theme, index)}
+                <div class="archive-screen__scanlines" aria-hidden="true"></div>
+                <div class="archive-screen__flare" aria-hidden="true"></div>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    build() {
+      const screens = THEMES.map((theme, index) =>
+        this.buildScreen(theme, index)
       ).join("");
-      const railTicks = Array.from({ length: 25 }, (_, index) => {
-        const isDetent = index % 8 === 0;
-        const position = ((index / 24) * 100).toFixed(4);
-        return `<i${isDetent ? ' class="is-detent"' : ""} style="--tick-position: ${position}%"></i>`;
-      }).join("");
 
       this.stream.innerHTML = `
         <div class="archive-interface">
-          <div class="archive-screen-stage" aria-label="Rotating archive screen">
-            <div class="archive-screen__horizon" aria-hidden="true"></div>
-
-            <div class="archive-screen-rig">
-              <div class="archive-screen__umbra" aria-hidden="true"></div>
-
-              <div class="archive-screen__shell">
-                <div class="archive-screen__face archive-screen__face--back">
-                  <span></span><span></span><span></span><span></span>
-                </div>
-                <div class="archive-screen__face archive-screen__face--left"></div>
-                <div class="archive-screen__face archive-screen__face--right"></div>
-                <div class="archive-screen__face archive-screen__face--top"></div>
-                <div class="archive-screen__face archive-screen__face--bottom"></div>
-
-                <div class="archive-screen__face archive-screen__face--front">
-                  <div class="archive-screen__hardware" aria-hidden="true">
-                    <span>GB / 020</span>
-                    <i></i><i></i><i></i><i></i>
-                    <b>REC</b>
-                  </div>
-
-                  <div class="archive-screen__glass">
-                    ${channels}
-                    <div class="archive-screen__scanlines" aria-hidden="true"></div>
-                    <div class="archive-screen__flare" aria-hidden="true"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="archive-screen__cable archive-screen__cable--a" aria-hidden="true"></div>
-              <div class="archive-screen__cable archive-screen__cable--b" aria-hidden="true"></div>
-            </div>
-
-            <div class="archive-screen__datum" aria-hidden="true">
-              <span>ROTATION DATUM</span>
-              <b></b>
-              <span id="archiveScreenReadout">01 / 04</span>
-            </div>
-          </div>
-
-          <nav
-            class="archive-carousel__rail"
+          <div
+            class="archive-screen-stage"
             role="slider"
             tabindex="0"
-            aria-label="Archive screen navigation"
+            aria-label="Drag the archive model to rotate screens"
             aria-valuemin="1"
             aria-valuemax="${THEMES.length}"
             aria-valuenow="1"
             aria-valuetext="${THEMES[0].number}: ${THEMES[0].title}"
           >
-            <div class="archive-carousel__ticks" aria-hidden="true">
-              ${railTicks}
+            <div class="archive-screen__horizon" aria-hidden="true"></div>
+
+            <div
+              class="archive-card-model"
+              id="archiveCardModel"
+              aria-label="Four rotating industrial archive displays"
+            >
+              <span class="archive-card-model__status">ASSEMBLING / 3D</span>
             </div>
-            <div class="archive-carousel__rail-buttons">
-              ${railButtons}
+
+            <div class="archive-orbit-assembly">
+              <div class="archive-orbit__umbra" aria-hidden="true"></div>
+              <div class="archive-orbit__floor" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+              <div class="archive-orbit__mast" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><b></b>
+              </div>
+              <div class="archive-orbit__crown" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="archive-orbit__cable-bundle" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><b></b><b></b>
+              </div>
+              <div class="archive-screen-orbit">
+                ${screens}
+              </div>
             </div>
-            <div class="archive-carousel__capture" aria-hidden="true">
-              <i class="archive-carousel__capture-bracket archive-carousel__capture-bracket--left"></i>
-              <b class="archive-carousel__capture-body">
-                <span></span><span></span><span></span>
-              </b>
-              <i class="archive-carousel__capture-bracket archive-carousel__capture-bracket--right"></i>
-            </div>
-          </nav>
+
+          </div>
         </div>
       `;
 
       this.channels = Array.from(
         this.stream.querySelectorAll(".archive-screen__channel")
       );
-      this.railButtons = Array.from(
-        this.stream.querySelectorAll(".archive-carousel__rail-button")
+      this.modules = Array.from(
+        this.stream.querySelectorAll(".archive-screen-module")
       );
-      this.rail = this.stream.querySelector(".archive-carousel__rail");
-      this.screenReadout = this.stream.querySelector("#archiveScreenReadout");
+      this.railButtons = [];
+      this.rail = this.stream.querySelector(".archive-screen-stage");
+      this.modelHost = this.stream.querySelector("#archiveCardModel");
     }
 
     bindEvents() {
@@ -224,7 +219,7 @@
         this.setTheme(Number(button.dataset.themeIndex), true);
       });
 
-      this.rail?.addEventListener("pointerdown", (event) => {
+      this.modelHost?.addEventListener("pointerdown", (event) => {
         if (!this.active || event.button !== 0) return;
 
         this.finishPendingTheme();
@@ -239,10 +234,30 @@
         this.lastDragTime = performance.now();
         this.dragVelocity = 0;
         this.suppressClick = false;
-        this.rail.setPointerCapture?.(event.pointerId);
+        this.modelView?.setInteracting(true);
+        this.modelHost.setPointerCapture?.(event.pointerId);
       });
 
-      this.rail?.addEventListener("pointermove", (event) => {
+      this.stream.addEventListener("pointermove", (event) => {
+        if (!this.active || this.pointerId !== null) return;
+        const modelRect = this.modelHost?.getBoundingClientRect();
+        const railRect = this.rail?.getBoundingClientRect();
+        const overModel = Boolean(
+          modelRect &&
+          event.clientX >= modelRect.left &&
+          event.clientX <= modelRect.right &&
+          event.clientY >= modelRect.top &&
+          event.clientY <= modelRect.bottom &&
+          (!railRect || event.clientY < railRect.top - 8)
+        );
+        this.modelView?.setHovered(overModel);
+      });
+
+      this.stream.addEventListener("pointerleave", () => {
+        this.modelView?.setHovered(false);
+      });
+
+      this.modelHost?.addEventListener("pointermove", (event) => {
         if (
           this.pointerId !== event.pointerId ||
           this.pointerStartX === null
@@ -274,22 +289,22 @@
         this.updateRailDrag(event.clientX);
       });
 
-      this.rail?.addEventListener("pointerup", (event) => {
+      this.modelHost?.addEventListener("pointerup", (event) => {
         if (this.pointerId !== event.pointerId) return;
         this.finishPointerInteraction(false);
       });
 
-      this.rail?.addEventListener("pointercancel", (event) => {
+      this.modelHost?.addEventListener("pointercancel", (event) => {
         if (this.pointerId !== event.pointerId) return;
         this.finishPointerInteraction(true);
       });
 
-      this.rail?.addEventListener("lostpointercapture", (event) => {
+      this.modelHost?.addEventListener("lostpointercapture", (event) => {
         if (this.pointerId !== event.pointerId) return;
         this.finishPointerInteraction(false, false);
       });
 
-      this.rail?.addEventListener("pointerleave", (event) => {
+      this.modelHost?.addEventListener("pointerleave", (event) => {
         if (this.pointerId !== null) {
           if ((event.buttons & 1) !== 1) {
             this.finishPointerInteraction(false);
@@ -392,6 +407,7 @@
     activate() {
       if (!this.stream || this.active) return;
       this.active = true;
+      this.modelView?.setActive(true);
       this.stream.classList.add(
         "is-archive-interface-active",
         "is-archive-interface-entering"
@@ -406,21 +422,23 @@
     }
 
     updateRailDrag(clientX) {
-      if (!this.rail) return;
-      const rect = this.rail.getBoundingClientRect();
+      if (!this.modelHost || this.pointerStartX === null) return;
+      const rect = this.modelHost.getBoundingClientRect();
       if (!rect.width) return;
 
-      const trackStart = rect.left + rect.width * 0.11;
-      const trackWidth = rect.width * 0.78;
-      const rawProgress = Math.min(
-        1,
-        Math.max(0, (clientX - trackStart) / trackWidth)
+      const pixelsPerScreen = Math.max(180, Math.min(420, rect.width * 0.24));
+      const rawPosition = Math.min(
+        THEMES.length - 1,
+        Math.max(
+          0,
+          this.dragStartThemeIndex +
+            (this.pointerStartX - clientX) / pixelsPerScreen
+        )
       );
-      const rawPosition = rawProgress * (THEMES.length - 1);
       const now = performance.now();
       const elapsed = Math.max(8, now - this.lastDragTime);
       const instantaneousVelocity =
-        (clientX - this.lastDragClientX) / elapsed;
+        (this.lastDragClientX - clientX) / elapsed;
 
       this.dragVelocity =
         this.dragVelocity * 0.7 + instantaneousVelocity * 0.3;
@@ -449,28 +467,22 @@
         position >= previousPosition ? "next" : "previous";
 
       if (nextIndex !== this.themeIndex) {
-        this.applyTheme(nextIndex);
+        this.applyTheme(nextIndex, false);
         this.pulseRailDetent();
       }
 
-      const localOffset = position - this.themeIndex;
-      const turn = localOffset * -178;
       const roll = Math.max(
-        -2.8,
-        Math.min(2.8, this.dragVelocity * -1.75)
+        -1.8,
+        Math.min(1.8, this.dragVelocity * -1.15)
       );
-      const depth = Math.min(120, Math.abs(localOffset) * 130);
+      const depth = Math.min(54, Math.abs(this.dragVelocity) * 30);
 
       this.stream.style.setProperty(
-        "--archive-screen-turn",
-        `${turn.toFixed(2)}deg`
-      );
-      this.stream.style.setProperty(
-        "--archive-screen-roll",
+        "--archive-orbit-roll",
         `${roll.toFixed(2)}deg`
       );
       this.stream.style.setProperty(
-        "--archive-screen-depth",
+        "--archive-orbit-depth",
         `${depth.toFixed(2)}px`
       );
       this.setRailProgress(progress);
@@ -487,8 +499,8 @@
 
       if (releaseCapture) {
         try {
-          if (this.rail?.hasPointerCapture?.(pointerId)) {
-            this.rail.releasePointerCapture(pointerId);
+          if (this.modelHost?.hasPointerCapture?.(pointerId)) {
+            this.modelHost.releasePointerCapture(pointerId);
           }
         } catch (_error) {
           // The browser may have already released capture on blur/leave.
@@ -496,19 +508,20 @@
       }
 
       if (!didDrag) {
+        this.modelView?.setInteracting(false);
         this.snapRailToNearestDetent();
         return;
       }
 
       if (cancelled) {
-        this.applyTheme(this.dragStartThemeIndex);
+        this.applyTheme(this.dragStartThemeIndex, false);
       } else {
         const snapIndex = Math.min(
           THEMES.length - 1,
           Math.max(0, Math.round(this.dragRawPosition))
         );
         if (snapIndex !== this.themeIndex) {
-          this.applyTheme(snapIndex);
+          this.applyTheme(snapIndex, false);
         }
       }
       this.finishRailDrag();
@@ -558,7 +571,7 @@
 
       const direction = target >= this.railProgress ? 1 : -1;
       if (snapIndex !== this.themeIndex) {
-        this.applyTheme(snapIndex);
+        this.applyTheme(snapIndex, false);
       }
       this.animateRailTo(target, direction, this.dragVelocity, 620);
     }
@@ -577,7 +590,7 @@
       window.clearTimeout(this.themeSwapTimer);
       window.clearTimeout(this.transitionTimer);
       if (this.pendingThemeIndex !== null) {
-        this.applyTheme(this.pendingThemeIndex);
+        this.applyTheme(this.pendingThemeIndex, false);
         this.pendingThemeIndex = null;
       }
       this.stream.classList.remove(
@@ -620,7 +633,7 @@
       );
 
       this.themeSwapTimer = window.setTimeout(() => {
-        this.applyTheme(nextIndex);
+        this.applyTheme(nextIndex, false);
         this.pendingThemeIndex = null;
       }, 360);
 
@@ -633,7 +646,7 @@
       }, 900);
     }
 
-    applyTheme(index) {
+    applyTheme(index, syncPosition = true) {
       this.themeIndex = normalizeIndex(index);
       const theme = THEMES[this.themeIndex];
       this.stream.dataset.themeIndex = String(this.themeIndex);
@@ -642,6 +655,12 @@
         const selected = channelIndex === this.themeIndex;
         channel.classList.toggle("is-active", selected);
         channel.setAttribute("aria-hidden", String(!selected));
+      });
+
+      this.modules?.forEach((module, moduleIndex) => {
+        const selected = moduleIndex === this.themeIndex;
+        module.classList.toggle("is-active", selected);
+        module.setAttribute("aria-current", selected ? "true" : "false");
       });
 
       this.railButtons.forEach((button, buttonIndex) => {
@@ -657,15 +676,29 @@
           `${theme.number}: ${theme.title}`
         );
       }
-      if (this.screenReadout) {
-        this.screenReadout.textContent = `${theme.number} / 04`;
-      }
-      if (this.pointerId === null && !this.railAnimating) {
+      this.modelView?.setTheme(this.themeIndex);
+      if (syncPosition) {
         this.setRailProgress(this.themeIndex / (THEMES.length - 1));
       }
     }
 
-    setRailProgress(progress) {
+    setOrbitPosition(position) {
+      this.orbitPosition = position;
+      this.stream.style.setProperty(
+        "--archive-orbit-angle",
+        `${(-position * 90).toFixed(3)}deg`
+      );
+      this.modelView?.setPosition(position);
+    }
+
+    attachModelView(modelView) {
+      this.modelView = modelView;
+      this.modelView.setPosition(this.orbitPosition);
+      this.modelView.setTheme(this.themeIndex);
+      this.modelView.setActive(this.active);
+    }
+
+    setRailProgress(progress, syncOrbit = true) {
       const clamped = Math.min(1, Math.max(0, progress));
       this.railProgress = clamped;
       const displayPosition = 11 + clamped * 78;
@@ -673,12 +706,16 @@
         "--archive-rail-position",
         `${displayPosition.toFixed(3)}%`
       );
+      if (syncOrbit) {
+        this.setOrbitPosition(clamped * (THEMES.length - 1));
+      }
     }
 
     cancelRailAnimation() {
       window.cancelAnimationFrame(this.railAnimationFrame);
       this.railAnimationFrame = 0;
       this.railAnimating = false;
+      this.modelView?.setInteracting(false);
       this.stream.classList.remove(
         "is-rail-inertial",
         "is-rail-moving-next",
@@ -699,11 +736,21 @@
         Math.min(1.7, 0.34 + Math.abs(velocity) * 0.38);
       const startTime = performance.now();
       let previousTime = startTime;
+      const railStart = position;
+      const orbitStart = this.orbitPosition;
+      const targetThemePosition = target * (THEMES.length - 1);
+      let orbitTarget = targetThemePosition;
+      if (resolvedDirection > 0) {
+        while (orbitTarget < orbitStart - 0.001) orbitTarget += THEMES.length;
+      } else if (resolvedDirection < 0) {
+        while (orbitTarget > orbitStart + 0.001) orbitTarget -= THEMES.length;
+      }
       const stiffness = 112;
       const damping = 17.5;
       const maximumDuration = Math.max(720, duration + 240);
 
       this.railAnimating = true;
+      this.modelView?.setInteracting(true);
       this.stream.classList.add("is-rail-inertial");
 
       const animate = (time) => {
@@ -720,7 +767,14 @@
           springVelocity *= -0.16;
         }
 
-        this.setRailProgress(position);
+        this.setRailProgress(position, false);
+        const railTravel = target - railStart;
+        const travelProgress = Math.abs(railTravel) > 0.0001
+          ? (position - railStart) / railTravel
+          : Math.min(1, (time - startTime) / maximumDuration);
+        this.setOrbitPosition(
+          orbitStart + (orbitTarget - orbitStart) * travelProgress
+        );
         const settled =
           Math.abs(target - position) < 0.00035 &&
           Math.abs(springVelocity) < 0.0035;
@@ -729,8 +783,10 @@
           return;
         }
 
-        this.setRailProgress(target);
+        this.setRailProgress(target, false);
+        this.setOrbitPosition(targetThemePosition);
         this.railAnimating = false;
+        this.modelView?.setInteracting(false);
         this.railAnimationFrame = 0;
         this.stream.classList.remove("is-rail-inertial");
       };
@@ -739,9 +795,8 @@
     }
 
     resetScreenTransform() {
-      this.stream.style.setProperty("--archive-screen-turn", "0deg");
-      this.stream.style.setProperty("--archive-screen-roll", "0deg");
-      this.stream.style.setProperty("--archive-screen-depth", "0px");
+      this.stream.style.setProperty("--archive-orbit-roll", "0deg");
+      this.stream.style.setProperty("--archive-orbit-depth", "0px");
     }
   }
 
