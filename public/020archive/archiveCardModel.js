@@ -2,7 +2,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "../libs/three/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "../libs/three/environments/RoomEnvironment.js";
 
-const MODEL_URL = "/assets/models/cardstream/cardstreamCarousel.glb";
+// Cache-bust the hand-edited industrial detail pass. Keeping the revision in
+// the asset URL prevents an older carousel from surviving a normal reload.
+const MODEL_URL = "/assets/models/cardstream/cardstreamCarousel.glb?v=20260813-detail-stack-01";
 const THEMES = [
   ["01", "SIGNAL", "FIELD TRACE", "LOCKED"],
   ["02", "VECTOR", "MOTION DATUM", "PROJECTED"],
@@ -25,6 +27,9 @@ class ArchiveCardModel {
     this.autoStartedAt = 0;
     this.lastFrameTime = 0;
     this.screenMaterials = [];
+    this.cableDynamics = [];
+    this.lastRigRotation = null;
+    this.rigAngularVelocity = 0;
     this.renderFrame = 0;
 
     this.scene = new THREE.Scene();
@@ -289,7 +294,7 @@ class ArchiveCardModel {
       texture.colorSpace = colorSpace;
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(1.15, 1.15);
+      texture.repeat.set(0.92, 0.92);
       texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
       return texture;
     };
@@ -335,14 +340,16 @@ class ArchiveCardModel {
     material.envMapIntensity = 1;
 
     if (name.includes("Display Frame Stained Metal")) {
-      material.color.set(0x4b4d50);
+      // The supplied stain atlas is nearly black; a neutral multiplier keeps
+      // the fingerprints, abrasion and uneven gloss visible under dim light.
+      material.color.set(0xaaa5a2);
       material.map = this.displayFrameTextures.color;
       material.normalMap = this.displayFrameTextures.normal;
-      material.normalScale = new THREE.Vector2(0.2, 0.2);
+      material.normalScale = new THREE.Vector2(0.3, 0.3);
       material.roughnessMap = this.displayFrameTextures.gloss;
-      material.metalness = 0.58;
-      material.roughness = 0.68;
-      material.envMapIntensity = 1.18;
+      material.metalness = 0.62;
+      material.roughness = 0.58;
+      material.envMapIntensity = 1.3;
     } else if (name.includes("Chassis Black")) {
       material.color.set(0x0d0e11);
       material.metalness = 0.64;
@@ -545,13 +552,6 @@ class ArchiveCardModel {
           this.camera.position.x
         );
 
-        for (let index = 1; index <= 4; index += 1) {
-          const screenRoot = root.getObjectByName(
-            `SCREEN_${String(index).padStart(2, "0")}_ROOT`
-          );
-          screenRoot?.scale.setScalar(1.16);
-        }
-
         root.traverse((object) => {
           if (!object.isMesh) return;
           object.frustumCulled = true;
@@ -563,6 +563,31 @@ class ArchiveCardModel {
           objectMaterials.forEach((material) =>
             this.configureIndustrialMaterial(material)
           );
+          const cableMatch = object.name.match(/SCREEN_(\d+)_CABLE_(\d+)/);
+          if (cableMatch && object.morphTargetInfluences) {
+            const dictionary = object.morphTargetDictionary || {};
+            const positive = dictionary.CableSwayPositive;
+            const negative = dictionary.CableSwayNegative;
+            const settle = dictionary.CableSettle;
+            if (
+              Number.isInteger(positive) &&
+              Number.isInteger(negative) &&
+              Number.isInteger(settle)
+            ) {
+              object.frustumCulled = false;
+              this.cableDynamics.push({
+                mesh: object,
+                positive,
+                negative,
+                settle,
+                phase:
+                  Number(cableMatch[1]) * 0.83 +
+                  Number(cableMatch[2]) * 1.37,
+                sway: 0,
+                swayVelocity: 0,
+              });
+            }
+          }
           const displayMatch = object.name.match(/SCREEN_(\d+)_DISPLAY/);
           if (!displayMatch) return;
           const screenIndex = Number(displayMatch[1]) - 1;
@@ -716,10 +741,46 @@ class ArchiveCardModel {
     const autoRotation = Math.sin(autoTime / 7200) * Math.PI * 0.048;
 
     if (this.rig) {
-      this.rig.rotation.y =
+      const nextRotation =
         this.baseRotation -
         this.position * Math.PI * 0.5 +
         autoRotation * this.autoBlend;
+      const previousRotation = this.lastRigRotation ?? nextRotation;
+      const rotationDelta = Math.atan2(
+        Math.sin(nextRotation - previousRotation),
+        Math.cos(nextRotation - previousRotation)
+      );
+      const instantaneousVelocity = rotationDelta / delta;
+      this.rigAngularVelocity +=
+        (instantaneousVelocity - this.rigAngularVelocity) *
+        (1 - Math.exp(-delta * 10));
+      this.lastRigRotation = nextRotation;
+      this.rig.rotation.y = nextRotation;
+
+      this.cableDynamics.forEach((cableState) => {
+        const ambient = Math.sin(time * 0.00105 + cableState.phase) * 0.035;
+        const inertia = THREE.MathUtils.clamp(
+          -this.rigAngularVelocity * 0.16,
+          -0.82,
+          0.82
+        );
+        const targetSway = inertia + ambient;
+        // A lightly damped spring creates rotational lag and a small settling
+        // overshoot while the pinned morph targets keep both sockets attached.
+        cableState.swayVelocity +=
+          ((targetSway - cableState.sway) * 18 -
+            cableState.swayVelocity * 5.2) *
+          delta;
+        cableState.sway += cableState.swayVelocity * delta;
+        cableState.sway = THREE.MathUtils.clamp(cableState.sway, -1, 1);
+
+        const positiveAmount = Math.max(0, cableState.sway);
+        const negativeAmount = Math.max(0, -cableState.sway);
+        cableState.mesh.morphTargetInfluences[cableState.positive] = positiveAmount;
+        cableState.mesh.morphTargetInfluences[cableState.negative] = negativeAmount;
+        cableState.mesh.morphTargetInfluences[cableState.settle] =
+          THREE.MathUtils.clamp(Math.abs(cableState.swayVelocity) * 0.055, 0, 0.32);
+      });
     }
     if (this.modelRoot) {
       this.modelRoot.position.y = this.rootBaseY;
