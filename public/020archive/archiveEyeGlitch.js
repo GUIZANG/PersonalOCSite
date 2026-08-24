@@ -96,12 +96,10 @@ void main() {
              * smoothstep(0.0, pxUv.y * fade, uv.y)
              * smoothstep(0.0, pxUv.y * fade, 1.0 - uv.y);
 
-  // Reveal the raster itself in five softly staggered horizontal bands. The
-  // source element remains fully rendered, so repeat hover cycles never swap a
-  // half-clipped texture into the VFX canvas.
+  // Reveal the raster from left to right in softly staggered horizontal bands.
   float revealBand = floor(uv.y * 5.0);
-  float bandOffset = (hash21(vec2(revealBand, 17.0)) - 0.5) * 0.09;
-  float revealEdge = reveal * 1.28 - 0.16 + bandOffset;
+  float bandOffset = (hash21(vec2(revealBand, 17.0)) - 0.5) * 0.075;
+  float revealEdge = reveal * 1.24 - 0.12 + bandOffset;
   float revealMask = 1.0 - smoothstep(revealEdge, revealEdge + 0.075, uv.x);
 
   gl_FragColor = vec4(cr.r, cg.g, cb.b, a) * mask * revealMask;

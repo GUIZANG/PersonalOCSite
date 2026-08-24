@@ -1,12 +1,18 @@
 (function () {
   const canvas = document.getElementById("archiveOverlayGrid");
   const overlay = document.getElementById("archiveOverlayPage");
+  const backdropTitle = overlay?.querySelector(".archive-overlay-page__backdrop-title");
+  const backdropMark = backdropTitle?.querySelector(".archive-overlay-page__backdrop-mark");
   if (!canvas || !overlay) return;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   const POINTER_RADIUS = 170;
+  const SCANLINE_PITCH = 11;
+  const GLYPH_GAP = SCANLINE_PITCH * 2;
+  const WIDE_GRID_BREAKPOINT = 1366;
+  const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
   let width = 0;
   let height = 0;
   let pixelRatio = 1;
@@ -22,6 +28,186 @@
   let influence = 0;
   let animationFrame = 0;
 
+  const backdropGlyphs = backdropMark
+    ? Array.from(backdropMark.querySelectorAll("path")).map((path) => {
+        const group = document.createElementNS(SVG_NAMESPACE, "g");
+        path.before(group);
+        group.appendChild(path);
+        return {
+          group,
+          path,
+          bounds: group.getBBox(),
+          gridGlyph: path.dataset.gridGlyph || "",
+          gridAspect: Number.parseFloat(path.dataset.gridAspect) || 0,
+        };
+      })
+    : [];
+
+  function rectanglePath(x, y, width, height) {
+    return `M${x} ${y}H${x + width}V${y + height}H${x}Z`;
+  }
+
+  function drawGridGlyph(path, glyph, width, height) {
+    const horizontalStroke = spacing;
+    const verticalStroke = width * (glyph === "e" ? 10.57 / 18.24 : 10.6 / 20.24);
+
+    if (glyph === "e") {
+      const middleY = Math.round(
+        ((height - horizontalStroke) * 0.5) / SCANLINE_PITCH
+      ) * SCANLINE_PITCH;
+      path.setAttribute(
+        "d",
+        [
+          rectanglePath(0, 0, width, horizontalStroke),
+          rectanglePath(0, middleY, width, horizontalStroke),
+          rectanglePath(0, height - horizontalStroke, width, horizontalStroke),
+          rectanglePath(0, 0, verticalStroke, height),
+        ].join("")
+      );
+      return;
+    }
+
+    path.setAttribute(
+      "d",
+      [
+        rectanglePath(0, 0, width, horizontalStroke),
+        rectanglePath(
+          (width - verticalStroke) * 0.5,
+          horizontalStroke,
+          verticalStroke,
+          height - horizontalStroke
+        ),
+      ].join("")
+    );
+  }
+
+  function resolveBackdropGuide() {
+    let targetWidth = Math.min(width * 0.76, 1080);
+    let centerX = width * 0.48;
+    let centerY = height * 0.5;
+
+    if (width <= 540) {
+      targetWidth = width * 0.92;
+      centerX = width * 0.5;
+      centerY = height * 0.18;
+    } else if (width <= 860) {
+      targetWidth = Math.min(width * 0.91, 700);
+      centerX = width * 0.5;
+      centerY = height * 0.22;
+    } else if (height <= 560 && width >= 700) {
+      targetWidth = Math.min(width * 0.72, 780);
+    }
+
+    return {
+      centerX,
+      centerY,
+      maxWidth: Math.max(spacing, Math.floor(targetWidth / spacing) * spacing),
+    };
+  }
+
+  function measureGlyphLayout(frameHeight) {
+    const metrics = backdropGlyphs.map(({ bounds, gridAspect }) => {
+      const scaleY = frameHeight / bounds.height;
+      const naturalWidth = gridAspect
+        ? frameHeight * gridAspect
+        : bounds.width * scaleY;
+      return {
+        scaleY,
+        naturalWidth,
+        width: Math.max(
+          SCANLINE_PITCH,
+          Math.round(naturalWidth / SCANLINE_PITCH) * SCANLINE_PITCH
+        ),
+      };
+    });
+    const contentWidth =
+      metrics.reduce((total, glyph) => total + glyph.width, 0) +
+      GLYPH_GAP * (metrics.length - 1);
+    const frameWidth = Math.ceil(contentWidth / spacing) * spacing;
+    let remainingUnits = Math.round((frameWidth - contentWidth) / SCANLINE_PITCH);
+
+    while (remainingUnits > 0) {
+      let candidate = 0;
+      for (let index = 1; index < metrics.length; index += 1) {
+        if (
+          metrics[index].naturalWidth - metrics[index].width >
+          metrics[candidate].naturalWidth - metrics[candidate].width
+        ) {
+          candidate = index;
+        }
+      }
+      metrics[candidate].width += SCANLINE_PITCH;
+      remainingUnits -= 1;
+    }
+
+    return { metrics, frameWidth, frameHeight };
+  }
+
+  function layoutBackdropTitle() {
+    if (!backdropTitle || !backdropMark || !backdropGlyphs.length) return;
+
+    const guide = resolveBackdropGuide();
+    let rowCount = Math.max(1, Math.round(guide.maxWidth / spacing / 2.31));
+    rowCount = Math.min(rowCount, Math.max(1, Math.floor(height / spacing)));
+    let layout = measureGlyphLayout(rowCount * spacing);
+
+    while (layout.frameWidth > guide.maxWidth && rowCount > 1) {
+      rowCount -= 1;
+      layout = measureGlyphLayout(rowCount * spacing);
+    }
+
+    const maxColumnStart = Math.max(0, Math.floor((width - layout.frameWidth) / spacing));
+    const columnStart = Math.max(
+      0,
+      Math.min(
+        maxColumnStart,
+        Math.round((guide.centerX - layout.frameWidth * 0.5) / spacing)
+      )
+    );
+    const maxRowStart = Math.max(0, Math.floor((height - layout.frameHeight) / spacing));
+    const rowStart = Math.max(
+      0,
+      Math.min(
+        maxRowStart,
+        Math.round((guide.centerY - layout.frameHeight * 0.5) / spacing)
+      )
+    );
+    const frame = {
+      x: columnStart * spacing,
+      y: rowStart * spacing,
+      width: layout.frameWidth,
+      height: layout.frameHeight,
+    };
+    let cursorX = 0;
+
+    backdropGlyphs.forEach(({ group, path, bounds, gridGlyph }, index) => {
+      const metric = layout.metrics[index];
+      if (gridGlyph) {
+        drawGridGlyph(path, gridGlyph, metric.width, layout.frameHeight);
+        group.setAttribute("transform", `translate(${cursorX} 0)`);
+        cursorX += metric.width + GLYPH_GAP;
+        return;
+      }
+
+      const scaleX = metric.width / bounds.width;
+      const translateX = cursorX - bounds.x * scaleX;
+      const translateY = -bounds.y * metric.scaleY;
+      group.setAttribute(
+        "transform",
+        `matrix(${scaleX} 0 0 ${metric.scaleY} ${translateX} ${translateY})`
+      );
+      cursorX += metric.width + GLYPH_GAP;
+    });
+
+    backdropMark.setAttribute("viewBox", `0 0 ${frame.width} ${frame.height}`);
+    backdropMark.setAttribute("preserveAspectRatio", "none");
+    backdropTitle.style.left = `${frame.x}px`;
+    backdropTitle.style.top = `${frame.y}px`;
+    backdropTitle.style.width = `${frame.width}px`;
+    backdropTitle.style.height = `${frame.height}px`;
+    backdropTitle.classList.add("is-grid-fitted");
+  }
+
   function isOverlayOpen() {
     return document.body.classList.contains("is-archive-overlay-open");
   }
@@ -30,13 +216,14 @@
     width = window.innerWidth;
     height = window.innerHeight;
     pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-    spacing = Math.max(42, Math.min(56, Math.round(width / 27)));
+    spacing = SCANLINE_PITCH * (width < WIDE_GRID_BREAKPOINT ? 4 : 5);
     columns = Math.ceil(width / spacing) + 3;
     rows = Math.ceil(height / spacing) + 3;
 
     canvas.width = Math.round(width * pixelRatio);
     canvas.height = Math.round(height * pixelRatio);
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    layoutBackdropTitle();
 
     points = [];
     for (let row = 0; row < rows; row += 1) {

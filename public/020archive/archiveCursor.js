@@ -1,5 +1,12 @@
 (function () {
-  document.addEventListener("DOMContentLoaded", initCursor);
+  document.addEventListener("DOMContentLoaded", () => {
+    if (document.body.classList.contains("archive-is-loading")) {
+      window.addEventListener("archive:preloader-complete", initCursor, { once: true });
+      return;
+    }
+
+    initCursor();
+  });
 
   function initCursor() {
     const cursor = document.querySelector(".curzr");
@@ -173,7 +180,7 @@
       cursor.style.setProperty("--cursor-outer-scaled-half-size", `${renderOuterSize / 2}px`);
       cursor.style.setProperty(
         "--cursor-outer-diagonal-offset",
-        `${renderOuterSize / (2 * Math.SQRT2)}px`
+        `${Math.round(renderOuterSize / (2 * Math.SQRT2))}px`
       );
     }
 

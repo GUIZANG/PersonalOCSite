@@ -660,12 +660,23 @@ class ArchiveCardModel {
         this.setPosition(this.position);
         this.setTheme(this.themeIndex);
         this.render();
+        window.dispatchEvent(new CustomEvent("archive:model-ready"));
       },
-      undefined,
+      (event) => {
+        window.dispatchEvent(new CustomEvent("archive:model-progress", {
+          detail: {
+            loaded: event.loaded || 0,
+            total: event.total || 0,
+          },
+        }));
+      },
       () => {
         this.host.classList.add("is-load-error");
         const status = this.host.querySelector(".archive-card-model__status");
         if (status) status.textContent = "3D SIGNAL / LOST";
+        window.dispatchEvent(new CustomEvent("archive:model-ready", {
+          detail: { degraded: true },
+        }));
       }
     );
   }
@@ -801,25 +812,51 @@ class ArchiveCardModel {
 }
 
 let attached = false;
+let attachScheduled = false;
+let streamInstance = window.archiveCardStreamInstance || null;
 
 const attachModel = (streamOverride = null) => {
   if (attached) return;
   const host = document.getElementById("archiveCardModel");
-  const stream = streamOverride || window.archiveCardStreamInstance;
+  const stream = streamOverride || streamInstance || window.archiveCardStreamInstance;
   if (!host || !stream) return;
   attached = true;
   const view = new ArchiveCardModel(host);
   stream.attachModelView(view);
 };
 
+const scheduleModelAttach = () => {
+  if (attached || attachScheduled) return;
+  attachScheduled = true;
+  const run = () => {
+    attachScheduled = false;
+    attachModel();
+  };
+
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(run, { timeout: 350 });
+  } else {
+    window.setTimeout(run, 0);
+  }
+};
+
 window.addEventListener(
   "archive-card-stream-ready",
-  (event) => attachModel(event.detail),
+  (event) => {
+    streamInstance = event.detail;
+  },
   { once: true }
 );
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", attachModel, { once: true });
-} else {
-  attachModel();
-}
+// The preloader starts the expensive secondary WebGL scene only after the main
+// hypercube has yielded its first frame. This keeps startup responsive while
+// moving shader compilation and GLB parsing out of the user's first long-press.
+window.addEventListener("archive:preload-card-model", scheduleModelAttach, { once: true });
+
+// Retain the interaction fallback in case the preloader is bypassed.
+window.addEventListener("archive:hypercube-long-press", (event) => {
+  if (event.detail?.active) scheduleModelAttach();
+});
+
+// Fallback for keyboard/programmatic activation paths that skip the hold event.
+window.addEventListener("archive:hypercube-burst", () => attachModel(), { once: true });

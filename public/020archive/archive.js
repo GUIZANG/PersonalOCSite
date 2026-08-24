@@ -167,6 +167,7 @@
       this.hudState = "DORMANT";
       this.hudEyeRecordActive = false;
       this.hudEyeRecordClearTimer = 0;
+      this.hudEyeRecordReturnTimer = 0;
       this.hudPressPhaseIndex = -1;
       this.verticalSyncTriggered = false;
       this.verticalSyncActive = false;
@@ -433,6 +434,7 @@
       const burstMask = new Float32Array(totalParticles);
       const hoverMask = new Float32Array(totalParticles);
       const pressThreshold = new Float32Array(totalParticles);
+      this.fillRandomOffsets(offsets);
       let pIdx = 0;
       let burstVisibleIndex = 0;
       let cubeVisibleIndex = 0;
@@ -453,16 +455,24 @@
         ));
       }
 
-      edgeLinks.forEach((edge) => {
+      const edgePoint = new THREE.Vector3();
+      const start = new THREE.Vector3();
+      const end = new THREE.Vector3();
+      const burst = new THREE.Vector3();
+      const square = new THREE.Vector3();
+      const burstSide = this.getBurstSideLength();
+
+      for (let edgeIndex = 0; edgeIndex < edgeLinks.length; edgeIndex++) {
+        const edge = edgeLinks[edgeIndex];
         const [cornerA, cornerB] = edge;
         const vA = cornerNodes[cornerA];
         const vB = cornerNodes[cornerB];
 
         for (let p = 0; p < hoverParticlesPerEdge; p++) {
           const t = p / hoverParticlesPerEdge;
-          const edgePoint = new THREE.Vector3().lerpVectors(vA, vB, t);
-          const start = edgePoint.clone().multiplyScalar(outerScale);
-          const end = edgePoint.clone().multiplyScalar(innerScale);
+          edgePoint.lerpVectors(vA, vB, t);
+          start.copy(edgePoint).multiplyScalar(outerScale);
+          end.copy(edgePoint).multiplyScalar(innerScale);
           const isCubeVisible = this.isVisibleSample(p, hoverParticlesPerEdge, cubeParticlesPerEdge);
           const isBurstVisible = this.isVisibleSample(p, hoverParticlesPerEdge, burstParticlesPerEdge);
           const isCoreLayer = p < hoverCoreParticlesPerEdge;
@@ -470,9 +480,12 @@
             this.isVisibleSample(p, hoverCoreParticlesPerEdge, initialHoverCoreParticlesPerEdge);
           const isScatterLayer = !isCoreLayer;
           const inward = isCubeVisible ? cubeVisibleIndex % 2 === 0 : pIdx % 2 === 0;
-          const burst = isBurstVisible
-            ? this.getBurstPoint(burstVisibleIndex++, edgeLinks.length * burstParticlesPerEdge)
-            : this.getBurstPoint(pIdx, totalParticles);
+          const burstIndex = isBurstVisible ? burstVisibleIndex++ : pIdx;
+          const burstTotal = isBurstVisible
+            ? edgeLinks.length * burstParticlesPerEdge
+            : totalParticles;
+          this.getBurstPoint(burstIndex, burstTotal, burst, burstSide);
+          this.getHoverTargetPoint(pIdx, totalParticles, square);
 
           this.setParticleData(
             pIdx,
@@ -482,8 +495,8 @@
             posEnd,
             squarePos,
             burstPos,
-            offsets,
-            burst
+            burst,
+            square
           );
           cubeMask[pIdx] = isCubeVisible ? 1 : 0;
           burstMask[pIdx] = isBurstVisible ? 1 : 0;
@@ -492,7 +505,13 @@
           if (isCubeVisible) cubeVisibleIndex++;
           pIdx++;
         }
-      });
+
+        // Keep startup responsive without changing the final particle field.
+        // Two edges per frame keeps each initialization task below a frame budget.
+        if (edgeIndex < edgeLinks.length - 1 && edgeIndex % 2 === 1) {
+          await this.yieldFrame();
+        }
+      }
 
       geo.setAttribute("position", new THREE.BufferAttribute(posStart, 3));
       geo.setAttribute("targetPos", new THREE.BufferAttribute(posEnd, 3));
@@ -696,6 +715,7 @@
       this.updateAmbientHudState("DORMANT");
       this.animate(0);
       this.scheduleInitialGlitches();
+      window.dispatchEvent(new CustomEvent("archive:scene-ready"));
     }
 
     animate(time) {
@@ -1180,11 +1200,11 @@
     exitHover() {
       this.hoverDustTarget = 0;
       this.isHoverDustExiting = this.hoverDustAmount > 0.02;
+      this.setAmbientHudEyeRecord(false);
 
       if (!this.isHoverDustExiting) {
         this.hoverTarget = 0;
         this.container.classList.remove("is-hypercube-hovered");
-        this.setAmbientHudEyeRecord(false);
       }
     }
 
@@ -1493,7 +1513,7 @@
         this.hudPressPhaseIndex = phaseIndex;
         this.ambientHud.dataset.pressPhase = String(phaseIndex);
         this.updateAmbientHudStaticPressCopy(phaseIndex);
-        this.hudSummary.textContent = phase.summary;
+        this.scrambleElement(this.hudSummary, phase.summary, 480);
         this.scrambleElement(this.hudSignal, phase.signal, 300);
         // Swap the wordmark copy directly (no per-glyph scramble): the VFX layer
         // re-captures once per phase, so the transition stays smooth instead of
@@ -1562,6 +1582,10 @@
       const glyphs = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789/#%*+<>";
       const start = performance.now();
       clearInterval(el._scrambleTimer);
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        el.textContent = finalText;
+        return;
+      }
       el._scrambleTimer = setInterval(() => {
         const progress = Math.min((performance.now() - start) / duration, 1);
         const revealed = Math.floor(progress * finalText.length);
@@ -1678,14 +1702,25 @@
       if (!this.hudRecord || !this.hudSummary || this.hudEyeRecordActive === active) return;
 
       window.clearTimeout(this.hudEyeRecordClearTimer);
+      window.clearTimeout(this.hudEyeRecordReturnTimer);
       this.hudEyeRecordClearTimer = 0;
+      this.hudEyeRecordReturnTimer = 0;
       this.hudEyeRecordActive = active;
-      this.ambientHud.dataset.eyeRecord = active ? "active" : "dormant";
       if (active) {
+        this.ambientHud.dataset.eyeRecord = "active";
+        this.ambientHud.classList.remove("is-eye-record-entering");
         this.ambientHud.classList.remove("is-eye-record-exiting");
+        this.ambientHud.classList.remove("is-eye-record-returning");
+        // Restart the component timeline for every distinct hover entry.
+        void this.ambientHud.offsetWidth;
+        this.ambientHud.classList.add("is-eye-record-entering");
         this.hudPressPhaseIndex = -1;
         this.setHudRecordText("THE EYE");
-        this.hudSummary.textContent = "It does not look at you. It remembers the version of you that has not happened yet.";
+        this.scrambleElement(
+          this.hudSummary,
+          "It does not look at you. It remembers the version of you that has not happened yet.",
+          520
+        );
         window.dispatchEvent(new CustomEvent("archive:eye-record-visibility", {
           detail: { active: true },
         }));
@@ -1694,17 +1729,50 @@
 
       this.hudPressPhaseIndex = -1;
       delete this.ambientHud.dataset.pressPhase;
+      clearInterval(this.hudSummary._scrambleTimer);
+      // Phase 1: keep the active geometry in place until the title shader and
+      // summary have completely disappeared. Showing 00 any earlier makes the
+      // two records visibly overlap.
+      this.ambientHud.dataset.eyeRecord = "active";
+      this.ambientHud.classList.remove("is-eye-record-returning");
       this.ambientHud.classList.add("is-eye-record-exiting");
+      this.reverseAmbientHudEyeRecordAnimations();
       window.dispatchEvent(new CustomEvent("archive:eye-record-visibility", {
         detail: { active: false },
       }));
-      this.hudEyeRecordClearTimer = window.setTimeout(() => {
+
+      this.hudEyeRecordReturnTimer = window.setTimeout(() => {
         if (this.hudEyeRecordActive) return;
+        // Phase 2: the wordmark is now fully hidden. Reveal 00 and play the
+        // continuing reverse record-line state.
+        this.ambientHud.dataset.eyeRecord = "dormant";
         this.ambientHud.classList.remove("is-eye-record-exiting");
-        this.setHudRecordText("");
-        this.hudSummary.textContent = "";
-        this.hudEyeRecordClearTimer = 0;
-      }, 420);
+        this.ambientHud.classList.add("is-eye-record-returning");
+        this.hudEyeRecordReturnTimer = 0;
+
+        this.hudEyeRecordClearTimer = window.setTimeout(() => {
+          if (this.hudEyeRecordActive) return;
+          this.ambientHud.classList.remove("is-eye-record-returning");
+          this.ambientHud.classList.remove("is-eye-record-entering");
+          // Keep THE EYE in the hidden source element. Clearing it here could
+          // make VFX-JS recapture an empty texture during rapid hover cycles.
+          this.hudEyeRecordClearTimer = 0;
+        }, 1040);
+      }, 340);
+    }
+
+    reverseAmbientHudEyeRecordAnimations() {
+      const animatedParts = [
+        this.ambientHud.querySelector(".strata__record-relay"),
+        this.ambientHud.querySelector(".strata__record-signal"),
+      ];
+
+      animatedParts.forEach((part) => {
+        const animation = part?.getAnimations()[0];
+        if (!animation || animation.currentTime === null || animation.currentTime <= 0) return;
+        animation.playbackRate = -Math.abs(animation.playbackRate || 1);
+        animation.play();
+      });
     }
 
     setHudRecordText(text) {
@@ -1815,9 +1883,8 @@
       return this.activeInteractionRect;
     }
 
-    setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, offsets, burst) {
+    setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, burst, square) {
       const index = i * 3;
-      const square = this.getHoverTargetPoint(i, offsets.length);
 
       posStart[index] = start.x;
       posStart[index + 1] = start.y;
@@ -1831,7 +1898,26 @@
       burstPos[index] = burst.x;
       burstPos[index + 1] = burst.y;
       burstPos[index + 2] = burst.z;
-      offsets[i] = Utils.random();
+    }
+
+    fillRandomOffsets(offsets) {
+      // getRandomValues has a 64 KiB limit. Reuse one chunk instead of allocating
+      // a new typed array and invoking the crypto provider once per particle.
+      const chunkSize = 16384;
+      const randomValues = new Uint32Array(Math.min(chunkSize, offsets.length));
+
+      for (let base = 0; base < offsets.length; base += chunkSize) {
+        const count = Math.min(chunkSize, offsets.length - base);
+        const chunk = randomValues.subarray(0, count);
+        crypto.getRandomValues(chunk);
+        for (let i = 0; i < count; i++) {
+          offsets[base + i] = chunk[i] / 2 ** 32;
+        }
+      }
+    }
+
+    yieldFrame() {
+      return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
     }
 
     createHoverDust() {
@@ -2136,12 +2222,18 @@
       this.scene.add(this.trails);
     }
 
-    getHoverTargetPoint(i, total) {
+    getHoverTargetPoint(i, total, target = new THREE.Vector3()) {
       if (this.hoverTargetPoints.length) {
-        return this.hoverTargetPoints[i % this.hoverTargetPoints.length];
+        const pointCount = this.hoverTargetPoints.length / 3;
+        const index = (i % pointCount) * 3;
+        return target.set(
+          this.hoverTargetPoints[index],
+          this.hoverTargetPoints[index + 1],
+          this.hoverTargetPoints[index + 2]
+        );
       }
 
-      return this.getSquarePoint(i, total);
+      return this.getSquarePoint(i, total, target);
     }
 
     async loadHoverTargetPoints(total, coreParticlesPerEdge, particlesPerEdge) {
@@ -2159,7 +2251,9 @@
         ctx.drawImage(image, 0, 0, width, height);
 
         const imageData = ctx.getImageData(0, 0, width, height).data;
-        const samples = [];
+        const pixelCount = width * height;
+        const lightWeights = new Float64Array(pixelCount);
+        const darkWeights = new Float64Array(pixelCount);
         let totalWeight = 0;
         let totalDarkWeight = 0;
 
@@ -2177,56 +2271,79 @@
 
             totalWeight += weight * weight;
             totalDarkWeight += darkWeight * darkWeight;
-            samples.push({ x, y, weight, darkWeight });
+            const pixelIndex = y * width + x;
+            lightWeights[pixelIndex] = weight;
+            darkWeights[pixelIndex] = darkWeight;
           }
         }
 
         const useDarkWeight = totalWeight <= 0.001 && totalDarkWeight > 0.001;
-        const cumulative = [];
-        const weightedPixels = [];
+        const selectedWeights = useDarkWeight ? darkWeights : lightWeights;
+        let weightedPixelCount = 0;
+
+        for (let i = 0; i < pixelCount; i++) {
+          if (selectedWeights[i] > 0.06) weightedPixelCount++;
+        }
+
+        if (!weightedPixelCount) {
+          return new Float32Array(0);
+        }
+
+        const cumulative = new Float64Array(weightedPixelCount);
+        const weightedPixels = new Uint32Array(weightedPixelCount);
         let activeWeight = 0;
+        let weightedIndex = 0;
 
-        samples.forEach((sample) => {
-          const weight = useDarkWeight ? sample.darkWeight : sample.weight;
-
-          if (weight <= 0.06) return;
+        for (let i = 0; i < pixelCount; i++) {
+          const weight = selectedWeights[i];
+          if (weight <= 0.06) continue;
 
           activeWeight += Math.pow(weight, 1.7);
-          weightedPixels.push(sample);
-          cumulative.push(activeWeight);
-        });
+          weightedPixels[weightedIndex] = i;
+          cumulative[weightedIndex] = activeWeight;
+          weightedIndex++;
+        }
 
         if (!weightedPixels.length || activeWeight <= 0) {
-          return [];
+          return new Float32Array(0);
         }
 
         const targetSize = 0.92 * 3.6;
         const aspect = width / height;
         const targetWidth = aspect >= 1 ? targetSize : targetSize * aspect;
         const targetHeight = aspect >= 1 ? targetSize / aspect : targetSize;
-        const points = [];
+        const points = new Float32Array(total * 3);
 
         for (let i = 0; i < total; i++) {
           const isScatterLayer = (i % particlesPerEdge) >= coreParticlesPerEdge;
           const seedOffset = isScatterLayer ? 97.31 : 0;
           const pick = Utils.hash(i * 19.73 + 3.17 + seedOffset) * activeWeight;
           const pixelIndex = this.findWeightedPixel(cumulative, pick);
-          const pixel = weightedPixels[pixelIndex];
+          const sourcePixelIndex = weightedPixels[pixelIndex];
+          const pixelX = sourcePixelIndex % width;
+          const pixelY = Math.floor(sourcePixelIndex / width);
           const jitterScale = isScatterLayer ? 1.5 : 0;
           const jitterX = (Utils.hash(i * 31.11 + 7.91 + seedOffset) - 0.5) * jitterScale;
           const jitterY = (Utils.hash(i * 43.87 + 11.29 + seedOffset) - 0.5) * jitterScale;
-          const u = (pixel.x + 0.5 + jitterX) / width;
-          const v = (pixel.y + 0.5 + jitterY) / height;
+          const u = (pixelX + 0.5 + jitterX) / width;
+          const v = (pixelY + 0.5 + jitterY) / height;
           const x = (u - 0.5) * targetWidth;
           const y = (0.5 - v) * targetHeight;
+          const targetIndex = i * 3;
 
-          points.push(new THREE.Vector3(x, y, 0));
+          points[targetIndex] = x;
+          points[targetIndex + 1] = y;
+          points[targetIndex + 2] = 0;
+
+          if (i > 0 && i % 8192 === 0) {
+            await this.yieldFrame();
+          }
         }
 
         return points;
       } catch (error) {
         console.warn("Failed to load hover target image", error);
-        return [];
+        return new Float32Array(0);
       }
     }
 
@@ -2265,20 +2382,19 @@
       return low;
     }
 
-    getSquarePoint(i, total) {
+    getSquarePoint(i, total, target = new THREE.Vector3()) {
       const squareSize = 0.92;
       const side = Math.floor((i / total) * 4);
       const t = ((i / total) * 4) % 1;
       const half = squareSize / 2;
 
-      if (side === 0) return new THREE.Vector3(THREE.MathUtils.lerp(-half, half, t), half, 0);
-      if (side === 1) return new THREE.Vector3(half, THREE.MathUtils.lerp(half, -half, t), 0);
-      if (side === 2) return new THREE.Vector3(THREE.MathUtils.lerp(half, -half, t), -half, 0);
-      return new THREE.Vector3(-half, THREE.MathUtils.lerp(-half, half, t), 0);
+      if (side === 0) return target.set(THREE.MathUtils.lerp(-half, half, t), half, 0);
+      if (side === 1) return target.set(half, THREE.MathUtils.lerp(half, -half, t), 0);
+      if (side === 2) return target.set(THREE.MathUtils.lerp(half, -half, t), -half, 0);
+      return target.set(-half, THREE.MathUtils.lerp(-half, half, t), 0);
     }
 
-    getBurstPoint(i, total) {
-      const side = this.getBurstSideLength();
+    getBurstPoint(i, total, target = new THREE.Vector3(), side = this.getBurstSideLength()) {
       const cols = Math.ceil(Math.sqrt(total));
       const rows = Math.ceil(total / cols);
       const col = i % cols;
@@ -2290,7 +2406,7 @@
       const x = THREE.MathUtils.lerp(-side / 2, side / 2, col / Math.max(cols - 1, 1)) + jitterX;
       const y = THREE.MathUtils.lerp(-side / 2, side / 2, row / Math.max(rows - 1, 1)) + jitterY;
 
-      return new THREE.Vector3(x, y, 0);
+      return target.set(x, y, 0);
     }
 
     getBurstSideLength() {
@@ -2305,14 +2421,16 @@
       if (!this.burstPositionAttribute) return;
 
       const visibleTotal = this.burstSourceIndices.length;
+      const point = new THREE.Vector3();
+      const burstSide = this.getBurstSideLength();
       this.burstSourceIndices.forEach((sourceIndex, visibleIndex) => {
-        const point = this.getBurstPoint(visibleIndex, visibleTotal);
+        this.getBurstPoint(visibleIndex, visibleTotal, point, burstSide);
         this.burstPositionAttribute.setXYZ(sourceIndex, point.x, point.y, point.z);
       });
       this.burstPositionAttribute.needsUpdate = true;
       if (this.trailBurstPositionAttribute) {
         this.trailSourceIndices.forEach((_, trailIndex) => {
-          const point = this.getBurstPoint(trailIndex, visibleTotal);
+          this.getBurstPoint(trailIndex, visibleTotal, point, burstSide);
           this.trailBurstPositionAttribute.setXYZ(trailIndex * 2, point.x, point.y, point.z);
           this.trailBurstPositionAttribute.setXYZ(trailIndex * 2 + 1, point.x, point.y, point.z);
         });

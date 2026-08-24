@@ -83,7 +83,7 @@
       id: "lower",
       size: "medium",
       label: "NOOSPHERE / 05",
-      x: 0.14,
+      x: 0.16,
       y: 0.26,
       width: 0.28,
       ratio: 3 / 2,

@@ -2,6 +2,272 @@
   box-sizing: border-box;
 }
 
+/* ---- Neural Strata preloader --------------------------------- */
+.archive-preloader {
+  --preloader-size: clamp(210px, 28vw, 360px);
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  overflow: hidden;
+  background: #040405;
+  color: #ecece7;
+  font-family: "supplyMono", monospace;
+  cursor: none;
+  isolation: isolate;
+  transition: background-color 420ms ease;
+}
+
+.archive-preloader::after {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  pointer-events: none;
+  animation: archive-preloader-grain 210ms steps(2) infinite;
+  transition: opacity 420ms ease;
+}
+
+.archive-preloader__brain {
+  position: absolute;
+  z-index: 2;
+  top: 47%;
+  left: 50%;
+  width: var(--preloader-size);
+  height: var(--preloader-size);
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.025));
+}
+
+.archive-preloader__brain-ghost,
+.archive-preloader__brain-slice {
+  position: absolute;
+  inset: 0;
+  -webkit-mask: url("../assets/images/logo/brain.svg") center / contain no-repeat;
+  mask: url("../assets/images/logo/brain.svg") center / contain no-repeat;
+}
+
+.archive-preloader__brain-ghost {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.archive-preloader__brain-slice {
+  background: #ecece7;
+  clip-path: inset(var(--slice-top) 0 var(--slice-bottom) 0);
+  opacity: calc(0.13 + var(--slice-lock, 0) * 0.87);
+  filter: blur(calc((1 - var(--slice-lock, 0)) * 0.7px));
+  transform: translate3d(var(--slice-shift), 0, 0);
+  transition:
+    transform 160ms linear,
+    opacity 160ms linear,
+    filter 160ms linear;
+  will-change: transform, opacity;
+}
+
+.archive-preloader__brain-slice::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #85000d;
+  opacity: var(--slice-fault, 0);
+  transform: translateX(4px);
+}
+
+.archive-preloader__brain-seam {
+  position: absolute;
+  z-index: 4;
+  top: 5%;
+  left: 50%;
+  width: 1px;
+  height: 90%;
+  background: linear-gradient(transparent, #c51f30 14%, #c51f30 86%, transparent);
+  opacity: 0;
+  transform: scaleY(0);
+  transform-origin: 50% 0;
+}
+
+.archive-preloader__exit-bands {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+}
+
+.archive-preloader__exit-bands i {
+  position: absolute;
+  top: var(--band-top);
+  left: 0;
+  width: 100%;
+  height: var(--band-height);
+  background: #040405;
+  transform: scaleX(1.002);
+  transform-origin: left center;
+  transition: transform 560ms cubic-bezier(0.76, 0, 0.24, 1);
+  transition-delay: calc(var(--band-index) * 34ms);
+  will-change: transform;
+}
+
+.archive-preloader__exit-bands i:nth-child(even) {
+  transform-origin: right center;
+}
+
+.archive-preloader__index {
+  position: absolute;
+  z-index: 3;
+  top: calc(47% + clamp(132px, 18vw, 218px));
+  left: 50%;
+  width: var(--preloader-size);
+  height: 18px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  transition: opacity 350ms ease, transform 500ms ease;
+}
+
+.archive-preloader__index strong {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 3ch;
+  font-family: "supplyMono", monospace;
+  font-size: 17px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.archive-preloader__index span {
+  position: absolute;
+  top: 1px;
+  left: calc(50% + 40px);
+}
+
+.archive-preloader__index span,
+.archive-preloader__note,
+.archive-preloader__telemetry {
+  color: rgba(236, 236, 231, 0.38);
+  font-size: 7px;
+  line-height: 1.8;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.archive-preloader__note,
+.archive-preloader__telemetry {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+  transition: opacity 350ms ease;
+}
+
+.archive-preloader__note {
+  left: clamp(26px, 3.2vw, 48px);
+}
+
+.archive-preloader__telemetry {
+  right: clamp(26px, 3.2vw, 48px);
+  text-align: right;
+}
+
+.archive-preloader.is-registered .archive-preloader__brain-slice {
+  opacity: 1;
+}
+
+.archive-preloader.is-registered .archive-preloader__brain-seam {
+  animation: archive-preloader-seam 220ms cubic-bezier(0.76, 0, 0.24, 1) forwards;
+}
+
+.archive-preloader.is-open {
+  background: transparent;
+  pointer-events: none;
+}
+
+.archive-preloader.is-open::after,
+.archive-preloader.is-open .archive-preloader__brain-ghost,
+.archive-preloader.is-open .archive-preloader__brain-seam,
+.archive-preloader.is-open .archive-preloader__note,
+.archive-preloader.is-open .archive-preloader__telemetry {
+  opacity: 0;
+}
+
+.archive-preloader.is-open .archive-preloader__brain-seam {
+  animation: none;
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+
+.archive-preloader.is-open .archive-preloader__exit-bands i {
+  transform: scaleX(0);
+}
+
+.archive-preloader.is-open .archive-preloader__brain-slice {
+  opacity: 0;
+  filter: blur(1px);
+  transition-property: opacity, filter;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+  transition-delay: calc(var(--slice-index) * 34ms);
+}
+
+.archive-preloader.is-open .archive-preloader__index {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+}
+
+body.archive-is-loading .hypercube-stage {
+  pointer-events: none;
+}
+
+@keyframes archive-preloader-seam {
+  0% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes archive-preloader-grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(2%, -1%); }
+  50% { transform: translate(-1%, 2%); }
+  75% { transform: translate(1%, 1%); }
+  100% { transform: translate(-2%, -1%); }
+}
+
+@media (max-width: 640px) {
+  .archive-preloader__telemetry {
+    display: none;
+  }
+
+  .archive-preloader__note {
+    top: auto;
+    bottom: 25px;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .archive-preloader::after {
+    animation: none;
+  }
+
+  .archive-preloader__brain-slice,
+  .archive-preloader__exit-bands i {
+    transition-duration: 220ms !important;
+  }
+}
+
 @font-face {
   font-family: "supplyMono";
   src: url("../assets/fonts/supplyMono/Supply-Light.otf");
@@ -1025,8 +1291,8 @@ body:not(.is-archive-overlay-open)
 
 .curzr__interaction-state {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: calc(var(--outer-y) + var(--cursor-outer-scaled-half-size) + 6px);
+  left: calc(var(--outer-x) + var(--cursor-outer-scaled-half-size) + 6px);
   min-width: max-content;
   padding: 3px 5px 2px;
   border: 1px solid rgba(247, 248, 250, 0.48);
@@ -1038,14 +1304,11 @@ body:not(.is-archive-overlay-open)
   line-height: 1;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-synthesis: none;
+  -webkit-font-smoothing: auto;
   opacity: 0;
-  transform: translate3d(
-    calc(var(--outer-x) + var(--cursor-outer-scaled-half-size) + 6px),
-    calc(var(--outer-y) + var(--cursor-outer-scaled-half-size) + 6px),
-    0
-  );
-  transition: opacity 90ms linear, border-color 90ms linear, color 90ms linear;
-  will-change: transform, opacity;
+  transform: none;
+  transition: border-color 90ms linear, color 90ms linear;
 }
 
 .curzr[data-interaction]:not([data-interaction=""]) .curzr__interaction-state {
@@ -1069,13 +1332,10 @@ body:not(.is-archive-overlay-open)
 }
 
 .curzr[data-interaction="hold"] .curzr__interaction-state {
+  top: calc(var(--outer-y) + var(--cursor-outer-diagonal-offset));
+  left: calc(var(--outer-x) + var(--cursor-outer-diagonal-offset));
   border-color: rgba(255, 13, 26, 0.9);
   color: #ff3542;
-  transform: translate3d(
-    calc(var(--outer-x) + var(--cursor-outer-diagonal-offset)),
-    calc(var(--outer-y) + var(--cursor-outer-diagonal-offset)),
-    0
-  );
 }
 
 .curzr[data-interaction="stay"] .curzr__interaction-state {
@@ -1685,7 +1945,7 @@ body.is-screen-glitching .hypercube-stage {
   --record-inner-bottom: clamp(11px, 1vw, 15px);
   --record-inner-left: clamp(15px, 1.35vw, 21px);
   --record-offset-x: clamp(22px, 2.2vw, 34px);
-  --fault-rail-y: clamp(36px, 4.5vh, 46px);
+  --fault-rail-y: clamp(51px, 5.5vh, 57px);
   --record-datum-y: calc(var(--record-inner-top) + var(--fault-rail-y));
   --record-block-height: clamp(150px, 16vh, 168px);
   grid-area: record;
@@ -1773,7 +2033,7 @@ body.is-screen-glitching .hypercube-stage {
   z-index: 1;
   inset: var(--record-inner-top) var(--record-inner-right) var(--record-inner-bottom) var(--record-inner-left);
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(0);
   transition:
     opacity 340ms cubic-bezier(0.22, 1, 0.36, 1),
     transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -1856,7 +2116,7 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 .strata__fault-plate.is-scrub-entering .strata__fault-rail {
-  animation: strataScrubRailEnter 720ms cubic-bezier(0.16, 1, 0.3, 1) 760ms both;
+  animation: none;
 }
 
 .strata__fault-plate.is-scrub-entering .strata__fault-zero {
@@ -1867,75 +2127,42 @@ body.is-screen-glitching .hypercube-stage {
   0% {
     opacity: 0;
     clip-path: inset(0 100% 0 0);
-    transform: translateX(-12px);
   }
 
   8% {
     opacity: 0.86;
     clip-path: inset(0 88% 0 0);
-    transform: translateX(4px);
   }
 
   17% {
     opacity: 0.12;
     clip-path: inset(0 71% 0 0);
-    transform: translateX(-7px);
   }
 
   26% {
     opacity: 1;
     clip-path: inset(0 47% 0 0);
-    transform: translateX(2px);
   }
 
   34% {
     opacity: 0.32;
     clip-path: inset(0 39% 0 0);
-    transform: translateX(11px);
   }
 
   43% {
     opacity: 1;
     clip-path: inset(0 18% 0 0);
-    transform: translateX(-2px);
   }
 
   55% {
     opacity: 0.76;
     clip-path: inset(0);
-    transform: translateX(3px);
   }
 
   67%,
   100% {
     opacity: 1;
     clip-path: inset(0);
-    transform: translateX(0);
-  }
-}
-
-@keyframes strataScrubRailEnter {
-  0% {
-    opacity: 0;
-    transform: translateX(-8px) scaleX(0);
-    transform-origin: left center;
-  }
-
-  38% {
-    opacity: 1;
-    transform: translateX(5px) scaleX(0.64);
-  }
-
-  52% {
-    opacity: 0.22;
-    transform: translateX(-3px) scaleX(0.82);
-  }
-
-  70%,
-  100% {
-    opacity: 1;
-    transform: translateX(0) scaleX(1);
-    transform-origin: left center;
   }
 }
 
@@ -2006,23 +2233,23 @@ body.is-screen-glitching .hypercube-stage {
   0%,
   35% {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateX(-8px);
   }
 
   46% {
     opacity: 0.75;
-    transform: translateY(4px);
+    transform: translateX(4px);
   }
 
   58% {
     opacity: 0.12;
-    transform: translateY(-2px);
+    transform: translateX(-2px);
   }
 
   72%,
   100% {
     opacity: 0.42;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 
@@ -2076,19 +2303,19 @@ body.is-screen-glitching .hypercube-stage {
   color: rgba(237, 240, 243, 0.7);
   font-weight: 400;
   opacity: 0;
-  transform: translateY(3px);
+  transform: translateX(5px);
 }
 
 .strata__fault-plate:has(.strata__fault-control:hover) .strata__fault-mode i,
 .strata__fault-plate.is-strata-scrubbing .strata__fault-mode i {
   opacity: 0;
-  transform: translateY(-3px);
+  transform: translateX(-5px);
 }
 
 .strata__fault-plate:has(.strata__fault-control:hover) .strata__fault-mode b,
 .strata__fault-plate.is-strata-scrubbing .strata__fault-mode b {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(0);
 }
 
 .strata__fault-rail {
@@ -2099,12 +2326,8 @@ body.is-screen-glitching .hypercube-stage {
   left: var(--record-offset-x);
   display: block;
   height: 1px;
-  background:
-    linear-gradient(
-      to right,
-      rgba(249, 250, 251, 0.2) 0 77%,
-      transparent 77%
-    );
+  /* The shared record relay supplies the structural line and signal. */
+  background: transparent;
 }
 
 .strata__fault-rail::after {
@@ -2116,17 +2339,6 @@ body.is-screen-glitching .hypercube-stage {
   height: 1px;
   background: rgba(249, 250, 251, 0.92);
   transition: width 90ms linear;
-}
-
-.strata__fault-rail i {
-  position: absolute;
-  top: -4px;
-  left: var(--fault-progress);
-  width: 8px;
-  height: 8px;
-  background: #f5f6f7;
-  transform: translateX(-50%);
-  transition: left 90ms linear;
 }
 
 .strata__fault-zero {
@@ -2240,7 +2452,7 @@ body.is-screen-glitching .hypercube-stage {
 
 .strata[data-eye-record="active"] .strata__fault-plate {
   opacity: 0;
-  transform: translateX(-12px);
+  transform: none;
 }
 
 .strata[data-eye-record="active"] .strata__fault-plate::after {
@@ -2300,37 +2512,9 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 @keyframes strataDepthCounterTick {
-  0% { transform: translateY(0); filter: blur(0); }
-  45% { transform: translateY(-3px); filter: blur(0.7px); }
-  100% { transform: translateY(0); filter: blur(0); }
-}
-
-.strata__record-title,
-.strata__record-body {
-  opacity: 0;
-  transform: translateY(5px);
-  transition:
-    opacity 180ms linear,
-    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.strata[data-eye-record="active"] .strata__record-dormant {
-  opacity: 0;
-  transform: translateY(-5px);
-}
-
-.strata[data-eye-record="active"] .strata__record-title,
-.strata[data-eye-record="active"] .strata__record-body {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.strata[data-eye-record="active"] .strata__record-title {
-  transition-delay: 110ms;
-}
-
-.strata[data-eye-record="active"] .strata__record-body {
-  transition-delay: 150ms;
+  0% { transform: translateX(0); filter: blur(0); }
+  45% { transform: translateX(4px); filter: blur(0.7px); }
+  100% { transform: translateX(0); filter: blur(0); }
 }
 
 .strata__record-title {
@@ -2342,11 +2526,7 @@ body.is-screen-glitching .hypercube-stage {
   color: var(--st-ink);
   white-space: nowrap;
   transition: color 260ms ease;
-  /* Fixed-WIDTH capture box so every press phase (THE EYE / IT HEARS YOU / ... /
-     DO NOT RELEASE) renders at the SAME size and position. VFX builds its texture
-     from the element's bounding box; when the box grew with the text, the longer
-     phrases got scaled down and shifted. The height stays auto (always one line,
-     so it never varies) — pinning it clipped the tops of the glyphs. */
+  /* Stable bounds keep every press-state title on one VFX capture surface. */
   box-sizing: border-box;
   width: min(78vw, 760px);
   height: 1.34em;
@@ -2354,9 +2534,7 @@ body.is-screen-glitching .hypercube-stage {
   max-height: 1.34em;
   flex: 0 0 auto;
   text-align: left;
-  /* Transparent gutter around the glyphs so the VFX capture never clips the
-     letters flush against the box edges (white cut-lines on the left / bottom).
-     Negative margins cancel the padding so the layout position is unchanged. */
+  /* The transparent gutter protects glyph edges inside the VFX texture. */
   padding: 0.18em 0.2em;
   margin: -0.18em -0.2em;
   margin-left: -0.24em;
@@ -2394,198 +2572,27 @@ body.is-screen-glitching .hypercube-stage {
      wordmark vertically whenever the copy changes. */
 }
 
-.strata[data-eye-record="active"] .strata__record {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(240px, 1.1fr);
-  grid-template-rows: auto minmax(62px, 1fr);
-  column-gap: clamp(22px, 2.6vw, 38px);
-  row-gap: clamp(8px, 1.1vh, 12px);
-  align-items: center;
-  width: min(66vw, 700px);
-  min-height: clamp(110px, 12vh, 120px);
-  margin: 0 -0.2em;
-  margin-left: -0.2em;
-  padding: clamp(11px, 1.2vh, 14px) clamp(17px, 1.7vw, 24px);
-  background: transparent;
-  isolation: auto;
-}
-
-.strata.is-eye-record-exiting .strata__record {
-  padding: clamp(7px, 0.8vh, 10px) clamp(13px, 1.3vw, 18px) clamp(11px, 1.2vh, 14px);
-  isolation: auto;
-}
-
-.strata[data-eye-record="active"] .strata__record::before {
-  top: 49%;
-  right: auto;
-  bottom: auto;
-  left: 0;
-  z-index: 4;
-  width: 96%;
-  height: 15px;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(244, 246, 248, 0.22) 0,
-      rgba(244, 246, 248, 0.22) 1px,
-      rgba(244, 246, 248, 0.08) 1px,
-      rgba(244, 246, 248, 0.08) 4px
-    );
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  mix-blend-mode: difference;
-  clip-path: polygon(0 8%, 46% 8%, 46% 0, 75% 0, 75% 22%, 100% 22%, 100% 90%, 61% 90%, 61% 100%, 0 100%);
-  opacity: 0.64;
-  animation: signalFaultOpen 560ms steps(5, end) 60ms 1 both;
-}
-
-.strata[data-eye-record="active"] .strata__record::after {
-  top: calc(49% + 6px);
-  bottom: auto;
-  left: 62%;
-  z-index: 4;
-  width: 30px;
-  height: 2px;
-  background: var(--st-signal);
-  opacity: 0.58;
-  animation: none;
-}
-
-.strata[data-eye-record="active"] .strata__record-title,
-.strata[data-eye-record="active"] .strata__record-body {
-  position: relative;
-  z-index: 2;
-}
-
-.strata[data-eye-record="active"] .strata__record-title {
-  grid-column: 1;
-  grid-row: 2;
-  align-self: center;
-  width: 100%;
-  max-width: 340px;
-  height: 1.34em;
-  min-height: 1.34em;
-  max-height: 1.34em;
-  margin-top: 0;
-  margin-bottom: 0;
-  color: #fff;
-  font-size: clamp(34px, 3.65vw, 52px);
-  letter-spacing: -0.025em;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.82);
-}
-
-.strata[data-eye-record="active"] .strata__record-title::before,
-.strata[data-eye-record="active"] .strata__record-title::after {
-  content: attr(data-fault-text);
-  position: absolute;
-  top: 0.18em;
-  right: 0.2em;
-  bottom: 0.18em;
-  left: 0.2em;
-  z-index: 3;
-  overflow: hidden;
-  color: #fff;
-  font: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.strata[data-eye-record="active"] .strata__record-title::before {
-  clip-path: inset(18% 0 58% 0);
-  opacity: 0.4;
-  transform: translateX(-5px);
-}
-
-.strata[data-eye-record="active"] .strata__record-title::after {
-  clip-path: inset(63% 0 12% 0);
-  opacity: 0.3;
-  transform: translateX(7px);
-}
-
-.strata[data-eye-record="active"] .strata__record-body {
-  grid-column: 2;
-  grid-row: 2;
-  align-self: center;
-  display: flex;
-  align-items: center;
-  height: calc(3.1em + 10px);
-  min-height: calc(3.1em + 10px);
-  max-height: calc(3.1em + 10px);
-  padding: 5px 0 5px clamp(16px, 1.8vw, 26px);
-  border-top: 0;
-  border-left: 1px solid rgba(235, 238, 242, 0.18);
-  color: rgba(218, 222, 227, 0.82);
-  overflow: visible;
-}
-
-@keyframes signalFaultOpen {
-  0% {
-    opacity: 0;
-    transform: translateX(-18px) scaleX(0.16);
-    transform-origin: left center;
-  }
-
-  42% {
-    opacity: 0.76;
-    transform: translateX(9px) scaleX(0.62);
-  }
-
-  100% {
-    opacity: 0.64;
-    transform: translateX(0) scaleX(1);
-    transform-origin: left center;
-  }
-}
-
-@keyframes signalFaultHold {
-  0%,
-  100% {
-    transform: translateX(-4px) scaleX(1);
-    clip-path: polygon(0 8%, 46% 8%, 46% 0, 75% 0, 75% 22%, 100% 22%, 100% 90%, 61% 90%, 61% 100%, 0 100%);
-  }
-
-  50% {
-    transform: translateX(7px) scaleX(0.98);
-    clip-path: polygon(0 0, 28% 0, 28% 18%, 69% 18%, 69% 4%, 100% 4%, 100% 100%, 54% 100%, 54% 82%, 0 82%);
-  }
-}
-
-.hypercube-stage.is-hud-pressing
-  .strata[data-eye-record="active"]
-  .strata__record::before {
-  animation: signalFaultHold 190ms steps(2, end) infinite;
-}
-
-.hypercube-stage.is-hud-pressing
-  .strata[data-eye-record="active"]
-  .strata__record-title::before {
-  opacity: 0.58;
-  transform: translateX(-8px);
-}
-
-.hypercube-stage.is-hud-pressing
-  .strata[data-eye-record="active"]
-  .strata__record-title::after {
-  opacity: 0.48;
-  transform: translateX(11px);
-}
-
 /* Active record / State Relay — the dormant 00 rail and the eye record share
    one footprint. The counter compresses out; the same horizontal datum extends
    and carries a single title/copy lockup into view. */
 .strata__record-relay {
+  --datum-rest-top: calc(var(--record-datum-y) - 4px);
+  --datum-rest-left: 0px;
+  --datum-rest-width: min(62%, 330px);
+  --datum-active-top: calc(var(--record-datum-y) + clamp(6px, 0.8vh, 9px) - 4px);
+  --datum-active-left: clamp(13px, 1.3vw, 18px);
+  --datum-active-width: min(84%, 440px);
   position: absolute;
   z-index: 1;
-  top: calc(var(--record-datum-y) - 4px);
-  right: 0;
-  left: 0;
+  top: var(--datum-rest-top);
+  right: auto;
+  left: var(--datum-rest-left);
+  width: var(--datum-rest-width);
   height: 9px;
   overflow: hidden;
-  opacity: 0;
+  opacity: 1;
   pointer-events: none;
-  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: none;
 }
 
 .strata__record-relay i {
@@ -2594,90 +2601,104 @@ body.is-screen-glitching .hypercube-stage {
   pointer-events: none;
 }
 
-.strata__record-relay i:nth-child(1) {
+.strata__record-line {
   top: 4px;
   left: 0;
   width: 100%;
   height: 1px;
   background: linear-gradient(
     to right,
-    rgba(246, 248, 250, 0.72),
-    rgba(246, 248, 250, 0.22) 68%,
+    rgba(246, 248, 250, 0.62),
+    rgba(246, 248, 250, 0.16) 72%,
     transparent
   );
-  opacity: 0;
-  transform: scaleX(0.22);
+  opacity: 1;
+  transform: scaleX(1);
   transform-origin: left center;
-  transition:
-    opacity 160ms linear,
-    transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none;
 }
 
-.strata__record-relay i:nth-child(2) {
-  top: 1px;
+.strata__record-signal {
+  --record-signal-width: clamp(24px, 2.4vw, 38px);
+  z-index: 1;
+  top: calc(50% - 4px);
+  right: auto;
   left: 0;
-  width: clamp(38px, 5vw, 58px);
-  height: 7px;
-  background: rgba(246, 248, 250, 0.92);
-  opacity: 0;
-  mix-blend-mode: difference;
-  transform: translateX(-110%);
-}
-
-.strata__record-relay i:nth-child(3) {
-  top: 3px;
-  left: 72%;
-  width: clamp(18px, 2vw, 26px);
-  height: 2px;
-  background: var(--st-signal);
-  opacity: 0;
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition:
-    opacity 120ms linear 180ms,
-    transform 360ms cubic-bezier(0.16, 1, 0.3, 1) 180ms;
+  width: 8px;
+  height: 8px;
+  background: #f5f6f7;
+  opacity: 1;
+  transform: rotate(0deg);
+  transform-origin: center center;
+  transition: none;
 }
 
 .strata[data-eye-record="active"] .strata__record-dormant {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: none;
   transition:
     opacity 360ms cubic-bezier(0.22, 1, 0.36, 1) 35ms,
-    transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0ms linear;
 }
 
 .strata[data-eye-record="active"] .strata__record-relay {
   opacity: 1;
 }
 
-.strata[data-eye-record="active"] .strata__record-relay i:nth-child(1) {
+.strata[data-eye-record="active"] .strata__record-line {
   opacity: 1;
   transform: scaleX(1);
 }
 
-.strata[data-eye-record="active"] .strata__record-relay i:nth-child(2) {
-  animation: recordRelaySweep 760ms cubic-bezier(0.3, 0, 0.15, 1) 80ms 1 both;
+.strata.is-eye-record-entering .strata__record-signal {
+  animation: recordSignalMorphTraverse 900ms linear 30ms both;
 }
 
-.strata[data-eye-record="active"] .strata__record-relay i:nth-child(3) {
-  opacity: 0.58;
-  transform: scaleX(1);
-}
-
-.strata[data-eye-record="active"] .strata__record {
+.strata[data-eye-record="active"] .strata__record,
+.strata.is-eye-record-exiting .strata__record,
+.strata.is-eye-record-returning .strata__record {
+  --eye-record-inset: 0px;
+  --eye-record-pad-top: clamp(9px, 1vh, 12px);
+  --eye-lockup-width: min(100%, 430px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto 12px auto;
   row-gap: 0;
   align-items: start;
-  width: min(42vw, 540px);
-  height: var(--record-block-height);
-  min-height: var(--record-block-height);
+  width: min(42vw, 520px);
+  height: clamp(132px, 13.5vh, 146px);
+  min-height: clamp(132px, 13.5vh, 146px);
   margin-bottom: clamp(18px, 2.2vh, 26px);
   margin-left: clamp(22px, 2.2vw, 34px);
-  padding: clamp(7px, 0.8vh, 10px) clamp(13px, 1.3vw, 18px) clamp(11px, 1.2vh, 14px);
+  padding: var(--eye-record-pad-top) var(--eye-record-inset) clamp(9px, 1vh, 12px);
   background: transparent;
   isolation: auto;
+}
+
+.strata.is-eye-record-returning .strata__record {
+  width: clamp(330px, 28vw, 430px);
+  height: var(--record-block-height);
+  min-height: var(--record-block-height);
+}
+
+/* The dormant rail and active eye record share one structural datum. */
+.strata[data-eye-record="active"] .strata__record-relay,
+.strata.is-eye-record-returning .strata__record-relay {
+  --datum-active-top: var(--datum-rest-top);
+  --datum-active-left: var(--datum-rest-left);
+  --datum-active-width: var(--eye-lockup-width);
+}
+
+.strata[data-eye-record="active"] .strata__record-relay {
+  position: absolute;
+  top: var(--datum-active-top);
+  right: auto;
+  left: var(--datum-active-left);
+  width: var(--datum-active-width);
+}
+
+.strata.is-eye-record-entering .strata__record-relay {
+  animation: recordDatumShift 450ms linear both;
 }
 
 .strata[data-eye-record="active"] .strata__record::before,
@@ -2705,7 +2726,8 @@ body.is-screen-glitching .hypercube-stage {
 .strata__record-body {
   clip-path: inset(0 100% 0 0);
   opacity: 0;
-  transform: translate3d(-12px, 2px, 0);
+  transform: translate3d(0, 0, 0);
+  transform-origin: left center;
   transition:
     clip-path 640ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 300ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -2722,18 +2744,19 @@ body.is-screen-glitching .hypercube-stage {
 
 .strata[data-eye-record="active"] .strata__record-title,
 .strata.is-eye-record-exiting .strata__record-title {
+  position: relative;
+  top: 0;
   grid-column: 1;
   grid-row: 1;
   align-self: start;
-  width: min(42vw, 500px);
-  max-width: 500px;
+  width: calc(var(--eye-lockup-width) + 0.4em);
+  max-width: none;
   height: 1.34em;
   min-height: 1.34em;
   max-height: 1.34em;
-  margin: -3px -0.2em 0;
-  margin-left: -0.2em;
+  margin: 0 0 -0.28em -0.2em;
   color: #fff;
-  font-size: clamp(42px, 4vw, 56px);
+  font-size: clamp(44px, 4vw, 58px);
   letter-spacing: -0.027em;
   line-height: 0.9;
   text-shadow: none;
@@ -2748,6 +2771,14 @@ body.is-screen-glitching .hypercube-stage {
 /* VFX owns the visible title transition. Keep its raster source complete and
    stationary while the shader reveals/hides it; the regular CSS transition
    above remains as the no-WebGL fallback. */
+.strata.is-eye-record-exiting .strata__record-title,
+.strata.is-eye-record-exiting .strata__record-body {
+  clip-path: inset(0 100% 0 0);
+  opacity: 0;
+  transform: translate3d(0, 0, 0);
+  transition-delay: 0ms;
+}
+
 .has-eye-vfx .strata__record-title {
   clip-path: inset(0);
   opacity: 1;
@@ -2755,45 +2786,55 @@ body.is-screen-glitching .hypercube-stage {
   transition: none;
 }
 
-/* The relay datum and THE EYE raster use the exact same reveal value. This
-   removes the old race between a CSS line transition and the WebGL wordmark:
-   when the datum reaches zero, the title is also fully gone. */
+/* VFX controls the title only. The shared datum remains ordinary DOM/CSS so it
+   can persist continuously between the dormant and active coordinates. */
 .has-eye-vfx .strata__record-relay {
   opacity: 1;
-  transition: none;
 }
 
 .has-eye-vfx
   .strata[data-eye-record]
   .strata__record-relay
-  i:nth-child(1) {
-  opacity: var(--eye-record-reveal, 0);
-  transform: scaleX(var(--eye-record-reveal, 0));
+  .strata__record-line {
+  opacity: 1;
+  transform: scaleX(1);
   transition: none;
 }
 
 .strata[data-eye-record="active"] .strata__record-body {
+  position: relative;
+  top: 0;
   grid-column: 1;
-  grid-row: 2;
-  display: block;
-  width: min(88%, 440px);
-  height: calc(3em + 12px);
-  min-height: calc(3em + 12px);
-  max-height: calc(3em + 12px);
+  grid-row: 3;
+  display: flex;
+  align-self: start;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: var(--eye-lockup-width);
+  height: 2.8em;
+  min-height: 2.8em;
+  max-height: 2.8em;
   margin: 0;
-  padding: 7px 0 5px;
+  padding: 5px 0 0;
   border: 0;
-  color: rgba(240, 242, 245, 0.76);
-  font-size: clamp(10.5px, 0.82vw, 12.5px);
-  line-height: 1.5;
-  letter-spacing: 0.045em;
+  color: rgba(248, 249, 250, 0.84);
+  font-family: "supplyMono", monospace;
+  font-weight: 400;
+  font-size: clamp(10px, 0.78vw, 12.5px);
+  line-height: 1.35;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
   mix-blend-mode: difference;
   overflow: visible;
-  transition-delay: 230ms;
+  clip-path: inset(0);
+  transform: none;
+  transition:
+    opacity 140ms linear 80ms,
+    color 160ms linear;
 }
 
 .strata__record-title {
-  clip-path: inset(0);
+  clip-path: inset(0 100% 0 0);
   transition-delay: 70ms;
 }
 
@@ -2801,20 +2842,98 @@ body.is-screen-glitching .hypercube-stage {
   transition-delay: 0ms;
 }
 
-@keyframes recordRelaySweep {
-  0% {
-    opacity: 0;
-    transform: translateX(-110%);
+@keyframes recordDatumShift {
+  from {
+    left: var(--datum-rest-left);
+    width: var(--datum-rest-width);
   }
 
-  12%,
-  72% {
-    opacity: 0.76;
+  to {
+    left: var(--datum-active-left);
+    width: var(--datum-active-width);
+  }
+}
+
+@keyframes recordSignalMorphTraverse {
+  0% {
+    left: 0;
+    top: calc(50% - 4px);
+    width: 8px;
+    height: 8px;
+    background: #f5f6f7;
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+
+  18% {
+    left: 0;
+    top: calc(50% - 2px);
+    width: 4px;
+    height: 4px;
+    background: #f5f6f7;
+    opacity: 1;
+    transform: rotate(135deg);
+  }
+
+  24% {
+    left: 0;
+    top: calc(50% - 2px);
+    width: 4px;
+    height: 4px;
+    background: #f5f6f7;
+    opacity: 1;
+    transform: rotate(180deg);
+  }
+
+  38% {
+    left: 0;
+    top: calc(50% - 2px);
+    width: var(--record-signal-width);
+    height: 4px;
+    background: #f5f6f7;
+    opacity: 1;
+    transform: rotate(180deg);
+  }
+
+  48% {
+    left: 0;
+    top: calc(50% - 1px);
+    width: var(--record-signal-width);
+    height: 2px;
+    background: var(--st-signal);
+    opacity: 0.92;
+    transform: rotate(180deg);
+  }
+
+  50% {
+    left: 0;
+    top: calc(50% - 1px);
+    width: var(--record-signal-width);
+    height: 2px;
+    background: var(--st-signal);
+    opacity: 0.92;
+    transform: rotate(180deg);
+    animation-timing-function: cubic-bezier(0.05, 0.9, 0.15, 1);
+  }
+
+  94% {
+    left: calc(80% - var(--record-signal-width));
+    top: calc(50% - 1px);
+    width: var(--record-signal-width);
+    height: 2px;
+    background: var(--st-signal);
+    opacity: 0.92;
+    transform: rotate(180deg);
   }
 
   100% {
-    opacity: 0;
-    transform: translateX(950%);
+    left: calc(80% - var(--record-signal-width));
+    top: calc(50% - 1px);
+    width: var(--record-signal-width);
+    height: 2px;
+    background: var(--st-signal);
+    opacity: 0.58;
+    transform: rotate(180deg);
   }
 }
 
@@ -3430,22 +3549,33 @@ body.is-screen-glitching .hypercube-stage {
   }
 
   .strata[data-eye-record="active"] .strata__record {
+    --eye-record-inset: 0px;
+    --eye-record-pad-top: 8px;
+    --eye-lockup-width: min(100%, 400px);
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto;
+    grid-template-rows: auto 11px auto;
     row-gap: 0;
     width: min(calc(100vw - (var(--st-pad) * 2)), 520px);
-    height: var(--record-block-height);
-    min-height: var(--record-block-height);
+    height: 134px;
+    min-height: 134px;
     margin-bottom: 14px;
     margin-left: 12px;
-    padding: 7px 11px 12px;
+    padding: var(--eye-record-pad-top) var(--eye-record-inset) 9px;
   }
 
-  .strata[data-eye-record="active"] .strata__record-relay {
-    top: calc(var(--record-datum-y) - 4px);
+  .strata[data-eye-record="active"] .strata__record-relay,
+  .strata.is-eye-record-returning .strata__record-relay {
+    --datum-active-top: var(--datum-rest-top);
   }
 
   .strata.is-eye-record-exiting .strata__record {
+    padding: 8px 0 9px;
+  }
+
+  .strata.is-eye-record-returning .strata__record {
+    width: min(82vw, 390px);
+    height: var(--record-block-height);
+    min-height: var(--record-block-height);
     padding: 7px 11px 12px;
   }
 
@@ -3453,22 +3583,22 @@ body.is-screen-glitching .hypercube-stage {
   .strata.is-eye-record-exiting .strata__record-title {
     grid-column: 1;
     grid-row: 1;
-    width: min(82vw, 500px);
+    width: calc(var(--eye-lockup-width) + 0.4em);
     max-width: none;
     font-size: clamp(34px, 8vw, 46px);
   }
 
   .strata[data-eye-record="active"] .strata__record-body {
     grid-column: 1;
-    grid-row: 2;
-    width: min(92%, 430px);
-    height: calc(3em + 10px);
-    min-height: calc(3em + 10px);
-    max-height: calc(3em + 10px);
-    padding: 6px 0 4px;
-    font-size: clamp(8.5px, 2.2vw, 10.5px);
-    line-height: 1.5;
-    letter-spacing: 0.03em;
+    grid-row: 3;
+    width: var(--eye-lockup-width);
+    height: 2.8em;
+    min-height: 2.8em;
+    max-height: 2.8em;
+    padding: 4px 0 0;
+    font-size: clamp(9.5px, 2.35vw, 11px);
+    line-height: 1.45;
+    letter-spacing: 0.035em;
   }
 }
 
@@ -3496,34 +3626,36 @@ body.is-screen-glitching .hypercube-stage {
   }
 
   .strata[data-eye-record="active"] .strata__record {
+    --eye-lockup-width: 100%;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto;
+    grid-template-rows: auto 10px auto;
     row-gap: 0;
-    height: var(--record-block-height);
-    min-height: var(--record-block-height);
-    padding-bottom: 12px;
+    height: 128px;
+    min-height: 128px;
+    padding-bottom: 8px;
   }
 
-  .strata[data-eye-record="active"] .strata__record-relay {
-    top: calc(var(--record-datum-y) - 4px);
+  .strata[data-eye-record="active"] .strata__record-relay,
+  .strata.is-eye-record-returning .strata__record-relay {
+    --datum-active-top: var(--datum-rest-top);
   }
 
   .strata[data-eye-record="active"] .strata__record-title,
   .strata.is-eye-record-exiting .strata__record-title {
     grid-column: 1;
     grid-row: 1;
-    width: min(82vw, 500px);
+    width: calc(var(--eye-lockup-width) + 0.4em);
     font-size: clamp(31px, 9vw, 39px);
   }
 
   .strata[data-eye-record="active"] .strata__record-body {
     grid-column: 1;
-    grid-row: 2;
-    width: 94%;
-    height: calc(3em + 9px);
-    min-height: calc(3em + 9px);
-    max-height: calc(3em + 9px);
-    padding: 5px 0 4px;
+    grid-row: 3;
+    width: var(--eye-lockup-width);
+    height: 2.8em;
+    min-height: 2.8em;
+    max-height: 2.8em;
+    padding: 4px 0 0;
     border: 0;
   }
 }
@@ -3561,9 +3693,23 @@ body.is-screen-glitching .hypercube-stage {
   }
 
   .strata[data-eye-record="active"] .strata__record::before,
-  .strata[data-eye-record="active"] .strata__record::after,
-  .strata[data-eye-record="active"] .strata__record-relay i:nth-child(2) {
+  .strata[data-eye-record="active"] .strata__record::after {
     animation: none;
+  }
+
+  .strata[data-eye-record="active"] .strata__record-signal,
+  .strata.is-eye-record-returning .strata__record-signal {
+    animation: none;
+  }
+
+  .strata[data-eye-record="active"] .strata__record-signal {
+    top: calc(50% - 1px);
+    left: calc(80% - var(--record-signal-width));
+    width: var(--record-signal-width);
+    height: 2px;
+    background: var(--st-signal);
+    opacity: 0.58;
+    transform: none;
   }
 
   .strata[data-eye-record="active"] .strata__record::before,
@@ -4195,7 +4341,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
   color: rgba(255, 255, 255, 0.105);
   opacity: var(--archive-depth-title-opacity, 1);
   filter: blur(var(--archive-depth-title-blur, 0));
-  transform: translate(-50%, -50%);
+  transform: none;
   scale: none;
 }
 
@@ -4295,9 +4441,14 @@ body.is-archive-overlay-open .archive-overlay-grid {
 .archive-overlay-page__backdrop-mark {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   overflow: visible;
   fill: currentColor;
+  shape-rendering: geometricPrecision;
+}
+
+.archive-overlay-page__backdrop-title.is-grid-fitted {
+  transform: none;
 }
 
 .archive-overlay-page.is-credits-revealed .archive-overlay-page__backdrop-title {
@@ -4309,7 +4460,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
     color: rgba(255, 255, 255, 0);
     opacity: 0;
     filter: blur(8px);
-    transform: translate(-50%, -50%);
+    transform: none;
   }
   9% {
     color: rgba(255, 255, 255, 0.94);
@@ -4332,7 +4483,7 @@ body.is-archive-overlay-open .archive-overlay-grid {
     color: rgba(255, 255, 255, 0.105);
     opacity: 1;
     filter: blur(0);
-    transform: translate(-50%, -50%);
+    transform: none;
   }
 }
 
