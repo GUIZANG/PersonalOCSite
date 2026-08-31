@@ -22,6 +22,15 @@ class ArchiveCardModel {
     this.modelRoot = null;
     this.baseRotation = 0;
     this.rootBaseY = 0;
+    this.rootDisplayOffsetY = 0.28;
+    this.cameraBasePosition = new THREE.Vector3();
+    this.cameraOrbitRadius = 1;
+    this.cameraOrbitAzimuth = 0;
+    this.cameraBaseElevation = 0;
+    this.targetCameraOrbit = 0;
+    this.currentCameraOrbit = 0;
+    this.cameraOrbitVelocity = 0;
+    this.cameraOrbitReturning = false;
     this.interacting = false;
     this.autoBlend = 1;
     this.autoStartedAt = 0;
@@ -31,6 +40,14 @@ class ArchiveCardModel {
     this.lastRigRotation = null;
     this.rigAngularVelocity = 0;
     this.renderFrame = 0;
+    this.thermalEnabled = false;
+    this.thermalAmount = 0;
+    this.thermalGlitchSeed = Math.random() * 1000;
+    this.dataSeaReveal = 0;
+    this.dataSeaRevealTarget = 0;
+    this.reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
@@ -50,6 +67,7 @@ class ArchiveCardModel {
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.domElement.setAttribute("aria-hidden", "true");
     this.host.appendChild(this.renderer.domElement);
+    this.setupDataSea();
     this.setupSignalPostProcess();
 
     this.target = new THREE.Vector3(0, 2.55, 0);
@@ -64,6 +82,298 @@ class ArchiveCardModel {
     this.resizeObserver.observe(this.host);
     this.resize();
     this.load();
+  }
+
+  createDataSeaGlyphAtlas() {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    const atlasGrid = 8;
+    const cellSize = 64;
+    const glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+-=?!";
+    canvas.width = atlasGrid * cellSize;
+    canvas.height = atlasGrid * cellSize;
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#fff";
+    context.font = '700 43px "supplyMono", monospace';
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+
+    for (let row = 0; row < atlasGrid; row += 1) {
+      for (let column = 0; column < atlasGrid; column += 1) {
+        const glyph = glyphs[(row * atlasGrid + column) % glyphs.length];
+        context.fillText(
+          glyph,
+          column * cellSize + cellSize * 0.5,
+          row * cellSize + cellSize * 0.52
+        );
+      }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  setupDataSea() {
+    this.dataSeaScene = new THREE.Scene();
+    this.dataSeaTarget = new THREE.WebGLRenderTarget(1, 1, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      depthBuffer: false,
+      stencilBuffer: false,
+    });
+    this.dataSeaTarget.texture.name = "CARDSTREAM_DATA_SEA";
+    this.dataSeaGlyphAtlas = this.createDataSeaGlyphAtlas();
+    this.dataSeaUniforms = {
+      time: { value: 0 },
+      reveal: { value: 0 },
+      fieldSeed: { value: Math.random() * 1000 },
+      glyphAtlas: { value: this.dataSeaGlyphAtlas },
+      aspect: { value: 1 },
+      tanHalfFov: {
+        value: Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5)),
+      },
+      viewPosition: { value: this.camera.position.clone() },
+      viewRight: { value: new THREE.Vector3(1, 0, 0) },
+      viewUp: { value: new THREE.Vector3(0, 1, 0) },
+      viewForward: { value: new THREE.Vector3(0, 0, -1) },
+      flowDirection: { value: new THREE.Vector2(0.63, 0.78).normalize() },
+      groundY: { value: -1.05 },
+    };
+    const material = new THREE.ShaderMaterial({
+      name: "CARDSTREAM_DATA_SEA_MATERIAL",
+      uniforms: this.dataSeaUniforms,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform float reveal;
+        uniform float fieldSeed;
+        uniform float aspect;
+        uniform float tanHalfFov;
+        uniform float groundY;
+        uniform sampler2D glyphAtlas;
+        uniform vec3 viewPosition;
+        uniform vec3 viewRight;
+        uniform vec3 viewUp;
+        uniform vec3 viewForward;
+        uniform vec2 flowDirection;
+        varying vec2 vUv;
+
+        float hash21(vec2 point) {
+          return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        float valueNoise(vec2 point) {
+          vec2 cell = floor(point);
+          vec2 local = fract(point);
+          local = local * local * (3.0 - 2.0 * local);
+          float a = hash21(cell);
+          float b = hash21(cell + vec2(1.0, 0.0));
+          float c = hash21(cell + vec2(0.0, 1.0));
+          float d = hash21(cell + vec2(1.0, 1.0));
+          return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
+        }
+
+        float fbm(vec2 point) {
+          float value = 0.0;
+          float amplitude = 0.5;
+          for (int octave = 0; octave < 5; octave++) {
+            value += valueNoise(point) * amplitude;
+            point = mat2(1.72, 1.08, -1.08, 1.72) * point + vec2(4.7, 8.3);
+            amplitude *= 0.5;
+          }
+          return value;
+        }
+
+        float dataHeight(vec2 point, float clock) {
+          vec2 seedOffset = vec2(fieldSeed * 0.071, -fieldSeed * 0.043);
+          point += seedOffset;
+          vec2 flowNormal = vec2(-flowDirection.y, flowDirection.x);
+          vec2 directedDrift =
+            -flowDirection * clock * 0.094 +
+            flowNormal * clock * 0.006;
+          vec2 broadPoint = point * 0.145 + directedDrift;
+          vec2 warp = vec2(
+            fbm(broadPoint + vec2(5.2, 1.7)),
+            fbm(broadPoint + vec2(-3.8, 9.4))
+          ) - 0.5;
+          float broadField = fbm(broadPoint + warp * 1.85);
+          float brokenField = fbm(
+            point * 0.31 +
+            warp * 0.82 +
+            -flowDirection * clock * 0.128 +
+            flowNormal * clock * 0.014
+          );
+          float detailField = fbm(
+            point * 0.58 +
+            -flowDirection * clock * 0.17 -
+            flowNormal * clock * 0.026
+          );
+          return clamp(
+            broadField * 0.68 + brokenField * 0.24 + detailField * 0.08,
+            0.0,
+            1.0
+          );
+        }
+
+        void main() {
+          float revealAlpha = smoothstep(0.015, 0.16, reveal);
+          vec2 ndc = vUv * 2.0 - 1.0;
+          vec3 rayDirection = normalize(
+            viewForward +
+            viewRight * ndc.x * aspect * tanHalfFov +
+            viewUp * ndc.y * tanHalfFov
+          );
+
+          if (rayDirection.y >= -0.0001) {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, revealAlpha * smoothstep(0.86, 1.0, reveal));
+            return;
+          }
+
+          float rayDistance = (groundY - viewPosition.y) / rayDirection.y;
+          if (rayDistance <= 0.0) {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+            return;
+          }
+
+          vec3 groundPoint = viewPosition + rayDirection * rayDistance;
+          vec2 ground = groundPoint.xz;
+          vec2 seedOffset = vec2(fieldSeed * 0.071, -fieldSeed * 0.043);
+          float heightField = dataHeight(ground, time);
+          float edgeVariation = valueNoise(
+            ground * 1.72 +
+            seedOffset * 1.37 +
+            -flowDirection * time * 0.16
+          ) - 0.5;
+          float redPresence = smoothstep(
+            0.468,
+            0.548,
+            heightField + edgeVariation * 0.035
+          );
+
+          const float gridDensity = 3.15;
+          vec2 characterFlow = -flowDirection * time * 0.72;
+          vec2 gridPosition = ground * gridDensity + characterFlow;
+          vec2 cellId = floor(gridPosition);
+          vec2 cellUv = fract(gridPosition);
+          float cellPhase = hash21(cellId + seedOffset * 1.37);
+          float glitchRate = mix(
+            0.24,
+            0.72,
+            hash21(cellId * 0.41 + seedOffset * 2.11)
+          );
+          float glitchTime = time * glitchRate + cellPhase * 6.0;
+          float glitchSlot = floor(glitchTime);
+          float glitchProgress = fract(glitchTime);
+          float burstChance = hash21(
+            vec2(glitchSlot + fieldSeed, cellPhase * 31.0)
+          );
+          float burstStep = step(0.78, burstChance) *
+            floor(glitchProgress * 4.0);
+          float glyphPacket = glitchSlot * 5.0 + burstStep;
+          float cellSeed = hash21(
+            cellId +
+            seedOffset * 0.83 +
+            vec2(glyphPacket * 0.67, -glyphPacket * 1.09)
+          );
+          float glyphIndex = floor(cellSeed * 48.0);
+          vec2 atlasCell = vec2(mod(glyphIndex, 8.0), 7.0 - floor(glyphIndex / 8.0));
+          float glyph = texture2D(
+            glyphAtlas,
+            (atlasCell + vec2(cellUv.x, 1.0 - cellUv.y)) / 8.0
+          ).r;
+
+          float crest = smoothstep(0.61, 0.86, heightField);
+          vec3 deepRed = vec3(0.24, 0.0015, 0.018);
+          vec3 bloodRed = vec3(0.78, 0.006, 0.045);
+          vec3 peakRed = vec3(1.0, 0.018, 0.072);
+          vec3 surfaceColor = mix(deepRed, bloodRed, redPresence);
+          surfaceColor = mix(surfaceColor, peakRed, crest);
+          float redFront = smoothstep(0.015, 0.12, redPresence) *
+            (1.0 - smoothstep(0.12, 0.34, redPresence));
+          surfaceColor = mix(surfaceColor, peakRed, redFront * 0.58);
+
+          float cellEdge = min(
+            min(cellUv.x, 1.0 - cellUv.x),
+            min(cellUv.y, 1.0 - cellUv.y)
+          );
+          float cellBody = smoothstep(0.008, 0.03, cellEdge);
+          surfaceColor *= mix(0.56, 1.0, cellBody);
+          vec3 color = mix(
+            surfaceColor,
+            vec3(0.001, 0.0, 0.0005),
+            glyph * 0.94
+          );
+
+          float distanceFade = 1.0 - smoothstep(34.0, 92.0, rayDistance);
+          float redCoverage = smoothstep(0.006, 0.085, redPresence);
+          color *= distanceFade * redCoverage;
+
+          float revealDistance = length(vec2(ground.x * 0.72, ground.y));
+          float revealNoise = (heightField - 0.5) * 1.4;
+          float revealEdge = mix(-0.5, 15.5, reveal);
+          float radialReveal = 1.0 - smoothstep(
+            revealEdge - 0.75,
+            revealEdge + 0.4,
+            revealDistance + revealNoise
+          );
+          float revealMask = mix(
+            radialReveal,
+            1.0,
+            smoothstep(0.86, 1.0, reveal)
+          );
+          gl_FragColor = vec4(
+            max(color, vec3(0.0)),
+            revealAlpha * revealMask
+          );
+        }
+      `,
+    });
+    this.dataSea = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+    this.dataSea.name = "CARDSTREAM_DATA_SEA";
+    this.dataSea.frustumCulled = false;
+    this.dataSeaScene.add(this.dataSea);
+  }
+
+  updateDataSeaViewUniforms() {
+    if (!this.dataSeaUniforms) return;
+    this.camera.updateMatrixWorld(true);
+    this.dataSeaUniforms.aspect.value = this.camera.aspect;
+    this.dataSeaUniforms.tanHalfFov.value = Math.tan(
+      THREE.MathUtils.degToRad(this.camera.fov * 0.5)
+    );
+    this.dataSeaUniforms.viewPosition.value.copy(this.camera.position);
+    this.dataSeaUniforms.viewRight.value
+      .set(1, 0, 0)
+      .applyQuaternion(this.camera.quaternion);
+    this.dataSeaUniforms.viewUp.value
+      .set(0, 1, 0)
+      .applyQuaternion(this.camera.quaternion);
+    this.dataSeaUniforms.viewForward.value
+      .set(0, 0, -1)
+      .applyQuaternion(this.camera.quaternion);
+    this.dataSeaUniforms.flowDirection.value
+      .set(
+        this.camera.position.x - this.target.x,
+        this.camera.position.z - this.target.z
+      )
+      .normalize();
   }
 
   setupSignalPostProcess() {
@@ -83,7 +393,8 @@ class ArchiveCardModel {
     const material = new THREE.ShaderMaterial({
       name: "CARDSTREAM_SIGNAL_HAZE",
       uniforms: this.signalUniforms,
-      transparent: true,
+      transparent: false,
+      blending: THREE.NoBlending,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
@@ -156,7 +467,10 @@ class ArchiveCardModel {
             max(leftNear.a, rightNear.a),
             max(upNear.a, downNear.a)
           );
-          gl_FragColor = vec4(max(color, vec3(0.0)), max(source.a, haloAlpha * 0.38));
+          gl_FragColor = vec4(
+            max(color, vec3(0.0)),
+            max(source.a, haloAlpha * 0.38)
+          );
         }
       `,
     });
@@ -165,6 +479,258 @@ class ArchiveCardModel {
     this.signalQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
     this.signalQuad.frustumCulled = false;
     this.signalScene.add(this.signalQuad);
+
+    const createPostTarget = (name) => {
+      const target = new THREE.WebGLRenderTarget(1, 1, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        depthBuffer: false,
+        stencilBuffer: false,
+      });
+      target.texture.name = name;
+      return target;
+    };
+
+    this.signalOutputTarget = createPostTarget("CARDSTREAM_SIGNAL_OUTPUT");
+    this.sceneCompositeTarget = createPostTarget("CARDSTREAM_SCENE_COMPOSITE");
+    this.historyTargets = [
+      createPostTarget("CARDSTREAM_THERMAL_HISTORY_A"),
+      createPostTarget("CARDSTREAM_THERMAL_HISTORY_B"),
+    ];
+    this.historyReadIndex = 0;
+    this.historyUniforms = {
+      tCurrent: { value: this.signalOutputTarget.texture },
+      tHistory: { value: this.historyTargets[0].texture },
+      damp: { value: 0 },
+    };
+    const historyMaterial = new THREE.ShaderMaterial({
+      name: "CARDSTREAM_THERMAL_AFTERIMAGE",
+      uniforms: this.historyUniforms,
+      transparent: false,
+      blending: THREE.NoBlending,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tCurrent;
+        uniform sampler2D tHistory;
+        uniform float damp;
+        varying vec2 vUv;
+
+        void main() {
+          vec4 currentFrame = texture2D(tCurrent, vUv);
+          vec4 historyFrame = texture2D(tHistory, vUv);
+          vec4 retainedHistory = historyFrame * damp * step(
+            vec4(0.1),
+            historyFrame
+          );
+          gl_FragColor = max(currentFrame, retainedHistory);
+        }
+      `,
+    });
+    this.historyScene = new THREE.Scene();
+    this.historyCamera = new THREE.Camera();
+    this.historyQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      historyMaterial
+    );
+    this.historyQuad.frustumCulled = false;
+    this.historyScene.add(this.historyQuad);
+
+    this.presentUniforms = {
+      tDiffuse: { value: this.signalOutputTarget.texture },
+      tBackground: { value: this.dataSeaTarget.texture },
+      resolution: { value: new THREE.Vector2(1, 1) },
+      time: { value: 0 },
+      thermalAmount: { value: 0 },
+      thermalGlitchSeed: { value: this.thermalGlitchSeed },
+    };
+    const presentMaterial = new THREE.ShaderMaterial({
+      name: "CARDSTREAM_SIGNAL_PRESENT",
+      uniforms: this.presentUniforms,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform sampler2D tBackground;
+        uniform vec2 resolution;
+        uniform float time;
+        uniform float thermalAmount;
+        uniform float thermalGlitchSeed;
+        varying vec2 vUv;
+
+        float thermalNoise(vec2 point) {
+          return fract(sin(dot(point, vec2(12.9898, 78.233))) * 43758.5453);
+        }
+
+        vec4 sampleScene(vec2 uv) {
+          vec2 safeUv = clamp(uv, vec2(0.0), vec2(1.0));
+          vec4 foreground = texture2D(tDiffuse, safeUv);
+          vec4 background = texture2D(tBackground, safeUv);
+          float alpha = foreground.a + background.a * (1.0 - foreground.a);
+          vec3 premultiplied =
+            foreground.rgb * foreground.a +
+            background.rgb * background.a * (1.0 - foreground.a);
+          vec3 color = alpha > 0.0001 ? premultiplied / alpha : vec3(0.0);
+          return vec4(color, alpha);
+        }
+
+        void main() {
+          vec4 scene = sampleScene(vUv);
+          float transitionGate =
+            smoothstep(0.015, 0.16, thermalAmount) *
+            (1.0 - smoothstep(0.84, 0.985, thermalAmount));
+          float bandCount = 8.0 + floor(
+            thermalNoise(vec2(thermalGlitchSeed, 3.7)) * 5.0
+          );
+          float baseBand = floor(vUv.y * bandCount);
+          float bandJitter = thermalNoise(
+            vec2(baseBand + thermalGlitchSeed * 0.17, 17.4)
+          );
+          float bandId = floor(
+            (vUv.y + (bandJitter - 0.5) * 0.032) * bandCount
+          );
+          float segmentCount = 3.0 + floor(
+            thermalNoise(
+              vec2(bandId, 29.1 + thermalGlitchSeed * 0.23)
+            ) * 5.0
+          );
+          float segmentId = floor(vUv.x * segmentCount);
+          float sliceSeed = thermalNoise(
+            vec2(
+              bandId * 13.7 + thermalGlitchSeed * 0.31,
+              segmentId + 5.2
+            )
+          );
+          float sliceDirection = step(0.5, sliceSeed) * 2.0 - 1.0;
+          float slicePixels = mix(3.0, 12.0, sliceSeed) *
+            sliceDirection * transitionGate;
+          vec2 thermalUv = vUv + vec2(
+            slicePixels / max(resolution.x, 1.0),
+            0.0
+          );
+          vec4 thermalScene = sampleScene(thermalUv);
+
+          float heat = clamp(
+            max(
+              max(
+                thermalScene.r,
+                max(thermalScene.g, thermalScene.b)
+              ) * 0.95,
+              dot(
+                thermalScene.rgb,
+                vec3(0.299, 0.587, 0.114)
+              ) * 1.8
+            ),
+            0.0,
+            1.0
+          );
+          vec3 thermal = vec3(0.0);
+          thermal = mix(thermal, vec3(0.03, 0.00, 0.38), smoothstep(0.02, 0.14, heat));
+          thermal = mix(thermal, vec3(0.48, 0.00, 0.80), smoothstep(0.14, 0.30, heat));
+          thermal = mix(thermal, vec3(1.00, 0.05, 0.00), smoothstep(0.30, 0.50, heat));
+          thermal = mix(thermal, vec3(1.00, 0.55, 0.00), smoothstep(0.50, 0.70, heat));
+          thermal = mix(thermal, vec3(1.00, 0.95, 0.10), smoothstep(0.70, 0.86, heat));
+          thermal = mix(thermal, vec3(1.00), smoothstep(0.86, 0.98, heat));
+
+          float takeoverOrder = mix(
+            0.08,
+            0.92,
+            thermalNoise(
+              vec2(
+                bandId + 41.3,
+                segmentId * 7.9 + thermalGlitchSeed * 0.43
+              )
+            )
+          );
+          float faultTick = floor(time * 28.0);
+          float faultValue = thermalNoise(
+            vec2(
+              bandId * 19.1 + segmentId + thermalGlitchSeed * 0.59,
+              faultTick
+            )
+          );
+          float faultProgress = thermalAmount +
+            (faultValue - 0.5) * 0.26 * transitionGate;
+          float thermalField = smoothstep(
+            takeoverOrder - 0.055,
+            takeoverOrder + 0.055,
+            faultProgress
+          );
+          thermal = min(thermal * (1.0 + 0.30 * thermalField), vec3(1.0));
+          vec3 color = mix(scene.rgb, thermal, thermalField);
+
+          float splitPulse = transitionGate * step(0.82, faultValue);
+          vec2 splitOffset = vec2(2.4 / max(resolution.x, 1.0), 0.0);
+          vec3 separated = vec3(
+            sampleScene(vUv + splitOffset).r,
+            color.g,
+            sampleScene(vUv - splitOffset).b
+          );
+          color = mix(color, separated, splitPulse * 0.34);
+          gl_FragColor = vec4(color, scene.a);
+        }
+      `,
+    });
+    this.presentScene = new THREE.Scene();
+    this.presentCamera = new THREE.Camera();
+    this.presentQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      presentMaterial
+    );
+    this.presentQuad.frustumCulled = false;
+    this.presentScene.add(this.presentQuad);
+
+    this.displayUniforms = {
+      tDiffuse: { value: this.historyTargets[0].texture },
+    };
+    const displayMaterial = new THREE.ShaderMaterial({
+      name: "CARDSTREAM_SCENE_DISPLAY",
+      uniforms: this.displayUniforms,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = texture2D(tDiffuse, vUv);
+        }
+      `,
+    });
+    this.displayScene = new THREE.Scene();
+    this.displayCamera = new THREE.Camera();
+    this.displayQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      displayMaterial
+    );
+    this.displayQuad.frustumCulled = false;
+    this.displayScene.add(this.displayQuad);
   }
 
   addLights() {
@@ -655,6 +1221,11 @@ class ArchiveCardModel {
         });
 
         this.scene.add(root);
+        root.updateMatrixWorld(true);
+        const modelBounds = new THREE.Box3().setFromObject(root);
+        if (Number.isFinite(modelBounds.min.y)) {
+          this.dataSeaUniforms.groundY.value = modelBounds.min.y - 0.18;
+        }
         this.host.classList.add("is-loaded");
         this.host.querySelector(".archive-card-model__status")?.remove();
         this.setPosition(this.position);
@@ -687,7 +1258,15 @@ class ArchiveCardModel {
     this.renderer.setSize(width, height, false);
     const drawingSize = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     this.signalTarget?.setSize(drawingSize.x, drawingSize.y);
+    this.dataSeaTarget?.setSize(drawingSize.x, drawingSize.y);
+    this.signalOutputTarget?.setSize(drawingSize.x, drawingSize.y);
+    this.sceneCompositeTarget?.setSize(drawingSize.x, drawingSize.y);
+    this.historyTargets?.forEach((target) =>
+      target.setSize(drawingSize.x, drawingSize.y)
+    );
     this.signalUniforms?.resolution.value.copy(drawingSize);
+    this.presentUniforms?.resolution.value.copy(drawingSize);
+    this.clearThermalHistory();
     this.camera.aspect = width / height;
     const portrait = this.camera.aspect < 0.85;
     this.camera.position.set(
@@ -695,9 +1274,39 @@ class ArchiveCardModel {
       portrait ? 7.3 : 5.4,
       portrait ? 14.8 : 10.8
     );
-    this.camera.lookAt(this.target);
+    this.cameraBasePosition.copy(this.camera.position);
+    const cameraOffset = this.cameraBasePosition.clone().sub(this.target);
+    this.cameraOrbitRadius = Math.max(0.001, cameraOffset.length());
+    this.cameraOrbitAzimuth = Math.atan2(cameraOffset.z, cameraOffset.x);
+    this.cameraBaseElevation = Math.asin(
+      THREE.MathUtils.clamp(cameraOffset.y / this.cameraOrbitRadius, -1, 1)
+    );
+    this.applyCameraOrbit();
     this.camera.updateProjectionMatrix();
+    this.updateDataSeaViewUniforms();
     this.render();
+  }
+
+  applyCameraOrbit() {
+    const elevation = this.cameraBaseElevation + this.currentCameraOrbit;
+    const horizontalRadius = Math.cos(elevation) * this.cameraOrbitRadius;
+    this.camera.position.set(
+      this.target.x + Math.cos(this.cameraOrbitAzimuth) * horizontalRadius,
+      this.target.y + Math.sin(elevation) * this.cameraOrbitRadius,
+      this.target.z + Math.sin(this.cameraOrbitAzimuth) * horizontalRadius
+    );
+    this.camera.lookAt(this.target);
+  }
+
+  clearThermalHistory() {
+    if (!this.historyTargets?.length) return;
+    const previousTarget = this.renderer.getRenderTarget();
+    this.historyTargets.forEach((target) => {
+      this.renderer.setRenderTarget(target);
+      this.renderer.clear(true, false, false);
+    });
+    this.renderer.setRenderTarget(previousTarget);
+    this.historyReadIndex = 0;
   }
 
   setPosition(position) {
@@ -717,8 +1326,24 @@ class ArchiveCardModel {
     this.render();
   }
 
+  setThermalEnabled(enabled) {
+    const wasEnabled = this.thermalEnabled;
+    this.thermalEnabled = Boolean(enabled);
+    if (this.thermalEnabled && !wasEnabled) {
+      this.thermalGlitchSeed = Math.random() * 1000;
+      if (this.presentUniforms) {
+        this.presentUniforms.thermalGlitchSeed.value = this.thermalGlitchSeed;
+      }
+    }
+    if (!this.thermalEnabled) {
+      if (this.historyUniforms) this.historyUniforms.damp.value = 0;
+    }
+    this.render();
+  }
+
   setActive(active) {
     this.active = active;
+    this.dataSeaRevealTarget = active ? 1 : 0;
     if (active && !this.autoStartedAt) {
       this.autoStartedAt = performance.now() + 2600;
     }
@@ -732,6 +1357,25 @@ class ArchiveCardModel {
 
   setInteracting(interacting) {
     this.interacting = Boolean(interacting);
+    this.render();
+  }
+
+  adjustDragCameraOrbit(deltaY) {
+    if (!Number.isFinite(deltaY)) return;
+    const orbitLimit = THREE.MathUtils.degToRad(6);
+    this.cameraOrbitReturning = false;
+    this.cameraOrbitVelocity = 0;
+    this.targetCameraOrbit = THREE.MathUtils.clamp(
+      this.targetCameraOrbit + deltaY * 0.00045,
+      -orbitLimit,
+      orbitLimit
+    );
+    this.render();
+  }
+
+  releaseDragCameraOrbit() {
+    this.targetCameraOrbit = 0;
+    this.cameraOrbitReturning = true;
     this.render();
   }
 
@@ -750,6 +1394,52 @@ class ArchiveCardModel {
       (autoTarget - this.autoBlend) * (1 - Math.exp(-delta * 4.8));
     const autoTime = Math.max(0, time - (this.autoStartedAt || time));
     const autoRotation = Math.sin(autoTime / 7200) * Math.PI * 0.048;
+    const thermalTarget = this.thermalEnabled ? 1 : 0;
+    this.thermalAmount +=
+      (thermalTarget - this.thermalAmount) * (1 - Math.exp(-delta * 8));
+    if (Math.abs(thermalTarget - this.thermalAmount) < 0.001) {
+      this.thermalAmount = thermalTarget;
+    }
+    const linkedBurstProgress = Number(window.archiveHypercubeBurstProgress);
+    if (this.active && Number.isFinite(linkedBurstProgress)) {
+      const normalizedSeaProgress = THREE.MathUtils.clamp(
+        (linkedBurstProgress - 0.26) / 0.68,
+        0,
+        1
+      );
+      this.dataSeaReveal =
+        normalizedSeaProgress *
+        normalizedSeaProgress *
+        (3 - 2 * normalizedSeaProgress);
+    } else {
+      this.dataSeaReveal +=
+        (this.dataSeaRevealTarget - this.dataSeaReveal) *
+        (1 - Math.exp(-delta * 2.9));
+    }
+    this.dataSeaUniforms.time.value = this.reducedMotion ? 0 : time * 0.001;
+    this.dataSeaUniforms.reveal.value = this.dataSeaReveal;
+
+    if (this.cameraOrbitReturning) {
+      const orbitAcceleration =
+        (this.targetCameraOrbit - this.currentCameraOrbit) * 12 -
+        this.cameraOrbitVelocity * 5.8;
+      this.cameraOrbitVelocity += orbitAcceleration * delta;
+      this.currentCameraOrbit += this.cameraOrbitVelocity * delta;
+      if (
+        Math.abs(this.targetCameraOrbit - this.currentCameraOrbit) < 0.00025 &&
+        Math.abs(this.cameraOrbitVelocity) < 0.0012
+      ) {
+        this.currentCameraOrbit = this.targetCameraOrbit;
+        this.cameraOrbitVelocity = 0;
+        this.cameraOrbitReturning = false;
+      }
+    } else {
+      this.currentCameraOrbit +=
+        (this.targetCameraOrbit - this.currentCameraOrbit) *
+        (1 - Math.exp(-delta * 7));
+    }
+    this.applyCameraOrbit();
+    this.updateDataSeaViewUniforms();
 
     if (this.rig) {
       const nextRotation =
@@ -794,16 +1484,49 @@ class ArchiveCardModel {
       });
     }
     if (this.modelRoot) {
-      this.modelRoot.position.y = this.rootBaseY;
+      this.modelRoot.position.y = this.rootBaseY + this.rootDisplayOffsetY;
     }
 
+    this.renderer.setRenderTarget(this.dataSeaTarget);
+    this.renderer.render(this.dataSeaScene, this.camera);
     this.renderer.setRenderTarget(this.signalTarget);
     this.renderer.render(this.scene, this.camera);
-    this.renderer.setRenderTarget(null);
     this.signalUniforms.time.value = time * 0.001;
+    this.renderer.setRenderTarget(this.signalOutputTarget);
     this.renderer.render(this.signalScene, this.signalCamera);
+
+    this.presentUniforms.time.value = time * 0.001;
+    this.presentUniforms.thermalAmount.value = this.thermalAmount;
+    this.renderer.setRenderTarget(this.sceneCompositeTarget);
+    this.renderer.render(this.presentScene, this.presentCamera);
+
+    const historyWriteIndex = 1 - this.historyReadIndex;
+    const historyWriteTarget = this.historyTargets[historyWriteIndex];
+    this.historyUniforms.tCurrent.value = this.sceneCompositeTarget.texture;
+    this.historyUniforms.tHistory.value =
+      this.historyTargets[this.historyReadIndex].texture;
+    this.historyUniforms.damp.value = this.reducedMotion
+      ? 0
+      : 0.93 * this.thermalAmount;
+    this.renderer.setRenderTarget(historyWriteTarget);
+    this.renderer.render(this.historyScene, this.historyCamera);
+
+    this.displayUniforms.tDiffuse.value = historyWriteTarget.texture;
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.displayScene, this.displayCamera);
+    this.historyReadIndex = historyWriteIndex;
     const autoSettled = Math.abs(autoTarget - this.autoBlend) < 0.002;
-    if (this.active || !autoSettled) {
+    const thermalSettled =
+      Math.abs((this.thermalEnabled ? 1 : 0) - this.thermalAmount) < 0.002;
+    const cameraOrbitSettled =
+      !this.cameraOrbitReturning &&
+      Math.abs(this.targetCameraOrbit - this.currentCameraOrbit) < 0.00025;
+    if (
+      this.active ||
+      !autoSettled ||
+      !thermalSettled ||
+      !cameraOrbitSettled
+    ) {
       this.renderFrame = window.requestAnimationFrame((nextTime) =>
         this.tick(nextTime)
       );

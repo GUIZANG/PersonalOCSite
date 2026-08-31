@@ -68,6 +68,10 @@
   transform: translate3d(0, 0, 0);
 }
 
+.archive-card-stream.is-archive-interface-entering .archive-interface {
+  pointer-events: none;
+}
+
 .archive-interface button {
   appearance: none;
   border: 0;
@@ -1488,7 +1492,10 @@ body:not(.is-archive-overlay-open)
 
 .archive-card-model {
   position: absolute;
-  inset: -7% -2% -10%;
+  inset:
+    -7%
+    -2%
+    calc(-1 * clamp(108px, 14vh, 146px));
   z-index: 3;
   overflow: hidden;
   opacity: 0;
@@ -1505,6 +1512,116 @@ body:not(.is-archive-overlay-open)
 .archive-card-model.is-loaded {
   opacity: 1;
   transform: translate3d(0, 0, 0) scale(1);
+}
+
+.archive-thermal-toggle {
+  position: absolute;
+  bottom: clamp(98px, 13vh, 132px);
+  left: 50%;
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 92px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.88);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.62);
+  font-family: "supplyMono", monospace;
+  font-size: 7px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  cursor: none;
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+  transform: translateX(-50%);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
+}
+
+.archive-thermal-toggle i {
+  flex: 0 0 2px;
+  width: 2px;
+  height: 8px;
+  background: rgba(176, 20, 34, 0.42);
+  box-shadow: 0 0 0 rgba(213, 8, 28, 0);
+  transform-origin: 50% 100%;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.archive-thermal-toggle span {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.archive-thermal-toggle b {
+  color: rgba(255, 255, 255, 0.94);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.archive-thermal-toggle:hover,
+.archive-thermal-toggle:focus-visible {
+  border-color: rgba(176, 20, 34, 0.88);
+  outline: none;
+}
+
+.archive-thermal-toggle.is-active {
+  border-color: #b01422;
+  background: rgba(12, 0, 2, 0.94);
+  box-shadow:
+    inset 0 0 0 1px rgba(176, 20, 34, 0.18),
+    0 0 12px rgba(176, 20, 34, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.archive-thermal-toggle.is-active b {
+  color: #ef1830;
+}
+
+.archive-thermal-toggle.is-active i {
+  background: #ef1830;
+  box-shadow: 0 0 7px rgba(239, 24, 48, 0.72);
+}
+
+.archive-thermal-toggle.is-active span,
+.archive-thermal-toggle.is-active b {
+  animation: archiveThermalLabelSignal 260ms steps(2, end) both;
+}
+
+@keyframes archiveThermalLabelSignal {
+  0% {
+    opacity: 0.42;
+    transform: translateX(-2px);
+    text-shadow: 3px 0 rgba(239, 24, 48, 0.7);
+  }
+  38% {
+    opacity: 1;
+    transform: translateX(2px);
+    text-shadow: -2px 0 rgba(239, 24, 48, 0.45);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    text-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .archive-thermal-toggle.is-active span,
+  .archive-thermal-toggle.is-active b {
+    animation: none;
+  }
 }
 
 .archive-card-stream.is-archive-interface-ready

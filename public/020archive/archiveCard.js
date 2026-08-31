@@ -35,7 +35,7 @@
   ];
 
   const normalizeIndex = (index) =>
-    (index + THEMES.length) % THEMES.length;
+    ((index % THEMES.length) + THEMES.length) % THEMES.length;
 
   class ArchiveCardStream {
     constructor() {
@@ -49,9 +49,11 @@
       this.pointerStartX = null;
       this.dragStarted = false;
       this.dragStartThemeIndex = 0;
+      this.dragStartOrbitPosition = 0;
       this.dragPosition = 0;
       this.dragRawPosition = 0;
       this.lastDragClientX = 0;
+      this.lastDragClientY = 0;
       this.lastDragTime = 0;
       this.dragVelocity = 0;
       this.suppressClick = false;
@@ -65,6 +67,7 @@
       this.entranceTimer = 0;
       this.detentTimer = 0;
       this.modelView = null;
+      this.thermalEnabled = false;
 
       this.build();
       this.bindEvents();
@@ -176,6 +179,16 @@
               <span class="archive-card-model__status">ASSEMBLING / 3D</span>
             </div>
 
+            <button
+              class="archive-thermal-toggle"
+              type="button"
+              aria-pressed="false"
+              aria-label="Enable thermal imaging"
+            >
+              <i aria-hidden="true"></i>
+              <span>THERMAL</span><b>T–00</b>
+            </button>
+
             <div class="archive-orbit-assembly">
               <div class="archive-orbit__umbra" aria-hidden="true"></div>
               <div class="archive-orbit__floor" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -204,10 +217,38 @@
       this.railButtons = [];
       this.rail = this.stream.querySelector(".archive-screen-stage");
       this.modelHost = this.stream.querySelector("#archiveCardModel");
+      this.thermalButton = this.stream.querySelector(".archive-thermal-toggle");
     }
 
     bindEvents() {
+      this.thermalButton?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (this.stream.classList.contains("is-archive-interface-entering")) {
+          event.preventDefault();
+          return;
+        }
+        this.thermalEnabled = !this.thermalEnabled;
+        this.thermalButton.classList.toggle("is-active", this.thermalEnabled);
+        this.thermalButton.setAttribute(
+          "aria-pressed",
+          String(this.thermalEnabled)
+        );
+        this.thermalButton.setAttribute(
+          "aria-label",
+          this.thermalEnabled
+            ? "Disable thermal imaging"
+            : "Enable thermal imaging"
+        );
+        const state = this.thermalButton.querySelector("b");
+        if (state) state.textContent = this.thermalEnabled ? "T–01" : "T–00";
+        this.modelView?.setThermalEnabled(this.thermalEnabled);
+      });
+
       this.stream.addEventListener("click", (event) => {
+        if (this.stream.classList.contains("is-archive-interface-entering")) {
+          event.preventDefault();
+          return;
+        }
         if (event.detail !== 0 || this.suppressClick) {
           event.preventDefault();
           this.suppressClick = false;
@@ -220,7 +261,13 @@
       });
 
       this.modelHost?.addEventListener("pointerdown", (event) => {
-        if (!this.active || event.button !== 0) return;
+        if (
+          !this.active ||
+          this.stream.classList.contains("is-archive-interface-entering") ||
+          event.button !== 0
+        ) {
+          return;
+        }
 
         this.finishPendingTheme();
         this.cancelRailAnimation();
@@ -228,9 +275,11 @@
         this.pointerStartX = event.clientX;
         this.dragStarted = false;
         this.dragStartThemeIndex = this.themeIndex;
-        this.dragPosition = this.themeIndex;
-        this.dragRawPosition = this.themeIndex;
+        this.dragStartOrbitPosition = this.orbitPosition;
+        this.dragPosition = this.orbitPosition;
+        this.dragRawPosition = this.orbitPosition;
         this.lastDragClientX = event.clientX;
+        this.lastDragClientY = event.clientY;
         this.lastDragTime = performance.now();
         this.dragVelocity = 0;
         this.suppressClick = false;
@@ -239,7 +288,14 @@
       });
 
       this.stream.addEventListener("pointermove", (event) => {
-        if (!this.active || this.pointerId !== null) return;
+        if (
+          !this.active ||
+          this.stream.classList.contains("is-archive-interface-entering") ||
+          this.pointerId !== null
+        ) {
+          this.modelView?.setHovered(false);
+          return;
+        }
         const modelRect = this.modelHost?.getBoundingClientRect();
         const railRect = this.rail?.getBoundingClientRect();
         const overModel = Boolean(
@@ -286,7 +342,7 @@
           );
         }
 
-        this.updateRailDrag(event.clientX);
+        this.updateRailDrag(event.clientX, event.clientY);
       });
 
       this.modelHost?.addEventListener("pointerup", (event) => {
@@ -358,6 +414,7 @@
               : event.deltaY;
           if (
             !this.active ||
+            this.stream.classList.contains("is-archive-interface-entering") ||
             this.pointerId !== null ||
             Math.abs(wheelDelta) < 5
           ) {
@@ -380,6 +437,7 @@
       window.addEventListener("keydown", (event) => {
         if (
           !this.active ||
+          this.stream.classList.contains("is-archive-interface-entering") ||
           this.pointerId !== null ||
           document.body.classList.contains("is-archive-overlay-open") ||
           event.metaKey ||
@@ -421,24 +479,20 @@
       }, 1500);
     }
 
-    updateRailDrag(clientX) {
+    updateRailDrag(clientX, clientY) {
       if (!this.modelHost || this.pointerStartX === null) return;
       const rect = this.modelHost.getBoundingClientRect();
       if (!rect.width) return;
 
       const pixelsPerScreen = Math.max(180, Math.min(420, rect.width * 0.24));
-      const rawPosition = Math.min(
-        THEMES.length - 1,
-        Math.max(
-          0,
-          this.dragStartThemeIndex +
-            (this.pointerStartX - clientX) / pixelsPerScreen
-        )
-      );
+      const rawPosition =
+        this.dragStartOrbitPosition +
+        (this.pointerStartX - clientX) / pixelsPerScreen;
       const now = performance.now();
       const elapsed = Math.max(8, now - this.lastDragTime);
       const instantaneousVelocity =
         (this.lastDragClientX - clientX) / elapsed;
+      const verticalDelta = clientY - this.lastDragClientY;
 
       this.dragVelocity =
         this.dragVelocity * 0.7 + instantaneousVelocity * 0.3;
@@ -456,12 +510,13 @@
         0.5;
       const position = nearestDetent + magneticDistance;
       const progress = position / (THEMES.length - 1);
-      const nextIndex = Math.round(rawPosition);
+      const nextIndex = normalizeIndex(Math.round(rawPosition));
       const previousPosition = this.dragPosition;
 
       this.dragPosition = position;
       this.dragRawPosition = rawPosition;
       this.lastDragClientX = clientX;
+      this.lastDragClientY = clientY;
       this.lastDragTime = now;
       this.stream.dataset.screenDirection =
         position >= previousPosition ? "next" : "previous";
@@ -485,7 +540,9 @@
         "--archive-orbit-depth",
         `${depth.toFixed(2)}px`
       );
-      this.setRailProgress(progress);
+      this.modelView?.adjustDragCameraOrbit(verticalDelta);
+      this.setRailProgress(progress, false);
+      this.setOrbitPosition(position);
     }
 
     finishPointerInteraction(cancelled = false, releaseCapture = true) {
@@ -496,6 +553,7 @@
       this.pointerId = null;
       this.pointerStartX = null;
       this.dragStarted = false;
+      if (didDrag) this.modelView?.releaseDragCameraOrbit();
 
       if (releaseCapture) {
         try {
@@ -515,20 +573,27 @@
 
       if (cancelled) {
         this.applyTheme(this.dragStartThemeIndex, false);
-      } else {
-        const snapIndex = Math.min(
-          THEMES.length - 1,
-          Math.max(0, Math.round(this.dragRawPosition))
+        const cycleOffset = Math.round(
+          (this.orbitPosition - this.dragStartThemeIndex) / THEMES.length
         );
+        this.finishRailDrag(
+          this.dragStartThemeIndex + cycleOffset * THEMES.length
+        );
+      } else {
+        const targetOrbitPosition = Math.round(this.dragRawPosition);
+        const snapIndex = normalizeIndex(targetOrbitPosition);
         if (snapIndex !== this.themeIndex) {
           this.applyTheme(snapIndex, false);
         }
+        this.finishRailDrag(targetOrbitPosition);
       }
-      this.finishRailDrag();
     }
 
-    finishRailDrag() {
+    finishRailDrag(targetOrbitPosition = Math.round(this.dragRawPosition)) {
       const changed = this.themeIndex !== this.dragStartThemeIndex;
+      const settleDirection = Math.sign(
+        targetOrbitPosition - this.orbitPosition
+      );
       this.stream.classList.remove(
         "is-screen-dragging",
         "is-carousel-rail-dragging"
@@ -539,9 +604,11 @@
       this.resetScreenTransform();
       this.animateRailTo(
         this.themeIndex / (THEMES.length - 1),
-        this.stream.dataset.screenDirection === "previous" ? -1 : 1,
-        this.dragVelocity,
-        760
+        settleDirection ||
+          (this.stream.dataset.screenDirection === "previous" ? -1 : 1),
+        0,
+        760,
+        targetOrbitPosition
       );
       window.clearTimeout(this.transitionTimer);
       this.transitionTimer = window.setTimeout(() => {
@@ -696,6 +763,7 @@
       this.modelView.setPosition(this.orbitPosition);
       this.modelView.setTheme(this.themeIndex);
       this.modelView.setActive(this.active);
+      this.modelView.setThermalEnabled(this.thermalEnabled);
     }
 
     setRailProgress(progress, syncOrbit = true) {
@@ -723,7 +791,13 @@
       );
     }
 
-    animateRailTo(targetProgress, direction, velocity = 0, duration = 780) {
+    animateRailTo(
+      targetProgress,
+      direction,
+      velocity = 0,
+      duration = 780,
+      absoluteOrbitTarget = null
+    ) {
       this.cancelRailAnimation();
 
       const target = Math.min(1, Math.max(0, targetProgress));
@@ -731,23 +805,27 @@
       const travel = target - position;
       const resolvedDirection =
         direction || (travel === 0 ? 1 : Math.sign(travel));
+      const railDirection = travel === 0 ? 0 : Math.sign(travel);
       let springVelocity =
-        resolvedDirection *
-        Math.min(1.7, 0.34 + Math.abs(velocity) * 0.38);
+        railDirection * Math.min(0.55, Math.abs(velocity) * 0.18);
       const startTime = performance.now();
       let previousTime = startTime;
-      const railStart = position;
       const orbitStart = this.orbitPosition;
       const targetThemePosition = target * (THEMES.length - 1);
-      let orbitTarget = targetThemePosition;
-      if (resolvedDirection > 0) {
-        while (orbitTarget < orbitStart - 0.001) orbitTarget += THEMES.length;
-      } else if (resolvedDirection < 0) {
-        while (orbitTarget > orbitStart + 0.001) orbitTarget -= THEMES.length;
+      let orbitTarget = Number.isFinite(absoluteOrbitTarget)
+        ? absoluteOrbitTarget
+        : targetThemePosition;
+      if (!Number.isFinite(absoluteOrbitTarget)) {
+        if (resolvedDirection > 0) {
+          while (orbitTarget < orbitStart - 0.001) orbitTarget += THEMES.length;
+        } else if (resolvedDirection < 0) {
+          while (orbitTarget > orbitStart + 0.001) orbitTarget -= THEMES.length;
+        }
       }
       const stiffness = 112;
       const damping = 17.5;
       const maximumDuration = Math.max(720, duration + 240);
+      const orbitDuration = Math.min(680, Math.max(420, duration * 0.82));
 
       this.railAnimating = true;
       this.modelView?.setInteracting(true);
@@ -768,16 +846,17 @@
         }
 
         this.setRailProgress(position, false);
-        const railTravel = target - railStart;
-        const travelProgress = Math.abs(railTravel) > 0.0001
-          ? (position - railStart) / railTravel
-          : Math.min(1, (time - startTime) / maximumDuration);
-        this.setOrbitPosition(
-          orbitStart + (orbitTarget - orbitStart) * travelProgress
-        );
-        const settled =
+        const orbitTime = Math.min(1, (time - startTime) / orbitDuration);
+        const travelProgress = orbitTime * orbitTime * (3 - 2 * orbitTime);
+        const currentOrbitPosition =
+          orbitStart + (orbitTarget - orbitStart) * travelProgress;
+        this.setOrbitPosition(currentOrbitPosition);
+        const railSettled =
           Math.abs(target - position) < 0.00035 &&
           Math.abs(springVelocity) < 0.0035;
+        const orbitSettled =
+          Math.abs(orbitTarget - currentOrbitPosition) < 0.0005;
+        const settled = railSettled && orbitSettled;
         if (!settled && time - startTime < maximumDuration) {
           this.railAnimationFrame = window.requestAnimationFrame(animate);
           return;

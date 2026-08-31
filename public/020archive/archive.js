@@ -45,10 +45,8 @@
         particle: 0xffffff, // pure-white hypercube (dormant)
         hoverParticle: 0xffffff, // cube is hidden on hover; kept white regardless
         pressParticle: 0xc21f2d, // eye/rays turn a slightly darker/deeper red on press
-        burstParticle: 0xff2338, // red starfield after burst
         dust: 0xffffff, // white eye so the difference blend renders a clean inverse
         ray: 0xffffff, // white rays for the same inverse effect
-        trail: 0xff2338,
       };
       const initialPalette = this.themePalette;
       this.background = initialPalette.background;
@@ -65,6 +63,7 @@
       this.isHoverDustExiting = false;
       this.burstAmount = 0;
       this.burstTarget = 0;
+      this.cardStreamActivationPending = false;
       this.pressAmount = 0;
       this.pressStartTime = 0;
       this.pressPointerId = null;
@@ -72,6 +71,7 @@
       this.restingCubeScale = 1.15;
       this.hoverEnterRadiusRatio = 0.16 * this.restingCubeScale;
       this.hoverExitRadiusRatio = 0.4;
+      this.initialHoverReleaseRadiusRatio = this.hoverEnterRadiusRatio + 0.025;
       this.pressRadiusRatio = 0.06;
       this.pressOffsetXRatio = 0;
       this.pressOffsetYRatio = 0;
@@ -122,12 +122,6 @@
         progress: "",
         tension: "",
       };
-      this.trails = null;
-      this.trailMat = null;
-      this.burstPositionAttribute = null;
-      this.trailBurstPositionAttribute = null;
-      this.burstSourceIndices = [];
-      this.trailSourceIndices = [];
       this.hoverTargetPoints = [];
       this.ambientHud = document.getElementById("archiveAmbientHud");
       this.hudSignal = document.getElementById("archiveHudSignal");
@@ -173,30 +167,24 @@
       this.verticalSyncActive = false;
       this.verticalSyncStart = 0;
       this.verticalSyncDuration = 480;
+      this.preloaderComplete = !document.body.classList.contains("archive-is-loading");
+      this.initialHoverGatePending = !this.preloaderComplete;
+      this.initialHoverBlocked = false;
+      this.lastPhysicalPointer = null;
       this.scene = new THREE.Scene();
       // Transparent while dormant so the DOM nested-frame background (z-index
       // below the canvas) shows through the empty areas around the particles.
-      // Once the cube bursts into the card stream we restore an opaque dark
-      // backdrop (see animate) so the settled starfield keeps its soft look.
+      // Once the cube transitions into the card stream, restore an opaque dark
+      // backdrop so the display model has a stable, uncluttered field.
       this.scene.background = null;
       this.sceneBackgroundColor = new THREE.Color(this.background);
-      this.fadeScene = new THREE.Scene();
-      this.fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      this.fadeMaterial = new THREE.MeshBasicMaterial({
-        color: this.background,
-        transparent: true,
-        opacity: 0.16,
-        depthTest: false,
-        depthWrite: false,
-      });
-      this.fadeScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.fadeMaterial));
 
       this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
       this.camera.position.set(0, 0, 6);
 
       // The liquid-glass pass samples this WebGL canvas via drawImage(). Keep
       // the presented frame available so the card refraction can see the main
-      // cardstream starfield/hypercube background instead of a cleared buffer.
+      // card stream/hypercube background instead of a cleared buffer.
       this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -235,6 +223,8 @@
       this.onPointerLeave = this.onPointerLeave.bind(this);
       this.onPointerDown = this.onPointerDown.bind(this);
       this.onPointerUp = this.onPointerUp.bind(this);
+      this.trackPhysicalPointer = this.trackPhysicalPointer.bind(this);
+      this.onPreloaderComplete = this.onPreloaderComplete.bind(this);
     }
 
     createVerticalSyncPass() {
@@ -379,37 +369,66 @@
       this.baseRayColor.setHex(palette.ray);
       this.scene?.background?.setHex(palette.background);
       this.renderer?.setClearColor(palette.background, 0);
-      this.fadeMaterial?.color?.setHex(palette.background);
       this.mat?.uniforms.uColor.value.setHex(palette.particle);
       this.hoverDustMat?.uniforms.uColor.value.setHex(palette.dust);
       this.hoverDustRayMat?.uniforms.uColor.value.setHex(palette.ray);
-      this.trailMat?.uniforms.uColor.value.setHex(palette.trail);
     }
 
     updateArchiveThemeRenderColors() {
       const palette = this.themePalette;
+      const pressColorAmount = this.pressAmount * (1 - this.burstAmount);
 
       this.themeRenderColor
         .setHex(palette.particle)
         .lerp(this.themeTargetColor.setHex(palette.hoverParticle), this.hoverAmount)
-        .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount)
-        .lerp(this.themeTargetColor.setHex(palette.burstParticle), this.burstAmount);
+        .lerp(this.themeTargetColor.setHex(palette.pressParticle), pressColorAmount);
       // Eye + rays are pure white on plain hover (normal compositing) and share one
       // white->red ramp so the whole assembly reddens together as the long-press
       // deepens. The canvas' difference blend is enabled ONLY during the press, so
       // the reddening reads as a live inverse of the background frames.
       this.themeDustRenderColor
         .setHex(palette.dust)
-        .lerp(this.themeTargetColor.setHex(palette.pressParticle), this.pressAmount);
+        .lerp(this.themeTargetColor.setHex(palette.pressParticle), pressColorAmount);
 
       this.mat?.uniforms.uColor.value.copy(this.themeRenderColor);
       this.hoverDustMat?.uniforms.uColor.value.copy(this.themeDustRenderColor);
       this.hoverDustRayMat?.uniforms.uColor.value.copy(this.themeDustRenderColor);
     }
 
+    createTransitionGlyphAtlas() {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      const grid = 8;
+      const cell = 64;
+      const glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+-=?!";
+      canvas.width = grid * cell;
+      canvas.height = grid * cell;
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#fff";
+      context.font = '700 38px "supplyMono", monospace';
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      for (let row = 0; row < grid; row += 1) {
+        for (let column = 0; column < grid; column += 1) {
+          const glyph = glyphs[(row * grid + column) % glyphs.length];
+          context.fillText(
+            glyph,
+            column * cell + cell * 0.5,
+            row * cell + cell * 0.52
+          );
+        }
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.NearestFilter;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
     async init() {
       const cubeParticlesPerEdge = 400;
-      const burstParticlesPerEdge = 200;
       const initialHoverCoreParticlesPerEdge = 1800;
       const hoverCoreParticlesPerEdge = 7200;
       const hoverScatterParticlesPerEdge = 0;
@@ -428,15 +447,13 @@
       const posStart = new Float32Array(totalParticles * 3);
       const posEnd = new Float32Array(totalParticles * 3);
       const squarePos = new Float32Array(totalParticles * 3);
-      const burstPos = new Float32Array(totalParticles * 3);
       const offsets = new Float32Array(totalParticles);
       const cubeMask = new Float32Array(totalParticles);
-      const burstMask = new Float32Array(totalParticles);
       const hoverMask = new Float32Array(totalParticles);
       const pressThreshold = new Float32Array(totalParticles);
+      const particleIndex = new Float32Array(totalParticles);
       this.fillRandomOffsets(offsets);
       let pIdx = 0;
-      let burstVisibleIndex = 0;
       let cubeVisibleIndex = 0;
 
       this.hoverTargetPoints = await this.loadHoverTargetPoints(
@@ -458,9 +475,7 @@
       const edgePoint = new THREE.Vector3();
       const start = new THREE.Vector3();
       const end = new THREE.Vector3();
-      const burst = new THREE.Vector3();
       const square = new THREE.Vector3();
-      const burstSide = this.getBurstSideLength();
 
       for (let edgeIndex = 0; edgeIndex < edgeLinks.length; edgeIndex++) {
         const edge = edgeLinks[edgeIndex];
@@ -474,17 +489,11 @@
           start.copy(edgePoint).multiplyScalar(outerScale);
           end.copy(edgePoint).multiplyScalar(innerScale);
           const isCubeVisible = this.isVisibleSample(p, hoverParticlesPerEdge, cubeParticlesPerEdge);
-          const isBurstVisible = this.isVisibleSample(p, hoverParticlesPerEdge, burstParticlesPerEdge);
           const isCoreLayer = p < hoverCoreParticlesPerEdge;
           const isInitialCoreVisible = isCoreLayer &&
             this.isVisibleSample(p, hoverCoreParticlesPerEdge, initialHoverCoreParticlesPerEdge);
           const isScatterLayer = !isCoreLayer;
           const inward = isCubeVisible ? cubeVisibleIndex % 2 === 0 : pIdx % 2 === 0;
-          const burstIndex = isBurstVisible ? burstVisibleIndex++ : pIdx;
-          const burstTotal = isBurstVisible
-            ? edgeLinks.length * burstParticlesPerEdge
-            : totalParticles;
-          this.getBurstPoint(burstIndex, burstTotal, burst, burstSide);
           this.getHoverTargetPoint(pIdx, totalParticles, square);
 
           this.setParticleData(
@@ -494,14 +503,12 @@
             posStart,
             posEnd,
             squarePos,
-            burstPos,
-            burst,
             square
           );
           cubeMask[pIdx] = isCubeVisible ? 1 : 0;
-          burstMask[pIdx] = isBurstVisible ? 1 : 0;
           hoverMask[pIdx] = (isInitialCoreVisible || isScatterLayer) ? 1 : 0;
           pressThreshold[pIdx] = isCoreLayer ? Math.max(Utils.hash(pIdx * 23.17 + 5.91), 0.001) : 2;
+          particleIndex[pIdx] = pIdx;
           if (isCubeVisible) cubeVisibleIndex++;
           pIdx++;
         }
@@ -516,13 +523,13 @@
       geo.setAttribute("position", new THREE.BufferAttribute(posStart, 3));
       geo.setAttribute("targetPos", new THREE.BufferAttribute(posEnd, 3));
       geo.setAttribute("squarePos", new THREE.BufferAttribute(squarePos, 3));
-      geo.setAttribute("burstPos", new THREE.BufferAttribute(burstPos, 3));
       geo.setAttribute("offset", new THREE.BufferAttribute(offsets, 1));
       geo.setAttribute("cubeMask", new THREE.BufferAttribute(cubeMask, 1));
-      geo.setAttribute("burstMask", new THREE.BufferAttribute(burstMask, 1));
       geo.setAttribute("hoverMask", new THREE.BufferAttribute(hoverMask, 1));
       geo.setAttribute("pressThreshold", new THREE.BufferAttribute(pressThreshold, 1));
-      this.burstPositionAttribute = geo.getAttribute("burstPos");
+      geo.setAttribute("particleIndex", new THREE.BufferAttribute(particleIndex, 1));
+
+      this.transitionGlyphAtlas = this.createTransitionGlyphAtlas();
 
       this.mat = new THREE.ShaderMaterial({
         uniforms: {
@@ -535,6 +542,7 @@
           uHoverTilt: { value: new THREE.Matrix3() },
           uEyeShift: { value: new THREE.Vector2(0, 0) },
           uSignalLoss: { value: 0 },
+          uGlyphAtlas: { value: this.transitionGlyphAtlas },
         },
         vertexShader: `
           uniform float uTime;
@@ -545,15 +553,18 @@
           uniform mat3 uHoverTilt;
           uniform vec2 uEyeShift;
           uniform float uSignalLoss;
+          uniform sampler2D uGlyphAtlas;
           attribute vec3 targetPos;
           attribute vec3 squarePos;
-          attribute vec3 burstPos;
           attribute float offset;
           attribute float cubeMask;
-          attribute float burstMask;
           attribute float hoverMask;
           attribute float pressThreshold;
+          attribute float particleIndex;
           varying float vAlpha;
+          varying float vIntensity;
+          varying float vBurstMorph;
+          varying float vGlyphIndex;
 
           float cubicBezierX(float t, float x1, float x2) {
             return 3.0 * (1.0 - t) * (1.0 - t) * t * x1 + 3.0 * (1.0 - t) * t * t * x2 + t * t * t;
@@ -579,6 +590,10 @@
             }
 
             return 3.0 * (1.0 - t) * (1.0 - t) * t * y1 + 3.0 * (1.0 - t) * t * t * y2 + t * t * t;
+          }
+
+          float particleHash(float value) {
+            return fract(sin(value * 91.731 + 17.13) * 43758.5453);
           }
 
           void main() {
@@ -635,27 +650,42 @@
             float swirlAmt = arc * (0.35 + 0.4 * fract(offset * 3.17));
             vec3 collapsedPos = straightPos + swirlTangent * swirlAmt;
 
-            float radius = length(burstPos.xy);
-            float orbitSpeed = mix(0.05, 0.2, fract(offset * 19.73));
-            orbitSpeed *= mix(1.35, 0.55, smoothstep(0.0, 6.5, radius));
-            float angle = uTime * orbitSpeed + offset * 6.2831853;
-            float ca = cos(angle);
-            float sa = sin(angle);
-            vec3 orbitBurst = vec3(
-              burstPos.x * ca - burstPos.y * sa,
-              burstPos.x * sa + burstPos.y * ca,
-              burstPos.z
-            );
             float burstEase = cubicBezierEase(uBurst);
-            float orbitEase = smoothstep(0.96, 1.0, burstEase);
-            vec3 burstTarget = mix(burstPos, orbitBurst, orbitEase);
-            vec3 currentPos = mix(collapsedPos, burstTarget, burstEase);
+            float burstFlight = cubicBezierEase(smoothstep(0.015, 0.78, uBurst));
+            float bridgeStride = 7.0;
+            float bridgeIndex = floor(particleIndex / bridgeStride);
+            float bridgeParticle = 1.0 - step(1.0, mod(particleIndex, bridgeStride));
+            float columns = 144.0;
+            float rows = 86.0;
+            float column = mod(bridgeIndex, columns);
+            float row = floor(bridgeIndex / columns);
+            float rowProgress = clamp(row / (rows - 1.0), 0.0, 1.0);
+            float columnProgress = column / (columns - 1.0) * 2.0 - 1.0;
+            float fieldHalfWidth = mix(6.35, 2.75, rowProgress);
+            float wave =
+              sin(columnProgress * 4.2 + rowProgress * 5.7 + uTime * 0.44) * 0.055 +
+              sin(columnProgress * -2.1 + rowProgress * 8.4 - uTime * 0.29) * 0.026;
+            vec3 dataSeaBridge = vec3(
+              columnProgress * fieldHalfWidth,
+              mix(-3.18, 0.58, rowProgress) + wave * smoothstep(0.3, 1.0, uBurst),
+              mix(1.15, -2.7, rowProgress)
+            );
+            float releaseArc = sin(burstFlight * 3.14159265);
+            dataSeaBridge.y += releaseArc * (0.18 + rowProgress * 0.16);
+            vec3 currentPos = mix(collapsedPos, dataSeaBridge, burstFlight);
             float pressReveal = step(pressThreshold, uPress);
             float edgeAmount = smoothstep(1.08, 1.66, max(abs(squarePos.x), abs(squarePos.y)));
             float edgeAlpha = mix(1.0, 0.5, edgeAmount);
             float hoverAlpha = max(hoverMask, pressReveal) * edgeAlpha;
             float stageAlpha = mix(cubeMask, hoverAlpha, hoverEase);
-            vAlpha = mix(stageAlpha, burstMask, burstEase);
+            float fieldStructure = smoothstep(0.1, 0.7, uBurst);
+            float bridgeFade = 1.0 - smoothstep(0.72, 0.985, uBurst);
+            vAlpha = stageAlpha
+              * mix(1.0, bridgeParticle * mix(0.86, 0.34, rowProgress), fieldStructure)
+              * bridgeFade;
+            vIntensity = mix(1.18, mix(1.08, 0.68, rowProgress), burstEase);
+            vBurstMorph = smoothstep(0.16, 0.62, uBurst) * bridgeParticle;
+            vGlyphIndex = mod(bridgeIndex, 48.0);
 
             // Signal-loss glitch: horizontal slice tearing + point dropout, only
             // meaningful before the burst so the cube reads like a failing feed.
@@ -669,23 +699,43 @@
             }
 
             vec4 mvPosition = modelViewMatrix * vec4(currentPos, 1.0);
-            float dustScale = mix(1.0, 0.72, burstEase);
-            gl_PointSize = (uResolution / 190.5) * dustScale * (1.0 / -mvPosition.z);
+            float eyePointSize = (uResolution / 190.5) * (1.0 / -mvPosition.z);
+            float glyphPointSize = (uResolution / 165.0) * (5.0 / -mvPosition.z);
+            gl_PointSize = mix(eyePointSize, glyphPointSize, vBurstMorph);
             gl_Position = projectionMatrix * mvPosition;
           }
         `,
         fragmentShader: `
           uniform vec3 uColor;
+          uniform float uBurst;
+          uniform sampler2D uGlyphAtlas;
           varying float vAlpha;
+          varying float vIntensity;
+          varying float vBurstMorph;
+          varying float vGlyphIndex;
 
           void main() {
             if (vAlpha <= 0.001) discard;
-            // Rounded-square sprite: small corner radius, filled body.
             vec2 p = abs(gl_PointCoord - vec2(0.5));
             float r = 0.12;
             vec2 q = p - (0.5 - r);
-            if (length(max(q, 0.0)) - r > 0.0) discard;
-            gl_FragColor = vec4(uColor, vAlpha);
+            float squareMask = 1.0 - step(0.0, length(max(q, 0.0)) - r);
+            vec2 atlasCell = vec2(
+              mod(vGlyphIndex, 8.0),
+              7.0 - floor(vGlyphIndex / 8.0)
+            );
+            float glyphMask = texture2D(
+              uGlyphAtlas,
+              (atlasCell + vec2(gl_PointCoord.x, 1.0 - gl_PointCoord.y)) / 8.0
+            ).r;
+            float spriteMask = mix(squareMask, glyphMask, vBurstMorph);
+            if (spriteMask < 0.08) discard;
+            vec3 signalRed = vec3(0.82, 0.018, 0.07);
+            vec3 particleColor = mix(uColor, signalRed, smoothstep(0.08, 0.42, uBurst));
+            gl_FragColor = vec4(
+              particleColor * vIntensity,
+              vAlpha * spriteMask
+            );
           }
         `,
         transparent: true,
@@ -701,10 +751,20 @@
       this.scene.add(this.cubeCloud);
       this.applyHypercubeOffset();
 
-      this.createTrails(burstPos, offsets, burstMask);
       this.applyArchiveThemeColors();
 
       window.addEventListener("resize", this.onResize);
+      window.addEventListener("pointermove", this.trackPhysicalPointer, {
+        capture: true,
+        passive: true,
+      });
+      if (!this.preloaderComplete) {
+        window.addEventListener(
+          "archive:preloader-complete",
+          this.onPreloaderComplete,
+          { once: true }
+        );
+      }
       this.container.addEventListener("pointermove", this.onPointerMove);
       this.container.addEventListener("pointerleave", this.onPointerLeave);
       this.container.addEventListener("pointerdown", this.onPointerDown);
@@ -731,11 +791,8 @@
         const baseSpeed = (Math.PI * 2) / msToSeconds; // rad/s
 
         if (this.burstTarget > 0) {
-          // Burst: ease the whole cube back to identity orientation. The red-dot
-          // starfield lives on this rotating cubeCloud, but the trails are a
-          // separate world-space object that is never rotated — so any leftover
-          // cube spin would make the dots and their trails point different ways.
-          // Easing (not snapping) keeps the collapse->starfield hand-off smooth.
+          // Settle the particle assembly toward its identity orientation while it
+          // fades, keeping the hand-off to the card stream visually stable.
           this.cubeSpinY = (this.cubeSpinY || 0) * 0.9;
           this.cubeCloud.rotation.x *= 0.9;
           this.cubeCloud.rotation.y = this.cubeSpinY;
@@ -774,6 +831,17 @@
       this.hoverDustAmount += (this.hoverDustTarget - this.hoverDustAmount) * 0.12;
       this.updateHoverLookTransform();
       this.burstAmount += (this.burstTarget - this.burstAmount) * 0.025;
+      if (this.burstTarget > 0) {
+        window.archiveHypercubeBurstProgress = this.burstAmount;
+        if (
+          this.cardStreamActivationPending &&
+          this.burstAmount >= 0.4 &&
+          this.cardStream
+        ) {
+          this.cardStreamActivationPending = false;
+          this.cardStream.activate();
+        }
+      }
 
       if (this.pressPointerId !== null && this.burstTarget === 0) {
         this.pressAmount = Math.min((performance.now() - this.pressStartTime) / this.longPressDuration, 1);
@@ -811,16 +879,8 @@
         this.hoverDustRayMat.uniforms.uHover.value = this.hoverDustAmount;
         this.hoverDustRayMat.uniforms.uBurst.value = this.burstAmount;
       }
-      const trailAmount = smoothstep(0.82, 0.96, this.burstAmount);
-
-      if (this.trailMat) {
-        this.trailMat.uniforms.uTime.value = time / 1000;
-        this.trailMat.uniforms.uBurst.value = trailAmount;
-      }
-
-      // Transparent only while dormant/hover/press (so the frame background shows
-      // through); opaque dark backdrop once bursting into the card stream, which
-      // restores the soft look of the settled red starfield.
+      // Transparent during the Hypercube stages so the nested DOM frames remain
+      // visible; opaque during Card Stream so its model sits in a clean dark field.
       const opaqueStage = this.burstAmount > 0.001 || this.burstTarget > 0;
       if (opaqueStage !== this.lastOpaqueStage) {
         this.lastOpaqueStage = opaqueStage;
@@ -836,11 +896,6 @@
 
       if (this.verticalSyncActive) {
         this.renderVerticalSyncFrame();
-      } else if (trailAmount > 0.001) {
-        this.renderer.autoClear = false;
-        this.fadeMaterial.opacity = THREE.MathUtils.lerp(0.34, 0.08, trailAmount);
-        this.renderer.render(this.fadeScene, this.fadeCamera);
-        this.renderer.render(this.scene, this.camera);
       } else {
         this.renderer.autoClear = true;
         this.renderer.render(this.scene, this.camera);
@@ -963,7 +1018,53 @@
         this.hoverDustGroup.position.set(hoverCenter.x, hoverCenter.y, 0);
       }
       this.updatePressTargetGuide();
-      this.updateBurstPositions();
+    }
+
+    trackPhysicalPointer(event) {
+      this.lastPhysicalPointer = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
+    }
+
+    onPreloaderComplete() {
+      this.preloaderComplete = true;
+      if (this.lastPhysicalPointer) {
+        this.resolveInitialHoverGate(this.lastPhysicalPointer);
+      }
+    }
+
+    resolveInitialHoverGate(event) {
+      const { distance, rect } = this.getCenterDistance(event);
+      const enterRadius =
+        Math.min(rect.width, rect.height) * this.hoverEnterRadiusRatio;
+      this.initialHoverBlocked = distance < enterRadius;
+      this.initialHoverGatePending = false;
+    }
+
+    suppressInitialHover(event) {
+      if (!this.preloaderComplete) return true;
+      if (this.initialHoverGatePending) this.resolveInitialHoverGate(event);
+      if (!this.initialHoverBlocked) return false;
+
+      const { distance, rect } = this.getCenterDistance(event);
+      const releaseRadius =
+        Math.min(rect.width, rect.height) * this.initialHoverReleaseRadiusRatio;
+      if (distance >= releaseRadius) {
+        this.initialHoverBlocked = false;
+        return false;
+      }
+
+      this.resetHoverLookTarget();
+      this.cancelLongPress();
+      this.hoverTarget = 0;
+      this.hoverAmount = 0;
+      this.cursorSnapActive = false;
+      this.container.classList.remove("is-hypercube-hovered", "is-hud-scanning");
+      this.setAmbientHudEyeRecord(false);
+      this.updateAmbientHudState("DORMANT");
+      this.dispatchCursorSnap(false);
+      return true;
     }
 
     onPointerMove(event) {
@@ -987,6 +1088,8 @@
       if (this.burstTarget > 0) {
         return;
       }
+
+      if (this.suppressInitialHover(event)) return;
 
       if (this.container.classList.contains("is-observation-dragging")) {
         this.activeInteractionRect = null;
@@ -1073,6 +1176,10 @@
         this.pointerMoveFrame = null;
       }
       this.pendingPointerMove = null;
+      if (this.preloaderComplete) {
+        this.initialHoverGatePending = false;
+        this.initialHoverBlocked = false;
+      }
       this.resetHoverLookTarget();
       if (this.pressPointerId !== null) {
         return;
@@ -1105,6 +1212,7 @@
 
     onPointerDown(event) {
       if (event.button !== 0) return;
+      if (this.suppressInitialHover(event)) return;
       if (
         this.container.classList.contains("has-archive-media-windows") &&
         !event.target?.closest?.(".archive-media-window__viewport")
@@ -1332,6 +1440,7 @@
       this.updateCursorPressState(false);
       this.hoverTarget = 1;
       this.burstTarget = 1;
+      window.archiveHypercubeBurstProgress = 0;
       this.container.classList.remove("is-hypercube-hovered");
       this.container.classList.add("is-hypercube-bursting");
       this.container.classList.remove("is-hud-scanning", "is-hud-pressing");
@@ -1342,7 +1451,7 @@
       this.dispatchCursorSnap(false);
       window.dispatchEvent(new CustomEvent("archive:hypercube-burst"));
       if (this.cardStream) {
-        this.cardStream.activate();
+        this.cardStreamActivationPending = true;
       }
     }
 
@@ -1883,7 +1992,7 @@
       return this.activeInteractionRect;
     }
 
-    setParticleData(i, start, end, posStart, posEnd, squarePos, burstPos, burst, square) {
+    setParticleData(i, start, end, posStart, posEnd, squarePos, square) {
       const index = i * 3;
 
       posStart[index] = start.x;
@@ -1895,9 +2004,6 @@
       squarePos[index] = square.x;
       squarePos[index + 1] = square.y;
       squarePos[index + 2] = square.z;
-      burstPos[index] = burst.x;
-      burstPos[index + 1] = burst.y;
-      burstPos[index + 2] = burst.z;
     }
 
     fillRandomOffsets(offsets) {
@@ -2133,95 +2239,6 @@
       );
     }
 
-    createTrails(burstPos, offsets, burstMask) {
-      const sourceIndices = [];
-      for (let i = 0; i < offsets.length; i++) {
-        if (burstMask[i] > 0) {
-          sourceIndices.push(i);
-        }
-      }
-      this.burstSourceIndices = sourceIndices;
-      this.trailSourceIndices = sourceIndices;
-      const total = sourceIndices.length;
-      const trailGeo = new THREE.BufferGeometry();
-      const positions = new Float32Array(total * 2 * 3);
-      const trailBurstPos = new Float32Array(total * 2 * 3);
-      const trailStep = new Float32Array(total * 2);
-      const trailOffsets = new Float32Array(total * 2);
-
-      for (let i = 0; i < total; i++) {
-        const sourceIndex = sourceIndices[i];
-        const srcIndex = sourceIndex * 3;
-        const dstIndex = i * 6;
-        const stepIndex = i * 2;
-
-        for (let v = 0; v < 2; v++) {
-          trailBurstPos[dstIndex + v * 3] = burstPos[srcIndex];
-          trailBurstPos[dstIndex + v * 3 + 1] = burstPos[srcIndex + 1];
-          trailBurstPos[dstIndex + v * 3 + 2] = burstPos[srcIndex + 2];
-          trailOffsets[stepIndex + v] = offsets[sourceIndex];
-        }
-
-        trailStep[stepIndex] = 0;
-        trailStep[stepIndex + 1] = 1;
-      }
-
-      trailGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      trailGeo.setAttribute("burstPos", new THREE.BufferAttribute(trailBurstPos, 3));
-      trailGeo.setAttribute("trailStep", new THREE.BufferAttribute(trailStep, 1));
-      trailGeo.setAttribute("offset", new THREE.BufferAttribute(trailOffsets, 1));
-      this.trailBurstPositionAttribute = trailGeo.getAttribute("burstPos");
-
-      this.trailMat = new THREE.ShaderMaterial({
-        uniforms: {
-          uTime: { value: 0 },
-          uBurst: { value: 0 },
-          uColor: { value: new THREE.Color(this.foreground) },
-        },
-        vertexShader: `
-          uniform float uTime;
-          uniform float uBurst;
-          attribute vec3 burstPos;
-          attribute float trailStep;
-          attribute float offset;
-          varying float vAlpha;
-
-          void main() {
-            float radius = length(burstPos.xy);
-            float orbitSpeed = mix(0.05, 0.2, fract(offset * 19.73));
-            orbitSpeed *= mix(1.35, 0.55, smoothstep(0.0, 6.5, radius));
-            float trailLength = mix(0.0, 0.18, uBurst);
-            float angle = uTime * orbitSpeed + offset * 6.2831853 - trailStep * trailLength;
-            float ca = cos(angle);
-            float sa = sin(angle);
-            vec3 currentPos = vec3(
-              burstPos.x * ca - burstPos.y * sa,
-              burstPos.x * sa + burstPos.y * ca,
-              0.0
-            );
-
-            vAlpha = uBurst * mix(0.34, 0.0, trailStep);
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(currentPos, 1.0);
-          }
-        `,
-        fragmentShader: `
-          uniform vec3 uColor;
-          varying float vAlpha;
-
-          void main() {
-            gl_FragColor = vec4(uColor, vAlpha);
-          }
-        `,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        depthTest: false,
-      });
-
-      this.trails = new THREE.LineSegments(trailGeo, this.trailMat);
-      this.scene.add(this.trails);
-    }
-
     getHoverTargetPoint(i, total, target = new THREE.Vector3()) {
       if (this.hoverTargetPoints.length) {
         const pointCount = this.hoverTargetPoints.length / 3;
@@ -2394,49 +2411,6 @@
       return target.set(-half, THREE.MathUtils.lerp(-half, half, t), 0);
     }
 
-    getBurstPoint(i, total, target = new THREE.Vector3(), side = this.getBurstSideLength()) {
-      const cols = Math.ceil(Math.sqrt(total));
-      const rows = Math.ceil(total / cols);
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const cellX = side / Math.max(cols - 1, 1);
-      const cellY = side / Math.max(rows - 1, 1);
-      const jitterX = (Utils.hash(i * 2) - 0.5) * cellX * 0.55;
-      const jitterY = (Utils.hash(i * 2 + 1) - 0.5) * cellY * 0.55;
-      const x = THREE.MathUtils.lerp(-side / 2, side / 2, col / Math.max(cols - 1, 1)) + jitterX;
-      const y = THREE.MathUtils.lerp(-side / 2, side / 2, row / Math.max(rows - 1, 1)) + jitterY;
-
-      return target.set(x, y, 0);
-    }
-
-    getBurstSideLength() {
-      const distance = this.camera.position.z;
-      const visibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * distance;
-      const visibleWidth = visibleHeight * this.camera.aspect;
-
-      return Math.hypot(visibleWidth, visibleHeight) * 1.18;
-    }
-
-    updateBurstPositions() {
-      if (!this.burstPositionAttribute) return;
-
-      const visibleTotal = this.burstSourceIndices.length;
-      const point = new THREE.Vector3();
-      const burstSide = this.getBurstSideLength();
-      this.burstSourceIndices.forEach((sourceIndex, visibleIndex) => {
-        this.getBurstPoint(visibleIndex, visibleTotal, point, burstSide);
-        this.burstPositionAttribute.setXYZ(sourceIndex, point.x, point.y, point.z);
-      });
-      this.burstPositionAttribute.needsUpdate = true;
-      if (this.trailBurstPositionAttribute) {
-        this.trailSourceIndices.forEach((_, trailIndex) => {
-          this.getBurstPoint(trailIndex, visibleTotal, point, burstSide);
-          this.trailBurstPositionAttribute.setXYZ(trailIndex * 2, point.x, point.y, point.z);
-          this.trailBurstPositionAttribute.setXYZ(trailIndex * 2 + 1, point.x, point.y, point.z);
-        });
-        this.trailBurstPositionAttribute.needsUpdate = true;
-      }
-    }
   }
 
   class Utils {

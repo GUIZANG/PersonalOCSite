@@ -54,6 +54,12 @@
     let isHovering = false;
     let isCreditsTriggerActive = false;
     let isLedgerHoverTarget = false;
+    let isThermalTarget = false;
+    let thermalTargetElement = null;
+    let thermalTargetRect = null;
+    let thermalPulseTargetX = null;
+    let thermalPulseTargetY = null;
+    let thermalLockAmount = 0;
     let snapActive = false;
     let snapX = 0;
     let snapY = 0;
@@ -92,7 +98,10 @@
         return;
       }
 
-      if (snapActive || isHypercubePressing) return;
+      updatePointerInteraction(event.target);
+      updateInteractionState();
+
+      if (snapActive || isHypercubePressing || isThermalTarget) return;
 
       previousTargetX = targetX;
       previousTargetY = targetY;
@@ -101,9 +110,6 @@
 
       const distanceX = clamp(previousTargetX - targetX, -10, 10);
       const distanceY = clamp(previousTargetY - targetY, -10, 10);
-      updatePointerInteraction(event.target);
-      updateInteractionState();
-
       if (distanceX || distanceY) {
         cursor.style.setProperty("--cursor-shadow", `
           ${distanceX}px ${distanceY}px 0 ${glitchColorB},
@@ -224,13 +230,22 @@
       isHovering = false;
       isCreditsTriggerActive = false;
       isLedgerHoverTarget = false;
+      isThermalTarget = false;
+      thermalTargetElement = null;
+      thermalTargetRect = null;
+      thermalPulseTargetX = null;
+      thermalPulseTargetY = null;
+      thermalLockAmount = 0;
       pressGlitchUntil = 0;
       cursor.classList.remove("is-hypercube-pressing");
       cursor.classList.add("is-cardstream-cursor");
       cursor.classList.remove(
         "is-ledger-hovering",
         "is-ledger-pressing",
-        "is-ledger-context-pressing"
+        "is-ledger-context-pressing",
+        "is-thermal-target",
+        "is-thermal-active",
+        "is-thermal-locking"
       );
       cursor.style.setProperty("--press-progress", "0");
       cursor.style.setProperty("--cursor-shadow", defaultShadow);
@@ -243,6 +258,17 @@
       isHovering = false;
       hoverScale = 1;
       snapActive = false;
+      isThermalTarget = false;
+      thermalTargetElement = null;
+      thermalTargetRect = null;
+      thermalPulseTargetX = null;
+      thermalPulseTargetY = null;
+      thermalLockAmount = 0;
+      cursor.classList.remove(
+        "is-thermal-target",
+        "is-thermal-active",
+        "is-thermal-locking"
+      );
       updateInteractionState();
     }
 
@@ -259,6 +285,7 @@
     }
 
     function updatePointerInteraction(target) {
+      const wasThermalTarget = isThermalTarget;
       const stage = document.getElementById("hypercube-stage");
       const isCardStreamActive = Boolean(
         stage?.classList.contains("is-hypercube-bursting")
@@ -282,10 +309,20 @@
         !isDragging &&
         target instanceof Element &&
         Boolean(target.closest(".archive-card-model"));
+      thermalTargetElement =
+        isCardStreamCursorActive && !isDragging && target instanceof Element
+          ? target.closest(".archive-thermal-toggle")
+          : null;
+      isThermalTarget = Boolean(thermalTargetElement);
       cursor.classList.toggle(
         "is-ledger-hovering",
         isLedgerHoverTarget
       );
+      cursor.classList.toggle("is-thermal-target", isThermalTarget);
+      if (wasThermalTarget && !isThermalTarget) {
+        cursor.classList.remove("is-thermal-active");
+        releaseHoldLock();
+      }
       hoverScale =
         !isCardStreamCursorActive && !isDragging && isHoverElement(target)
           ? 1.8
@@ -355,7 +392,25 @@
     }
 
     function animateCursor() {
-      const isHoldLocked = snapActive || isHypercubePressing;
+      if (isThermalTarget && thermalTargetElement?.isConnected) {
+        const rect = thermalTargetElement.getBoundingClientRect();
+        thermalTargetRect = rect;
+        thermalPulseTargetX = rect.left + 16;
+        thermalPulseTargetY = rect.bottom - 1;
+        targetX = rect.left + rect.width * 0.5;
+        targetY = rect.top + rect.height * 0.5;
+        cursor.classList.toggle(
+          "is-thermal-active",
+          thermalTargetElement.classList.contains("is-active")
+        );
+      } else if (isThermalTarget) {
+        isThermalTarget = false;
+        thermalTargetElement = null;
+        cursor.classList.remove("is-thermal-target", "is-thermal-active");
+        releaseHoldLock();
+      }
+
+      const isHoldLocked = snapActive || isHypercubePressing || isThermalTarget;
       if (snapActive) {
         targetX = snapX;
         targetY = snapY;
@@ -380,10 +435,103 @@
       if (Math.abs(dotY - outerY) < 0.01) outerY = dotY;
       if (Math.abs(hoverScale - renderHoverScale) < 0.001) renderHoverScale = hoverScale;
 
+      const lockTarget = isThermalTarget ? 1 : 0;
+      thermalLockAmount += (lockTarget - thermalLockAmount) * 0.22;
+      if (Math.abs(lockTarget - thermalLockAmount) < 0.002) {
+        thermalLockAmount = lockTarget;
+      }
+      renderThermalFrame();
+
       renderCursor();
       updatePressGlitch(performance.now());
       updateScreenGlitch(performance.now());
       animationFrame = requestAnimationFrame(animateCursor);
+    }
+
+    function renderThermalFrame() {
+      const hasThermalFrame =
+        thermalLockAmount > 0 || (isThermalTarget && thermalTargetRect);
+      cursor.classList.toggle("is-thermal-locking", Boolean(hasThermalFrame));
+      if (!hasThermalFrame) {
+        thermalTargetRect = null;
+        thermalPulseTargetX = null;
+        thermalPulseTargetY = null;
+        cursor.style.setProperty("--thermal-dot-shift-x", "0px");
+        cursor.style.setProperty("--thermal-dot-shift-y", "0px");
+        cursor.style.setProperty("--thermal-dot-rotation", "0deg");
+        cursor.style.setProperty("--thermal-dot-scale-x", "1");
+        cursor.style.setProperty("--thermal-dot-scale-y", "1");
+        return;
+      }
+
+      const sourceSize = cursorOuterSize;
+      const sourceLeft = outerX - sourceSize * 0.5;
+      const sourceTop = outerY - sourceSize * 0.5;
+      const targetLeft = thermalTargetRect
+        ? thermalTargetRect.left - 3
+        : sourceLeft;
+      const targetTop = thermalTargetRect
+        ? thermalTargetRect.top - 3
+        : sourceTop;
+      const targetWidth = thermalTargetRect
+        ? thermalTargetRect.width + 6
+        : sourceSize;
+      const targetHeight = thermalTargetRect
+        ? thermalTargetRect.height + 6
+        : sourceSize;
+      const amount = thermalLockAmount;
+
+      cursor.style.setProperty(
+        "--thermal-frame-left",
+        `${sourceLeft + (targetLeft - sourceLeft) * amount}px`
+      );
+      cursor.style.setProperty(
+        "--thermal-frame-top",
+        `${sourceTop + (targetTop - sourceTop) * amount}px`
+      );
+      cursor.style.setProperty(
+        "--thermal-frame-width",
+        `${sourceSize + (targetWidth - sourceSize) * amount}px`
+      );
+      cursor.style.setProperty(
+        "--thermal-frame-height",
+        `${sourceSize + (targetHeight - sourceSize) * amount}px`
+      );
+      renderThermalDot(amount);
+    }
+
+    function renderThermalDot(amount) {
+      let shiftX = 0;
+      let shiftY = 0;
+      let rotation = 0;
+      let scaleX = 1;
+      let scaleY = 1;
+
+      if (amount > 0.35) {
+        const contract = smoothstep01((amount - 0.35) / 0.23);
+        rotation = 45 * contract;
+        scaleX = 1 - contract * 0.5;
+        scaleY = scaleX;
+      }
+
+      if (
+        amount > 0.58 &&
+        Number.isFinite(thermalPulseTargetX) &&
+        Number.isFinite(thermalPulseTargetY)
+      ) {
+        const travel = smoothstep01((amount - 0.58) / 0.34);
+        shiftX = (thermalPulseTargetX - dotX) * travel;
+        shiftY = (thermalPulseTargetY - dotY) * travel;
+        rotation = 45 * (1 - travel);
+        scaleX = 0.5 + travel * 3.5;
+        scaleY = 0.5 - travel * 0.25;
+      }
+
+      cursor.style.setProperty("--thermal-dot-shift-x", `${shiftX}px`);
+      cursor.style.setProperty("--thermal-dot-shift-y", `${shiftY}px`);
+      cursor.style.setProperty("--thermal-dot-rotation", `${rotation}deg`);
+      cursor.style.setProperty("--thermal-dot-scale-x", scaleX.toFixed(3));
+      cursor.style.setProperty("--thermal-dot-scale-y", scaleY.toFixed(3));
     }
 
     function startAnimation() {
@@ -472,6 +620,11 @@
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
+    }
+
+    function smoothstep01(value) {
+      const amount = clamp(value, 0, 1);
+      return amount * amount * (3 - 2 * amount);
     }
 
     function snapEvenPixel(value) {
