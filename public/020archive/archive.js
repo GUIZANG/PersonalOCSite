@@ -1873,6 +1873,7 @@
     reverseAmbientHudEyeRecordAnimations() {
       const animatedParts = [
         this.ambientHud.querySelector(".strata__record-relay"),
+        this.ambientHud.querySelector(".strata__record-progress"),
         this.ambientHud.querySelector(".strata__record-signal"),
       ];
 

@@ -7,8 +7,9 @@
     const plate = document.getElementById("strataFaultPlate");
     const control = document.getElementById("strataDepthControl");
     const readout = document.getElementById("strataDepthReadout");
+    const rail = plate?.querySelector(".strata__fault-rail");
     const digits = Array.from(plate?.querySelectorAll(".strata__fault-zero b") || []);
-    if (!stage || !hud || !plate || !control || !readout || digits.length === 0) return;
+    if (!stage || !hud || !plate || !control || !readout || !rail || digits.length === 0) return;
 
     let depth = 0;
     let startDepth = 0;
@@ -20,6 +21,13 @@
     let skipTimer = 0;
     let tickTimer = 0;
     let pulseTimer = 0;
+
+    function syncRailWidth() {
+      hud.style.setProperty("--fault-rail-width", `${rail.getBoundingClientRect().width}px`);
+    }
+
+    syncRailWidth();
+    new ResizeObserver(syncRailWidth).observe(rail);
 
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       requestAnimationFrame(() => {
@@ -87,6 +95,7 @@
         "aria-label",
         `Strata depth ${label}. Drag horizontally or use arrow keys.`
       );
+      hud.style.setProperty("--fault-progress", progress);
       plate.style.setProperty("--fault-progress", progress);
 
       if (Math.abs(depth - previous) > 1) showSkipFault();

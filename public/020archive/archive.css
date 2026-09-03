@@ -2506,14 +2506,7 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 .strata__fault-rail::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--fault-progress);
-  height: 1px;
-  background: rgba(249, 250, 251, 0.92);
-  transition: width 90ms linear;
+  content: none;
 }
 
 .strata__fault-zero {
@@ -2753,7 +2746,7 @@ body.is-screen-glitching .hypercube-stage {
 .strata__record-relay {
   --datum-rest-top: calc(var(--record-datum-y) - 4px);
   --datum-rest-left: 0px;
-  --datum-rest-width: min(62%, 330px);
+  --datum-rest-width: var(--fault-rail-width, min(62%, 330px));
   --datum-active-top: calc(var(--record-datum-y) + clamp(6px, 0.8vh, 9px) - 4px);
   --datum-active-left: clamp(13px, 1.3vw, 18px);
   --datum-active-width: min(84%, 440px);
@@ -2793,19 +2786,28 @@ body.is-screen-glitching .hypercube-stage {
   transition: none;
 }
 
+.strata__record-progress {
+  top: 4px;
+  left: 0;
+  width: var(--fault-progress, 0%);
+  height: 1px;
+  background: rgba(249, 250, 251, 0.92);
+  transition: width 90ms linear;
+}
+
 .strata__record-signal {
   --record-signal-width: clamp(24px, 2.4vw, 38px);
   z-index: 1;
   top: calc(50% - 4px);
   right: auto;
-  left: 0;
+  left: var(--fault-progress, 0%);
   width: 8px;
   height: 8px;
   background: #f5f6f7;
   opacity: 1;
   transform: rotate(0deg);
   transform-origin: center center;
-  transition: none;
+  transition: left 90ms linear;
 }
 
 .strata[data-eye-record="active"] .strata__record-dormant {
@@ -2826,7 +2828,11 @@ body.is-screen-glitching .hypercube-stage {
 }
 
 .strata.is-eye-record-entering .strata__record-signal {
-  animation: recordSignalMorphTraverse 900ms linear 30ms both;
+  animation: recordSignalMorphTraverse 820ms linear 30ms both;
+}
+
+.strata.is-eye-record-entering .strata__record-progress {
+  animation: recordProgressFollowSignal 820ms linear 30ms both;
 }
 
 .strata[data-eye-record="active"] .strata__record,
@@ -3031,6 +3037,17 @@ body.is-screen-glitching .hypercube-stage {
 
 @keyframes recordSignalMorphTraverse {
   0% {
+    left: var(--fault-progress, 0%);
+    top: calc(50% - 4px);
+    width: 8px;
+    height: 8px;
+    background: #f5f6f7;
+    opacity: 1;
+    transform: rotate(0deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+
+  12% {
     left: 0;
     top: calc(50% - 4px);
     width: 8px;
@@ -3038,9 +3055,10 @@ body.is-screen-glitching .hypercube-stage {
     background: #f5f6f7;
     opacity: 1;
     transform: rotate(0deg);
+    animation-timing-function: linear;
   }
 
-  18% {
+  28% {
     left: 0;
     top: calc(50% - 2px);
     width: 4px;
@@ -3050,7 +3068,7 @@ body.is-screen-glitching .hypercube-stage {
     transform: rotate(135deg);
   }
 
-  24% {
+  34% {
     left: 0;
     top: calc(50% - 2px);
     width: 4px;
@@ -3060,7 +3078,7 @@ body.is-screen-glitching .hypercube-stage {
     transform: rotate(180deg);
   }
 
-  38% {
+  46% {
     left: 0;
     top: calc(50% - 2px);
     width: var(--record-signal-width);
@@ -3070,7 +3088,7 @@ body.is-screen-glitching .hypercube-stage {
     transform: rotate(180deg);
   }
 
-  48% {
+  55% {
     left: 0;
     top: calc(50% - 1px);
     width: var(--record-signal-width);
@@ -3080,7 +3098,7 @@ body.is-screen-glitching .hypercube-stage {
     transform: rotate(180deg);
   }
 
-  50% {
+  57% {
     left: 0;
     top: calc(50% - 1px);
     width: var(--record-signal-width);
@@ -3091,7 +3109,7 @@ body.is-screen-glitching .hypercube-stage {
     animation-timing-function: cubic-bezier(0.05, 0.9, 0.15, 1);
   }
 
-  94% {
+  95% {
     left: calc(80% - var(--record-signal-width));
     top: calc(50% - 1px);
     width: var(--record-signal-width);
@@ -3109,6 +3127,28 @@ body.is-screen-glitching .hypercube-stage {
     background: var(--st-signal);
     opacity: 0.58;
     transform: rotate(180deg);
+  }
+}
+
+@keyframes recordProgressFollowSignal {
+  0% {
+    width: var(--fault-progress, 0%);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+
+  12% {
+    width: 0;
+    animation-timing-function: linear;
+  }
+
+  57% {
+    width: 0;
+    animation-timing-function: cubic-bezier(0.05, 0.9, 0.15, 1);
+  }
+
+  95%,
+  100% {
+    width: calc(80% - var(--record-signal-width));
   }
 }
 
@@ -3873,8 +3913,14 @@ body.is-screen-glitching .hypercube-stage {
   }
 
   .strata[data-eye-record="active"] .strata__record-signal,
-  .strata.is-eye-record-returning .strata__record-signal {
+  .strata.is-eye-record-returning .strata__record-signal,
+  .strata[data-eye-record="active"] .strata__record-progress,
+  .strata.is-eye-record-returning .strata__record-progress {
     animation: none;
+  }
+
+  .strata[data-eye-record="active"] .strata__record-progress {
+    width: calc(80% - var(--record-signal-width));
   }
 
   .strata[data-eye-record="active"] .strata__record-signal {
